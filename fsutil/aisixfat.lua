@@ -255,7 +255,7 @@ function fat.mount(image)
 			end
 
 			print("fs: created "..name)
-			dirent.ss("name")
+			dirent.ss("name", name)
 			dirent.sv("type", st)
 			local sblock = fs:allocateBlock()
 			dirent.sv("startblock", sblock)

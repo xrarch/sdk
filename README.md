@@ -11,3 +11,5 @@ Then the following scripts can be used as follows:
 `./dragonc.sh [source file] [output binary]`
 
 `./asm.sh [source file] [output binary]`
+
+`./fsutil.sh [disk image] [command] ...`

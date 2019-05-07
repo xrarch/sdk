@@ -433,10 +433,6 @@ function asm.as(source, sym, p)
 
 	labels["__DATE"] = os.date()
 
-	local sp = getdirectory(p)
-
-	bd = sp
-
 	if sym == true then
 		return pass5(pass4(pass3(passi(pass2(pass1(source)), "root"))), true), labels
 	else

@@ -678,6 +678,10 @@ function df.cblock(out, stream, endt)
 		end
 
 		t = stream:extract()
+
+		if (not t) and endt then
+			error("no matching "..endt)
+		end
 	end
 end
 

@@ -370,6 +370,49 @@ local iwords = {
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
 	end,
+	["s>"] = function (out, stream)
+		out:a("popv r5, r0")
+		out:a("mov r1, r0")
+		out:a("popv r5, r0")
+		out:a("cmps r0, r1")
+		out:a("rshi r0, rf, 0x1") -- isolate gt bit in flag register
+		out:a("andi r0, r0, 1")
+		out:a("pushv r5, r0")
+	end,
+	["s<"] = function (out, stream) -- NOT FLAG:1 and NOT FLAG:0
+		out:a("popv r5, r0")
+		out:a("mov r1, r0")
+		out:a("popv r5, r0")
+		out:a("cmps r0, r1")
+		out:a("not r1, rf")
+		out:a("rshi r0, r1, 0x1") -- isolate gt bit in flag register
+		out:a("andi r0, r0, 1")
+		out:a("not rf, rf")
+		out:a("and r0, r0, rf")
+		out:a("andi r0, r0, 1")
+		out:a("pushv r5, r0")
+	end,
+	["s>="] = function (out, stream)
+		out:a("popv r5, r0")
+		out:a("mov r1, r0")
+		out:a("popv r5, r0")
+		out:a("cmps r0, r1")
+		out:a("mov r0, rf")
+		out:a("rshi rf, rf, 1") -- bitwise magic
+		out:a("ior r0, r0, rf")
+		out:a("andi r0, r0, 1")
+		out:a("pushv r5, r0")
+	end,
+	["s<="] = function (out, stream)
+		out:a("popv r5, r0")
+		out:a("mov r1, r0")
+		out:a("popv r5, r0")
+		out:a("cmps r0, r1")
+		out:a("not rf, rf")
+		out:a("rshi r0, rf, 0x1") -- isolate gt bit in flag register
+		out:a("andi r0, r0, 1")
+		out:a("pushv r5, r0")
+	end,
 	["~"] = function (out, stream)
 		out:a("popv r5, r0")
 		out:a("not r0, r0")

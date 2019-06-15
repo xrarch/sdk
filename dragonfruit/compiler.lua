@@ -582,6 +582,25 @@ local iwords = {
 		out:a("popv r5, r0")
 		out:a("srr.l r1, r0")
 	end,
+	["bitget"] = function (out, stream) -- (v bit -- bit)
+		out:a("popv r5, r1")
+		out:a("popv r5, r0")
+		out:a("rsh r0, r0, r1")
+		out:a("andi r0, r0, 1")
+		out:a("pushv r5, r0")
+	end,
+	["bitset"] = function (out, stream) -- (v bit -- v)
+		out:a("popv r5, r0")
+		out:a("popv r5, r1")
+		out:a("bset r1, r1, r0")
+		out:a("pushv r5, r1")
+	end,
+	["bitclear"] = function (out, stream) -- (v bit -- v)
+		out:a("popv r5, r0")
+		out:a("popv r5, r1")
+		out:a("bclr r1, r1, r0")
+		out:a("pushv r5, r1")
+	end,
 	["buffer"] = function (out, stream)
 		local name = stream:extract()
 

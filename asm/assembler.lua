@@ -387,10 +387,6 @@ local function pass5(lines, sym) --generate binary
 		else
 			local e = inst[tt[1]]
 
-			if not e then
-				error("what the fuck? "..tt[1])
-			end
-
 			out = out..string.char(e[2])
 
 			local rands = e[3] -- the names 'rand, operand

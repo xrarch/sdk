@@ -20,7 +20,7 @@ local df = {}
 local lexer = require(sd.."lexer")
 
 -- only one pass: parser and code gen rolled into one cannoli
--- possibly bad design as it fucks up retargetability
+-- possibly bad design as it messes up retargetability
 -- but whatever :D
 
 local iwords = {

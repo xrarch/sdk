@@ -191,6 +191,7 @@ local iwords = {
 				if (t[2] == "tag") and out.const[t[1]] then
 					t[1] = out.const[t[1]]
 				else
+					print(t[1])
 					print("unexpected "..t[2].." inside struct, wanted number or const")
 					break
 				end
@@ -605,19 +606,25 @@ local iwords = {
 		local name = stream:extract()
 
 		if name[2] ~= "tag" then
-			print("unexpected "..name[2].." at table")
+			print("unexpected "..name[2].." at buffer")
 		end
 
 		local sz = stream:extract()
 
+		local rsz = sz[1]
+
 		if sz[2] ~= "number" then
-			print("unexpected "..sz[2].." at buffer")
+			if (sz[2] == "tag") and out.const[sz[1]] then
+				rsz = out.const[sz[1]]
+			else
+				print("unexpected "..sz[2].." at buffer")
+			end
 		end
 
 		out.var[name[1]] = name[1]
 
 		out:d(name[1]..":")
-		out:d("	.bytes "..tostring(sz[1].." 0x0"))
+		out:d("	.bytes "..tostring(rsz.." 0x0"))
 	end,
 }
 

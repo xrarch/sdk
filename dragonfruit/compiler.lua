@@ -848,6 +848,11 @@ function df.c(src, path)
 			return
 		end
 
+		if (out.auto[name]) then
+			print("can't create new auto var "..name..": already exists")
+			return
+		end
+
 		out.auto[name] = out.auto._LAU
 		out.rauto[#out.rauto + 1] = out.auto._LAU
 		out.auto._LAU = out.auto._LAU + 1

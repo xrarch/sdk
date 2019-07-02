@@ -1,3 +1,4 @@
 #!/bin/bash
 
-lua5.1 $@
+luajit $@
+exit $?

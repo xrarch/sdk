@@ -27,6 +27,9 @@ function lex.new(src, ekc, ewhitespace)
 		self.ptr = self.ptr + 1
 
 		if o == "\n" then
+			if self.df_out then
+				self.df_out:a(".map " .. self.path .. "," .. self.line)
+			end
 			self.line = self.line + 1
 		end
 

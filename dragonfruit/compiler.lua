@@ -644,9 +644,26 @@ local directives = {
 			return
 		end
 
-		stream:insert(f:read("*a").."\n")
+		stream:insert("#path \"" .. bd..e[1] .. "\"\n" .. f:read("*a").."\n" .. "#path \"" .. stream.path .. "\"\n")
 
 		f:close()
+	end,
+	["path"] = function (out, stream, bd)
+		local e = stream:extract()
+		if e[2] ~= "string" then
+			print("path paths should be strings")
+			return
+		end
+		print("Switching from " .. stream.path .. " at line " .. stream.line .." to " .. e[1] .. "...")
+		out.path_map[stream.path] = stream.line
+		if out.path_map[e[1]] then
+			print("...a previously used file, at line " .. out.path_map[e[1]])
+			stream.line = out.path_map[e[1]] - 1
+		else
+			print("...a new file, at line 1")
+			stream.line = 1
+		end
+		stream.path = e[1]
 	end,
 }
 
@@ -873,9 +890,13 @@ function df.c(src, path)
 		["\t"] = true,
 		["\n"] = true,
 	}
+	
+	out.path_map = {}
 
 	local s = lexer.new(src, kc, whitespace)
-
+	s.df_out = out
+	s.path = out.path
+	out:a(".map " .. out.path .. ", 1")
 	df.compile(s, out)
 
 	return df.opt(out.as .. "\n" .. out.ds)

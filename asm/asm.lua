@@ -26,21 +26,21 @@ local dest = arg[2]
 if (not source) or (not dest) then
 	print("argument mismatch")
 	printhelp()
-	return
+	return 1
 end
 
 local srcf = io.open(source, "r")
 
 if not srcf then
 	print(string.format("error opening source file %s", source))
-	return
+	return 2
 end
 
 local destf = io.open(dest, "w")
 
 if not destf then
 	print(string.format("error opening destination file %s", dest))
-	return
+	return 3
 end
 
 destf:write(asm.as(srcf:read("*a"), false, source))

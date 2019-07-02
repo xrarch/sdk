@@ -227,6 +227,8 @@ local function pass3(tokens) --register labels
 					ln.lit = ".bc "..tostring(bc)
 				end
 				out[#out+1] = ln
+			elseif tt[1] == ".map" then
+				out[#out + 1] = ln
 			else
 				local e = inst[tt[1]]
 
@@ -260,7 +262,7 @@ local function pass4(tokens) --decode labels, registers, and also strings
 				if k == 1 then
 					lout = v
 				else
-					if tt[1] == ".ds" then
+					if tt[1] == ".ds" or tt[1] == ".map" then
 						lout = line
 					elseif tt[1] == ".ds$" then
 						lout = ".ds "..tostring(labels[tt[2]])
@@ -384,6 +386,8 @@ local function pass5(lines, sym) --generate binary
 			elseif #tt == 2 then
 				print("bytecount: "..string.format("%x",tt[2]))
 			end
+		elseif tt[1] == ".map" then
+			print(string.format("Mapped %s to 0x%x", tt[2], #out))
 		else
 			local e = inst[tt[1]]
 

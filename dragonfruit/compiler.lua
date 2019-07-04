@@ -303,8 +303,7 @@ local iwords = {
 
 		p = name[1]
 
-		out:a("li r0, "..tostring(p))
-		out:a("pushv r5, r0")
+		out:a("pushvi r5, "..tostring(p))
 	end,
 	["bswap"] = function (out, stream)
 		out:a("popv r5, r0")
@@ -312,16 +311,14 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["=="] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmp r0, r1")
 		out:a("andi r0, rf, 0x1") -- isolate eq bit in flag register
 		out:a("pushv r5, r0")
 	end,
 	["~="] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmp r0, r1")
 		out:a("not rf, rf")
@@ -329,8 +326,7 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	[">"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmp r0, r1")
 		out:a("rshi r0, rf, 0x1") -- isolate gt bit in flag register
@@ -338,8 +334,7 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["<"] = function (out, stream) -- NOT FLAG:1 and NOT FLAG:0
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmp r0, r1")
 		out:a("not r1, rf")
@@ -351,8 +346,7 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	[">="] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmp r0, r1")
 		out:a("mov r0, rf")
@@ -362,8 +356,7 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["<="] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmp r0, r1")
 		out:a("not rf, rf")
@@ -372,8 +365,7 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["s>"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmps r0, r1")
 		out:a("rshi r0, rf, 0x1") -- isolate gt bit in flag register
@@ -381,8 +373,7 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["s<"] = function (out, stream) -- NOT FLAG:1 and NOT FLAG:0
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmps r0, r1")
 		out:a("not r1, rf")
@@ -394,8 +385,7 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["s>="] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmps r0, r1")
 		out:a("mov r0, rf")
@@ -405,8 +395,7 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["s<="] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("cmps r0, r1")
 		out:a("not rf, rf")
@@ -426,45 +415,39 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["|"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("ior r0, r0, r1")
 		out:a("pushv r5, r0")
 	end,
 	["||"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("ior r0, r0, r1")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
 	end,
 	["&"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("and r0, r0, r1")
 		out:a("pushv r5, r0")
 	end,
 	["&&"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("and r0, r0, r1")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
 	end,
 	[">>"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("rsh r0, r0, r1")
 		out:a("pushv r5, r0")
 	end,
 	["<<"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("lsh r0, r0, r1")
 		out:a("pushv r5, r0")
@@ -475,8 +458,7 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["swap"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("xch r0, r1")
 		out:a("pushv r5, r0")
@@ -487,36 +469,31 @@ local iwords = {
 		out:a("popv r5, r0")
 	end,
 	["+"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("add r0, r1, r0")
 		out:a("pushv r5, r0")
 	end,
 	["-"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("sub r0, r0, r1")
 		out:a("pushv r5, r0")
 	end,
 	["*"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("mul r0, r1, r0")
 		out:a("pushv r5, r0")
 	end,
 	["/"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("div r0, r0, r1")
 		out:a("pushv r5, r0")
 	end,
 	["%"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("mod r0, r0, r1")
 		out:a("pushv r5, r0")
@@ -566,20 +543,17 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["sb"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("srr.b r1, r0")
 	end,
 	["si"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("srr.i r1, r0")
 	end,
 	["!"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("mov r1, r0")
+		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("srr.l r1, r0")
 	end,
@@ -687,11 +661,9 @@ local function cword(out, stream, word)
 	if iwords[word] then
 		iwords[word](out, stream)
 	elseif out.var[word] then
-		out:a("li r0, "..word)
-		out:a("pushv r5, r0")
+		out:a("pushvi r5, "..word)
 	elseif out.const[word] then
-		out:a("li r0, "..tostring(out.const[word]))
-		out:a("pushv r5, r0")
+		out:a("pushvi r5, "..tostring(out.const[word]))
 	elseif out.auto[word] then
 		cauto(out, stream, out.auto[word])
 	else
@@ -702,8 +674,7 @@ local function cword(out, stream, word)
 end
 
 local function cnumber(out, stream, number)
-	out:a("li r0, "..tostring(number))
-	out:a("pushv r5, r0")
+	out:a("pushvi r5, "..tostring(number))
 end
 
 local function cstring(out, stream, string)
@@ -722,10 +693,7 @@ local function cstring(out, stream, string)
 	out:d("")
 	out:d("	.db 0x0")
 
-	out:a("li r0, "..out:syms(s))
-	out:a("pushv r5, r0")
-
-	out.oc = out.oc + 1
+	out:a("pushvi r5, "..out:syms(s))
 end
 
 function df.cblock(out, stream, endt)
@@ -907,6 +875,18 @@ local function lineate(str)
 	return explode("\n",str)
 end
 
+local function ispushv(s)
+	return s:sub(1,10) == "pushv r5, "
+end
+
+local function ispopv(s)
+	return s:sub(1,9) == "popv r5, " 
+end
+
+local function ispushvi(s)
+	return s:sub(1,11) == "pushvi r5, "
+end
+
 -- extremely naive simple optimizer to straighten stack kinks
 function df.opt(asm)
 	local out = ""
@@ -923,16 +903,39 @@ function df.opt(asm)
 
 		local la = lines[i+1] or ""
 
+		local vt = tokenize(v)
+		local at = tokenize(la)
+
+		local vr = vt[3] or "HMM"
+		local ar = at[3] or "HMMM"
+
 		i = i + 1
 
-		if v == "pushv r5, r0" then
-			if la == "popv r5, r0" then
-				i = i + 1
+		if ispushv(v) then
+			if ispopv(la) then
+				if vr == ar then
+					i = i + 1
+				else
+					out = out .. "mov " .. ar .. ", " .. vr .. "\n"
+					i = i + 1
+				end
 			else
 				out = out .. v .. "\n"
 			end
-		elseif v == "popv r5, r0" then
-			if la == "pushv r5, r0" then
+		elseif ispopv(v) then
+			if ispushv(la) then
+				if vr == ar then
+					i = i + 1
+				else
+					out = out .. "mov " .. vr .. ", " .. ar .. "\n"
+					i = i + 1
+				end
+			else
+				out = out .. v .. "\n"
+			end
+		elseif ispushvi(v) then
+			if ispopv(la) then
+				out = out .. "li " .. ar .. ", " .. vr .. "\n"
 				i = i + 1
 			else
 				out = out .. v .. "\n"

@@ -105,7 +105,6 @@ local iwords = {
 			print("malformed if")
 		end
 
-		local t = out:asym() -- true
 		local f = out:asym() -- false
 
 		-- expression block
@@ -115,7 +114,6 @@ local iwords = {
 		out:a("popv r5, r0")
 		out:a("cmpi r0, 0")
 		out:a("be "..out:syms(f))
-		out:a(out:syms(t)..":")
 
 		-- true block
 
@@ -458,12 +456,10 @@ local iwords = {
 		out:a("pushv r5, r0")
 	end,
 	["swap"] = function (out, stream)
-		out:a("popv r5, r1")
 		out:a("popv r5, r0")
-		out:a("xch r0, r1")
+		out:a("popv r5, r1")
 		out:a("pushv r5, r0")
-		out:a("mov r0, r1")
-		out:a("pushv r5, r0")
+		out:a("pushv r5, r1")
 	end,
 	["drop"] = function (out, stream)
 		out:a("popv r5, r0")
@@ -518,14 +514,6 @@ local iwords = {
 		while t and (t[1] ~= ")") do
 			t = stream:extract()
 		end
-	end,
-	["ix"] = function (out, stream)
-		out:a("popv r5, r0")
-		out:a("muli r0, r0, 4")
-		out:a("mov r1, r0")
-		out:a("popv r5, r0")
-		out:a("add r0, r1, r0")
-		out:a("pushv r5, r0")
 	end,
 	["gb"] = function (out, stream)
 		out:a("popv r5, r0")
@@ -925,6 +913,7 @@ function df.opt(asm)
 		elseif ispopv(v) then
 			if ispushv(la) then
 				if vr == ar then
+					out = out .. "lrr.l " .. vr .. ", r5\n"
 					i = i + 1
 				else
 					out = out .. "mov " .. vr .. ", " .. ar .. "\n"

@@ -916,8 +916,7 @@ function df.opt(asm)
 					out = out .. "lrr.l " .. vr .. ", r5\n"
 					i = i + 1
 				else
-					out = out .. "mov " .. vr .. ", " .. ar .. "\n"
-					i = i + 1
+					out = out .. v .. "\n"
 				end
 			else
 				out = out .. v .. "\n"

@@ -23,7 +23,7 @@ local lexer = require(sd.."lexer")
 -- possibly bad design as it messes up retargetability
 -- but whatever :D
 
-local iwords = {
+iwords = {
 	["procedure"] = function (out, stream)
 		local name = stream:extract()
 
@@ -286,6 +286,10 @@ local iwords = {
 
 		if name[2] ~= "tag" then
 			print("unexpected "..name[2].." at auto")
+		end
+
+		if iwords[name[1]] then
+			error("autos can't share a name with a iword: "..name[1])
 		end
 
 		out:newauto(name[1])

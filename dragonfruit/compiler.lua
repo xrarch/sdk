@@ -33,6 +33,8 @@ iwords = {
 
 		out:a(name[1]..":")
 
+		--out:a(".global "..name[1])
+
 		df.cblock(out, stream, "end")
 
 		out:a("ret")

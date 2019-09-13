@@ -1,17 +1,3 @@
---[[
-
-	the most stupid assembler in the history of mankind, literally garbo
-	don't @ me
-
-	also don't try to read it or you'll lose faith in humanity
-	and also question my intelligence
-
-	its this bad since its a frankenstein with 100 things shoehorned in
-
-	should definitely be entirely replaced with something sane eventually
-
-]]
-
 local function getdirectory(p)
 	for i = #p, 1, -1 do
 		if p:sub(i,i) == "/" then
@@ -28,416 +14,729 @@ dofile(sd.."misc.lua")
 local tinst = dofile(sd.."inst.lua")
 local inst, regs = tinst[1], tinst[2]
 
+local function lerror(line, err)
+	print(string.format("%s:%d: %s", line.file, line.number, err))
+end
+
+local function dumpAllLines(block)
+	local lines = block.lines
+
+	print("== line dump ==")
+
+	for k,v in ipairs(lines) do
+		if v.text then
+			print(string.format("%s:%d: %s", v.file, v.number, v.text))
+		end
+	end
+end
+
 local asm = {}
 
-local labels = {}
-local lc = {}
-local llabels = {}
+function asm.lines(block, source, filename)
+	local lines = block.lines
 
-local strucs = {}
-local strucsz = {}
+	local llit = lineate(source)
 
-local bd = ""
+	local lnum = 0
 
-local function BitNOT(n)
-    local p,c=1,0
-    for i = 0, 31 do
-        local r=n%2
-        if r<1 then c=c+p end
-        n,p=(n-r)/2,p*2
-    end
-    return c
-end
+	for n,line in ipairs(llit) do
+		lnum = lnum + 1
 
-local function tc(n) -- two's complement
-	n = tonumber(n)
+		while (line:sub(1,1) == " ") or (line:sub(1,1) == "\t") do
+			line = line:sub(2)
+		end
 
-	if n < 0 then
-		n = BitNOT(math.abs(n))+1
-	end
+		local tt = tokenize(line)
 
-	return n
-end
-
-local function pass1(source) --turn into lines
-	return lineate(source)
-end
-
-local function pass2(lines, file) --format and tokenize src code (remove tabs and comments)
-	local out = {}
-	for k,v in ipairs(lines) do
-		if v ~= "" then
-			local sc = v:sub(1,1)
-			if (sc ~= ";") and (sc ~= "#") then
-				local lout = ""
-				while (v:sub(1,1) == "\t") or (v:sub(1,1) == " ") do
-					v = v:sub(2)
+		if tt[1] ~= ".ds" then
+			for i = 1, #line do
+				if line:sub(i,i) == ";" then
+					line = line:sub(1, i-1)
+					break
 				end
-				if v:sub(1,3) ~= ".ds" then
-					while (v:sub(-1,-1) == "\t") or (v:sub(-1,-1) == " ") do
+			end
+
+			while (line:sub(-1,-1) == " ") do
+				line = line:sub(1,-2)
+			end
+
+			tt = tokenize(line)
+		end
+
+		if line ~= "" then
+			if tt[1] ~= ".ds" then -- ds is immune
+				line = ""
+
+				for k,v in ipairs(tt) do
+					if v:sub(-1,-1) == "," then
 						v = v:sub(1,-2)
 					end
-				end
-				local tokens = tokenize(v)
-				if tokens[1] ~= ".ds" then
-					for k2,v2 in ipairs(tokens) do
-						if v2:sub(-1,-1) == "," then
-							v2 = v2:sub(1,-2)
-						end
 
-						if v2:sub(1,1) == ";" then
-							break
-						else
-							if k2 == 1 then
-								lout = v2
-							else
-								lout = lout.." "..v2
-							end
-						end
+					if k > 1 then
+						line = line .. " " .. v
+					else
+						line = v
 					end
-				else
-					lout = v
-				end
-				if lout ~= "" then
-					out[#out+1] = {["lit"] = lout, ["loc"] = k, ["file"] = file}
 				end
 			end
-		end
-	end
-	return out
-end
 
-local function passi(tokens) --include files
-	local out = {}
-	for k,ln in ipairs(tokens) do
-		local line = ln.lit
-		local tt = tokenize(line)
-		if tt[1] == ".include" then
-			local inc = passi(pass2(pass1(io.open(bd..tt[2], "r"):read("*a"))), bd)
-			for k2,line2 in ipairs(inc) do
-				line2.file = tt[2]
-				out[#out+1] = line2
-			end
-		else
-			out[#out+1] = ln
-		end
-	end
-	return out
-end
+			if tt[1] == ".include" then
+				local srcf = io.open(block.basedir .. "/" .. tt[2], "r")
+				if not srcf then
+					print(string.format("%s:%d: file not found", filename, lnum))
+					return false
+				end
 
-local function pass3(tokens) --register labels
-	local out = {}
-	local bc = 0 --byte count
-	local istr = false
-	local strc = 0
-	local clabel = ""
-	for k,ln in ipairs(tokens) do
-		local line = ln.lit
-		local tt = tokenize(line)
-		if istr then
-			if line == "end-struct" then
-				strucsz[istr] = strc
-				labels[istr.."_sizeof"] = strc
-				istr = false
-				strc = 0
+				if not asm.lines(block, srcf:read("*a"), tt[2]) then return false end
+
+				srcf:close()
 			else
-				labels[istr.."_"..tt[1]] = strc
-				strucs[istr][tt[1]] = strc
-				strc = strc + tonumber(tt[2])
-			end
-		else
-			if tt[1]:sub(-1,-1) == ":" then
-				if tt[1]:sub(1,1) == "." then -- local label
-					local t = llabels[clabel]
+				lines[#lines + 1] = {}
 
-					t[tt[1]:sub(2,-2)] = bc
-				else
-					if not labels[tt[1]:sub(1,-2)] then
-						clabel = tt[1]:sub(1,-2)
-						labels[tt[1]:sub(1,-2)] = bc
-						llabels[tt[1]:sub(1,-2)] = {}
-						lc[tt[1]:sub(1,-2)] = true
-						out[#out+1] = ln
-					else
-						error("attempt to define label "..tt[1]:sub(1,-2).." twice.")
-					end
-				end
-			elseif tt[2] == "===" then
-				if tt[3] then
-					if not labels[tt[1]] then
-						if tt[3]:sub(1,1) == "#" then
-							labels[tt[1]] = io.open(bd..tt[3]:sub(2), "r"):read("*a")
-						else
-							labels[tt[1]] = tt[3]
-						end
-					else
-						error("attempt to define constant "..tt[1].." twice.")
-					end
-				else
-					error("Error: Unfinished constant definition")
-				end
-			elseif tt[1] == ".struct" then
-				strucs[tt[2]] = {}
-				istr = tt[2]
-			elseif tt[1] == ".static" then
-				print(bd..tt[2])
-				bc = bc + #io.open(bd..tt[2], "r"):read("*a")
-				out[#out+1] = ln
-			elseif tt[1] == ".db" then
-				bc = bc + (#tt - 1)
-				out[#out+1] = ln
-			elseif tt[1] == ".di" then
-				bc = bc + ((#tt - 1) * 2)
-				out[#out+1] = ln
-			elseif tt[1] == ".dl" then
-				bc = bc + ((#tt - 1) * 4)
-				out[#out+1] = ln
-			elseif tt[1] == ".ds" then
-				bc = bc + #line:sub(5)
-				out[#out+1] = ln
-			elseif tt[1] == ".ds$" then
-				bc = bc + #tostring(labels[tt[2]])
-				out[#out+1] = ln
-			elseif tt[1] == ".bytes" then
-				if tonumber(tt[2]) then
-					bc = bc + tonumber(tt[2])
-					out[#out+1] = ln
-				else
-					error("Error: Invalid number at bytes")
-				end
-			elseif tt[1] == ".fill" then
-				if tonumber(tt[2]) then
-					bc = tonumber(tt[2])
-					out[#out+1] = ln
-				else
-					error("Error: Invalid number at fill")
-				end
-			elseif tt[1] == ".org" then
-				if tt[2] then
-					if tonumber(tt[2]) then
-						bc = tonumber(tt[2])
-					else
-						error("Error: Invalid number at org")
-					end
-				else
-					error("Error: Unfinished org")
-				end
-			elseif tt[1] == ".bc" then
-				if tt[2] == "@" then
-					ln.lit = ".bc "..tostring(bc)
-				end
-				out[#out+1] = ln
-			else
-				local e = inst[tt[1]]
+				local key = #lines
 
-				if e then
-					bc = bc + e[1]
-				else
-					error("Error: Not an instruction "..tt[1])
+				lines[key].text = line
+				lines[key].file = filename
+				lines[key].number = lnum
+
+				lines[key].destroy = function (self)
+					self.text = nil
 				end
-				out[#out+1] = ln
+
+				lines[key].replace = function (self, text)
+					self.text = text
+				end
 			end
 		end
 	end
-	return out
+
+	return true
 end
 
-local function pass4(tokens) --decode labels, registers, and also strings
-	local out = {}
+function asm.labels(block)
+	block.labels = {}
 
-	local clabel = ""
+	block.labels["__DATE"] = os.date()
 
-	for k,ln in ipairs(tokens) do
-		ln.sym = ""
-		local line = ln.lit
-		local tt = tokenize(line)
-		local lout = ""
+	block.globals = {}
+	block.extern = {}
+	block.structs = {}
+	block.localLabels = {}
+	block.constants = {}
+	local byteCount = 0
+	local curStruct = false
+	local strCount = 0
+	local curLabel
 
-		if tt[1]:sub(-1,-1) == ":" then
-			clabel = tt[1]:sub(1,-2)
+	for k,v in ipairs(block.lines) do
+		local tokens = tokenize(v.text)
+
+		local word = tokens[1]
+
+		if curStruct then
+			if word == "end-struct" then
+				block.labels[curStruct.."_sizeof"] = strCount
+				curStruct = false
+				strCount = 0
+			elseif #tokens == 2 then
+				block.labels[curStruct.."_"..word] = strCount
+
+				local sz = tonumber(tokens[2])
+
+				if not sz then
+					lerror(v, "malformed struct entry")
+					return false
+				end
+
+				strCount = strCount + sz
+			else
+				lerror(v, "malformed struct entry")
+				return false
+			end
+
+			v:destroy()
 		else
-			for k,v in ipairs(tt) do
-				if k == 1 then
-					lout = v
+			if word:sub(-1,-1) == ":" then -- label
+				if word:sub(1,1) == "." then -- local label
+					if not curLabel then
+						lerror(v, "can't define local label when no label has been defined yet")
+						return false
+					end
+
+					local ll = block.localLabels[curLabel]
+
+					if ll[word:sub(2,-2)] then
+						lerror(v, "can't define local label '"..word:sub(2,-2).."' twice")
+						return false
+					end
+
+					ll[word:sub(2,-2)] = byteCount
+
+					v:destroy()
 				else
-					if tt[1] == ".ds" then
-						lout = line
-					elseif tt[1] == ".ds$" then
-						lout = ".ds "..tostring(labels[tt[2]])
+					if block.labels[word:sub(1,-2)] then
+						lerror(v, "can't define label '"..word:sub(1,-2).."' twice.")
+						return false
 					else
-						if v:sub(1,1) == '"' then
-							if #v == 3 then
-								if v:sub(-1,-1) == '"' then
-									lout = lout.." "..string.byte(v:sub(2,2))
-								else
-									error("Error: Unfinished char")
-								end
-							else
-								error("Error: Cannot use a multi-byte char")
-							end
+						curLabel = word:sub(1,-2)
+
+						block.labels[curLabel] = byteCount
+
+						block.localLabels[curLabel] = {}
+					end
+				end
+			elseif tokens[2] == "===" then
+				local value = tokens[3]
+
+				if not value then
+					lerror(v, "unfinished constant definition")
+					return false
+				end
+
+				if block.labels[word] then
+					lerror(v, "can't define constant; symbol '"..word.."' cannot be defined twice.")
+					return false
+				end
+
+				if value:sub(1,1) == "#" then
+					local file = io.open(block.basedir .. "/" .. value:sub(2), "r")
+
+					if not file then
+						lerror(v, "can't open file '"..value:sub(2).."'.")
+						return false
+					end
+
+					block.labels[word] = file:read("*a")
+
+					file:close()
+				else
+					block.labels[word] = value
+				end
+
+				block.constants[word] = true
+
+				v:destroy()
+			elseif word == ".struct" then
+				curStruct = tokens[2]
+
+				if not curStruct then
+					lerror(v, "no name provided for struct")
+					return false
+				end
+
+				v:destroy()
+			elseif word == ".static" then
+				local path = tokens[2]
+
+				if not path then
+					lerror(v, "no path for .static")
+					return false
+				end
+
+				local file = io.open(block.basedir .. "/" .. path, "r")
+
+				if not file then
+					lerror(v, "can't open file '"..path.."'")
+					return false
+				end
+
+				local sc = file:read("*a")
+
+				local size = file:seek("end")
+
+				file:close()
+
+				v.static = sc
+				v.staticsize = size
+
+				byteCount = byteCount + size
+			elseif word == ".db" then
+				if #tokens == 1 then
+					lerror(v, ".db needs 2+ arguments")
+					return false
+				end
+
+				byteCount = byteCount + (#tokens - 1)
+			elseif word == ".di" then
+				if #tokens == 1 then
+					lerror(v, ".di needs 2+ arguments")
+					return false
+				end
+
+				byteCount = byteCount + ((#tokens - 1) * 2)
+			elseif word == ".dl" then
+				if #tokens == 1 then
+					lerror(v, ".dl needs 2+ arguments")
+					return false
+				end
+
+				byteCount = byteCount + ((#tokens - 1) * 4)
+			elseif word == ".ds" then
+				byteCount = byteCount + #v.text:sub(5)
+			elseif word == ".ds$" then
+				if #tokens == 1 then
+					lerror(v, ".ds$ needs a symbol")
+					return false
+				end
+
+				if not block.labels[tokens[2]] then
+					lerror(v, "'"..tokens[2].."' is not a symbol")
+					return false
+				end
+
+				byteCount = byteCount + #tostring(block.labels[tokens[2]])
+			elseif word == ".bytes" then
+				if tonumber(tokens[2]) then
+					byteCount = byteCount + tonumber(tokens[2])
+				else
+					lerror(v, ".bytes: invalid number")
+					return false
+				end
+			elseif word == ".fill" then
+				if tonumber(tokens[2]) then
+					byteCount = tonumber(tokens[2])
+				else
+					lerror(v, ".fill: invalid number")
+					return false
+				end
+			elseif word == ".org" then
+				if tokens[2] then
+					if tonumber(tokens[2]) then
+						byteCount = tonumber(tokens[2])
+					else
+						lerror(v, ".org: invalid number")
+						return false
+					end
+				else
+					lerror(v, ".org: unfinished org")
+					return false
+				end
+
+				v:destroy()
+			elseif word == ".bc" then
+				if not tokens[2] then
+					lerror(v, ".bc: needs symbol")
+					return false
+				end
+
+				if tokens[2] == "@" then
+					v:replace(".bc "..tostring(byteCount))
+				end
+			elseif word == ".global" then
+				if not tokens[2] then
+					lerror(v, ".global: needs symbol")
+					return false
+				end
+
+				if not block.labels[tokens[2]] then
+					lerror(v, ".global: '"..tokens[2].."' is not a symbol")
+					return false
+				end
+
+				block.globals[tokens[2]] = block.labels[tokens[2]]
+
+				v:destroy()
+			elseif word == ".extern" then
+				if not tokens[2] then
+					lerror(v, ".extern: needs symbol name")
+					return false
+				end
+
+				if block.labels[tokens[2]] then
+					lerror(v, ".extern: '"..tokens[2].."' is already a symbol")
+				end
+
+				block.extern[tokens[2]] = true
+
+				v:destroy()
+			else
+				local e = inst[word]
+
+				if not e then
+					lerror(v, "not an instruction: "..word)
+					return false
+				end
+
+				v.offset = byteCount
+
+				byteCount = byteCount + e[1]
+			end
+		end
+	end
+
+	return true
+end
+
+function asm.decode(block) -- decode labels, registers, strings
+	block.reloc = {}
+
+	local curLabel
+
+	for k,v in ipairs(block.lines) do
+		if v.text then
+			local tokens = tokenize(v.text)
+
+			local word = tokens[1]
+
+			local lout = ""
+
+			if word:sub(-1,-1) == ":" then
+				curLabel = word:sub(1,-2)
+				v:destroy()
+			else
+				if (word == ".ds") or (word == ".static") then
+					lout = v.text
+				elseif word == ".ds$" then
+					lout = ".ds " .. tostring(block.labels[tokens[2]])
+				else
+					for n,t in ipairs(tokens) do
+						if n == 1 then
+							lout = t
 						else
-							if tonumber(v) then
-								lout = lout.." "..v
-							else
-								if v:sub(1,1) == "." then -- local label
-									if llabels[clabel][v:sub(2)] then
-										lout = lout.." "..tostring(llabels[clabel][v:sub(2)])
+							if t:sub(1,1) == '"' then
+								if #t == 3 then
+									if t:sub(-1,-1) == '"' then
+										lout = lout .. " " .. string.byte(t:sub(2,2))
 									else
-										error("Error: Not a local label "..v:sub(2))
-									end
-								elseif regs[v] then
-									lout = lout.." "..tostring(regs[v])
-								elseif labels[v] then
-									lout = lout.." "..labels[v]
-									if lc[v] then
-										ln.sym = labels[v]
+										lerror(v, "unclosed char")
+										return false
 									end
 								else
-									lout = lout.." "..v
-									print("warning: unclear what "..v.." is")
+									lerror(v, "cannot use a multi-byte char (fixme?)")
+									return false
 								end
+							elseif tonumber(t) then
+								lout = lout .. " " .. t
+							elseif t:sub(1,1) == "." then -- local label
+								if block.localLabels[curLabel][t:sub(2)] then
+									lout = lout .. " " .. tostring(block.localLabels[curLabel][t:sub(2)])
+								else
+									lerror(v, "not a local label: '"..t:sub(2).."'")
+									return false
+								end
+
+								if v.offset then
+									block.reloc[#block.reloc + 1] = v.offset
+								end
+							elseif regs[t] then
+								lout = lout .. " " .. tostring(regs[t])
+							elseif block.labels[t] then
+								lout = lout .. " " .. tostring(block.labels[t])
+
+								if v.offset then
+									if not block.constants[t] then
+										block.reloc[#block.reloc + 1] = v.offset
+									end
+								end
+							elseif block.extern[t] then
+								lout = lout .. " " .. t
+							else
+								lerror(v, t .. " is not a symbol")
+								return false
 							end
 						end
 					end
 				end
+
+				v:replace(lout)
 			end
-			ln.lit = lout
-			out[#out+1] = ln
 		end
 	end
-	return out
+
+	return true
 end
 
-local function pass5(lines, sym) --generate binary
-	local out = ""
-	local bc = 0
-	local s = {}
-	for k,ln in ipairs(lines) do
-		local line = ln.lit
-		local tt = tokenize(line)
-		if tt[1] == ".static" then
-			local f = io.open(bd..tt[2], "r"):read("*a")
-			out = out..f
-			bc = bc + #f
-		elseif tt[1] == ".db" then
-			for i = 2, #tt do
-				local v = tt[i]
-				if v:sub(1,1) == '"' and v:sub(-1,-1) == '"' and #v == 3 then
-					out = out..v:sub(2,2)
-					bc = bc + 1
-				else
-					if tonumber(v) then
-						out = out..string.char(tc(v))
-						bc = bc + 1
+function asm.binary(block, lex)
+	local header = "TECUXELE"
+
+	local code = ""
+	local codesize = 0
+
+	local function addByte(byte)
+		code = code .. string.char(byte)
+
+		codesize = codesize + 1
+	end
+
+	local function addInt(int)
+		local u1, u2 = splitInt16(int)
+
+		code = code .. string.char(u2) .. string.char(u1)
+
+		codesize = codesize + 2
+	end
+
+	local function addLong(long)
+		local u1, u2, u3, u4 = splitInt32(long)
+
+		code = code .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		codesize = codesize + 4
+	end
+
+	local strtab = ""
+	local strtabsize = 0
+
+	local function addString(contents)
+		local off = strtabsize
+
+		strtab = strtab .. contents .. string.char(0)
+
+		strtabsize = strtabsize + #contents + 1
+
+		return off
+	end
+
+	local symtab = ""
+	local symtabsize = 0
+
+	local function addSymbol(name, value)
+		local off = symtabsize
+
+		local nameoff = addString(name)
+
+		local u1, u2, u3, u4 = splitInt32(nameoff)
+		symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		u1, u2, u3, u4 = splitInt32(value)
+		symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		symtabsize = symtabsize + 8
+
+		return off
+	end
+
+	local reloctab = ""
+	local reloctabsize = 0
+	
+	local function addRelocation(addr)
+		local off = reloctabsize
+
+		local u1, u2, u3, u4 = splitInt32(addr)
+		reloctab = reloctab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		reloctabsize = reloctabsize + 4
+
+		return off
+	end
+
+	local fixuptab = ""
+	local fixuptabsize = 0
+
+	local function addFixup(name)
+		local off = fixuptabsize
+
+		local nameoff = addString(name)
+
+		local u1, u2, u3, u4 = splitInt32(nameoff)
+		fixuptab = fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		u1, u2, u3, u4 = splitInt32(codesize)
+		fixuptab = fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		fixuptabsize = fixuptabsize + 8
+
+		return off
+	end
+
+	if lex then
+		for k,v in ipairs(block.reloc) do
+			addRelocation(v)
+		end
+
+		for k,v in pairs(block.globals) do
+			addSymbol(k, v)
+		end
+	end
+
+	for k,v in ipairs(block.lines) do
+		if v.text then
+			local tokens = tokenize(v.text)
+
+			local word = tokens[1]
+
+			if word == ".static" then
+				code = code .. v.static
+				codesize = codesize + v.staticsize
+			elseif word == ".db" then
+				for i = 2, #tokens do
+					local e = tokens[i]
+					if tonumber(e) then
+						addByte(tc(e))
 					else
-						error("Error: Invalid bytelist!")
+						lerror(v, "invalid bytelist")
+						return false
+					end
+				end
+			elseif word == ".di" then
+				for i = 2, #tokens do
+					local e = tokens[i]
+					if tonumber(e) then
+						addInt(tc(e))
+					else
+						lerror(v, "invalid intlist")
+						return false
+					end
+				end
+			elseif word == ".dl" then
+				for i = 2, #tokens do
+					local e = tokens[i]
+					if tonumber(e) then
+						addLong(tc(e))
+					else
+						lerror(v, "invalid longlist")
+						return false
+					end
+				end
+			elseif word == ".ds" then
+				local contents = v.text:sub(5)
+				code = code..contents
+				codesize = codesize + #contents
+			elseif word == ".bytes" then
+				if (not tonumber(tokens[2])) or (not tonumber(tokens[3])) then
+					lerror(v, "bad numbers on .bytes")
+					return false
+				end
+
+				for i = 1, tonumber(tokens[2]) do
+					addByte(tonumber(tokens[3]))
+				end
+			elseif word == ".fill" then
+				if (not tonumber(tokens[2])) or (not tonumber(tokens[3])) then
+					lerror(v, "bad numbers on .fill")
+					return false
+				end
+
+				if codesize > tonumber(tokens[2]) then
+					lerror(v, ".fill tried to go to "..tokens[2]..", bytecount already at "..string.format("%x",codesize))
+					return false
+				elseif codesize == tonumber(tokens[2]) then
+
+				else
+					repeat
+						addByte(tonumber(tokens[3]))
+					until codesize == tonumber(tokens[2])
+				end
+			elseif word == ".bc" then
+				if #tokens == 1 then
+					print("bytecount: "..string.format("%x",codesize))
+				elseif #tokens == 2 then
+					if not tonumber(tokens[2]) then
+						lerror(v, "strange .bc")
+						return false
+					end
+
+					print("bytecount: "..string.format("%x",tokens[2]))
+				end
+			else
+				local e = inst[word]
+
+				addByte(e[2])
+
+				local rands = e[3] -- the names 'rand, operand
+
+				if #tokens-1 ~= #rands then
+					lerror(v, "operand count mismatch: "..word.." wants "..tostring(#rands).." operands, "..tostring(#tokens-1).." given.")
+					return false
+				end
+
+				for n,s in ipairs(rands) do
+					local operand = tokens[n+1]
+					if not tonumber(operand) then
+						if not ((s == 4) and block.extern[operand]) then
+							lerror(v, "malformed number "..operand)
+							return false
+						end
+					end
+
+					if s == 1 then
+						addByte(tc(operand))
+					elseif s == 2 then
+						addInt(tc(operand))
+					elseif s == 4 then
+						if not tonumber(operand) then -- already checked to make sure its an extern
+							if not lex then
+								lerror(v, "can't leave hanging symbols in a flat binary")
+								return false
+							end
+
+							addFixup(operand)
+							addLong(0)
+						else
+							addLong(tc(operand))
+						end
 					end
 				end
 			end
-		elseif tt[1] == ".di" then
-			for i = 2, #tt do
-				local v = tt[i]
-				if tonumber(v) then
-					local u1, u2 = splitInt16(tc(v))
-
-					out = out..string.char(u2)..string.char(u1)
-					bc = bc + 2
-				else
-					error("Error: Invalid intlist!")
-				end
-			end
-		elseif tt[1] == ".dl" then
-			for i = 2, #tt do
-				local v = tt[i]
-				if tonumber(v) then
-					local u1, u2, u3, u4 = splitInt32(tc(v))
-
-					out = out..string.char(u4)..string.char(u3)..string.char(u2)..string.char(u1)
-					bc = bc + 4
-				else
-					error("Error: Invalid longlist!")
-				end
-			end
-		elseif tt[1] == ".ds" then
-			local contents = line:sub(5)
-			out = out..contents
-			bc = bc + #contents
-		elseif tt[1] == ".bytes" then
-			for i = 1, tonumber(tt[2]) do
-				out = out..string.char(tonumber(tt[3]))
-				bc = bc + 1
-			end
-		elseif tt[1] == ".fill" then
-			if bc > tonumber(tt[2]) then
-				error("Fill tried to go to "..tt[2]..", bc already at "..string.format("%x",bc))
-			elseif bc == tonumber(tt[2]) then
-
-			else
-				repeat
-					out = out..string.char(tt[3])
-					bc = bc + 1
-				until bc == tonumber(tt[2])
-			end
-		elseif tt[1] == ".bc" then
-			if #tt == 1 then
-				print("bytecount: "..string.format("%x",bc))
-			elseif #tt == 2 then
-				print("bytecount: "..string.format("%x",tt[2]))
-			end
-		else
-			local e = inst[tt[1]]
-
-			out = out..string.char(e[2])
-
-			local rands = e[3] -- the names 'rand, operand
-
-			if #tt-1 ~= #rands then
-				error("Operand count mismatch on a "..tt[1])
-			end
-
-			for k,v in ipairs(rands) do
-				if v == 1 then
-
-					out = out..string.char(tc(tt[k+1]))
-				elseif v == 2 then
-					local u1, u2 = splitInt16(tc(tt[k+1]))
-
-					out = out..string.char(u2)..string.char(u1)
-				elseif v == 4 then
-					local u1, u2, u3, u4 = splitInt32(tc(tt[k+1]))
-
-					out = out..string.char(u4)..string.char(u3)..string.char(u2)..string.char(u1)
-				end
-			end
-
-			bc = bc + e[1]
 		end
 	end
-	if sym == true then
-		return {out, s}
+
+	if lex then
+		-- make header
+		local size = 40
+		-- symtaboff
+		local u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + symtabsize
+		-- symcount
+		u1, u2, u3, u4 = splitInt32(symtabsize / 8)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		-- strtaboff
+		u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + strtabsize
+		-- reloctaboff
+		u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + reloctabsize
+		-- reloccount
+		u1, u2, u3, u4 = splitInt32(reloctabsize / 4)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		-- fixuptaboff
+		u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + fixuptabsize
+		-- fixupcount
+		u1, u2, u3, u4 = splitInt32(fixuptabsize / 8)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		-- codeoff
+		u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		block.binary = header .. symtab .. strtab .. reloctab .. fixuptab .. code
 	else
-		return out
+		block.binary = code
 	end
+
+	return true
 end
 
-function asm.as(source, sym, p)
-	labels = {}
-	lc = {}
-	strucs = {}
-	strucs2 = {}
-	llabels = {}
+function asm.assembleBlock(source, filename, arg)
+	local block = {}
 
-	labels["__DATE"] = os.date()
+	block.lines = {}
 
-	local sp = getdirectory(p)
+	block.statics = {}
 
-	bd = sp
+	block.basedir = getdirectory(filename)
 
-	if sym == true then
-		return pass5(pass4(pass3(passi(pass2(pass1(source)), "root"))), true), labels
-	else
-		return pass5(pass4(pass3(passi(pass2(pass1(source))))))
-	end
+	if not asm.lines(block, source, filename) then return false end
+
+	if not asm.labels(block) then return false end
+
+	if not asm.decode(block) then return false end
+
+	if not asm.binary(block, (arg[3] ~= "-flat")) then return false end
+
+	return block
+end
+
+function asm.assemble(source, filename, arg)
+	local block = asm.assembleBlock(source, filename, arg)
+
+	if not block then return false end
+
+	return block.binary
 end
 
 return asm

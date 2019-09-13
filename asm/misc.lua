@@ -58,6 +58,26 @@ function struct(stuff)
     return s
 end
 
+function BitNOT(n)
+    local p,c=1,0
+    for i = 0, 31 do
+        local r=n%2
+        if r<1 then c=c+p end
+        n,p=(n-r)/2,p*2
+    end
+    return c
+end
+
+function tc(n) -- two's complement
+	n = tonumber(n)
+
+	if n < 0 then
+		n = BitNOT(math.abs(n))+1
+	end
+
+	return n
+end
+
 function explode(d,p)
 	local t, ll
 	t={}

@@ -43,4 +43,12 @@ if not destf then
 	return
 end
 
-destf:write(asm.as(srcf:read("*a"), false, source))
+local output = asm.assemble(srcf:read("*a"), source, arg)
+
+if not output then
+	print("Failed to assemble "..source)
+else
+	destf:write(output)
+end
+
+destf:close()

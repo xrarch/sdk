@@ -43,4 +43,4 @@ if not destf then
 	return
 end
 
-destf:write(df.c(srcf:read("*a"), source, arg[3] == "-noprim"))
+destf:write(df.c(srcf:read("*a"), source))

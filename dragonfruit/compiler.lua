@@ -17,7 +17,7 @@ end
 
 local df = {}
 
-local lexer = require(sd.."lexer")
+local lexer = dofile(sd.."lexer.lua")
 
 -- only one pass: parser and code gen rolled into one cannoli
 -- possibly bad design as it messes up retargetability
@@ -33,7 +33,7 @@ iwords = {
 
 		out:a(name[1]..":")
 
-		--out:a(".global "..name[1])
+		out:a(".global "..name[1])
 
 		df.cblock(out, stream, "end")
 
@@ -232,6 +232,8 @@ iwords = {
 
 		tcad(name[1]..":")
 
+		tcad(".global "..name[1])
+
 		while t do
 			if t[1] == "endtable" then
 				break
@@ -295,6 +297,15 @@ iwords = {
 		end
 
 		out:newauto(name[1])
+	end,
+	["extern"] = function (out, stream)
+		local symbol = stream:extract()
+
+		if symbol[2] ~= "tag" then
+			print("unexpected "..symbol[2].." at auto")
+		end
+
+		out:a(".extern "..symbol[1])
 	end,
 	["pointerof"] = function (out, stream)
 		local name = stream:extract()
@@ -605,6 +616,11 @@ local directives = {
 			return
 		end
 
+		if e[1]:sub(1,5) == "<df>/" then
+			bd = sd.."/runtime/include/"
+			e[1] = e[1]:sub(6)
+		end
+
 		local f = io.open(bd..e[1])
 
 		if not f then
@@ -794,6 +810,7 @@ function df.c(src, path)
 
 	function out:newvar(name, initv)
 		self:d(name..":")
+		self:d(".global "..name)
 		self:d("	.dl "..tostring(initv))
 
 		self.var[name] = name

@@ -1,3 +1,6 @@
+
+-- got rewritten to be 100x better but is still sort of iffy, don't poke it too much
+
 local function getdirectory(p)
 	for i = #p, 1, -1 do
 		if p:sub(i,i) == "/" then
@@ -15,7 +18,7 @@ local tinst = dofile(sd.."inst.lua")
 local inst, regs = tinst[1], tinst[2]
 
 local function lerror(line, err)
-	print(string.format("%s:%d: %s", line.file, line.number, err))
+	print(string.format("asm: %s:%d: %s", line.file, line.number, err))
 end
 
 local function dumpAllLines(block)
@@ -124,6 +127,7 @@ function asm.labels(block)
 	block.localLabels = {}
 	block.constants = {}
 	local byteCount = 0
+	local rawByteCount = 0
 	local curStruct = false
 	local strCount = 0
 	local curLabel
@@ -156,6 +160,8 @@ function asm.labels(block)
 
 			v:destroy()
 		else
+			v.offset = rawByteCount
+
 			if word:sub(-1,-1) == ":" then -- label
 				if word:sub(1,1) == "." then -- local label
 					if not curLabel then
@@ -250,6 +256,7 @@ function asm.labels(block)
 				v.staticsize = size
 
 				byteCount = byteCount + size
+				rawByteCount = rawByteCount + size
 			elseif word == ".db" then
 				if #tokens == 1 then
 					lerror(v, ".db needs 2+ arguments")
@@ -257,6 +264,7 @@ function asm.labels(block)
 				end
 
 				byteCount = byteCount + (#tokens - 1)
+				rawByteCount = rawByteCount + (#tokens - 1)
 			elseif word == ".di" then
 				if #tokens == 1 then
 					lerror(v, ".di needs 2+ arguments")
@@ -264,6 +272,7 @@ function asm.labels(block)
 				end
 
 				byteCount = byteCount + ((#tokens - 1) * 2)
+				rawByteCount = rawByteCount + ((#tokens - 1) * 2)
 			elseif word == ".dl" then
 				if #tokens == 1 then
 					lerror(v, ".dl needs 2+ arguments")
@@ -271,8 +280,10 @@ function asm.labels(block)
 				end
 
 				byteCount = byteCount + ((#tokens - 1) * 4)
+				rawByteCount = rawByteCount + ((#tokens - 1) * 4)
 			elseif word == ".ds" then
 				byteCount = byteCount + #v.text:sub(5)
+				rawByteCount = rawByteCount + #v.text:sub(5)
 			elseif word == ".ds$" then
 				if #tokens == 1 then
 					lerror(v, ".ds$ needs a symbol")
@@ -285,9 +296,11 @@ function asm.labels(block)
 				end
 
 				byteCount = byteCount + #tostring(block.labels[tokens[2]])
+				rawByteCount = rawByteCount + #tostring(block.labels[tokens[2]])
 			elseif word == ".bytes" then
 				if tonumber(tokens[2]) then
 					byteCount = byteCount + tonumber(tokens[2])
+					rawByteCount = rawByteCount + tonumber(tokens[2])
 				else
 					lerror(v, ".bytes: invalid number")
 					return false
@@ -295,6 +308,7 @@ function asm.labels(block)
 			elseif word == ".fill" then
 				if tonumber(tokens[2]) then
 					byteCount = tonumber(tokens[2])
+					rawByteCount = rawByteCount + tonumber(tokens[2])
 				else
 					lerror(v, ".fill: invalid number")
 					return false
@@ -357,10 +371,22 @@ function asm.labels(block)
 					return false
 				end
 
-				v.offset = byteCount
+				v.offsets = {}
+
+				v.offsets[1] = rawByteCount
+
+				local off = rawByteCount + 1
+
+				for i = 1, #e[3] do
+					v.offsets[i+1] = off
+
+					off = off + e[3][i]
+				end
 
 				byteCount = byteCount + e[1]
+				rawByteCount = rawByteCount + e[1]
 			end
+
 		end
 	end
 
@@ -389,6 +415,8 @@ function asm.decode(block) -- decode labels, registers, strings
 				elseif word == ".ds$" then
 					lout = ".ds " .. tostring(block.labels[tokens[2]])
 				else
+					local e = inst[word]
+
 					for n,t in ipairs(tokens) do
 						if n == 1 then
 							lout = t
@@ -415,7 +443,11 @@ function asm.decode(block) -- decode labels, registers, strings
 									return false
 								end
 
-								if v.offset then
+								if e then
+									if v.offsets[n] then
+										block.reloc[#block.reloc + 1] = v.offsets[n]
+									end
+								elseif v.offset then
 									block.reloc[#block.reloc + 1] = v.offset
 								end
 							elseif regs[t] then
@@ -423,8 +455,12 @@ function asm.decode(block) -- decode labels, registers, strings
 							elseif block.labels[t] then
 								lout = lout .. " " .. tostring(block.labels[t])
 
-								if v.offset then
-									if not block.constants[t] then
+								if not block.constants[t] then
+									if e then
+										if v.offsets[n] then
+											block.reloc[#block.reloc + 1] = v.offsets[n]
+										end
+									elseif v.offset then
 										block.reloc[#block.reloc + 1] = v.offset
 									end
 								end
@@ -433,6 +469,14 @@ function asm.decode(block) -- decode labels, registers, strings
 							else
 								lerror(v, t .. " is not a symbol")
 								return false
+							end
+
+							if e and off then
+								if e[3][n-1] then
+									off = off + e[3][n-1]
+								else
+									lerror(v, "operand count mismatch")
+								end
 							end
 						end
 					end
@@ -447,7 +491,7 @@ function asm.decode(block) -- decode labels, registers, strings
 end
 
 function asm.binary(block, lex)
-	local header = "TECUXELE"
+	local header = "0XEL"
 
 	local code = ""
 	local codesize = 0
@@ -583,6 +627,14 @@ function asm.binary(block, lex)
 					local e = tokens[i]
 					if tonumber(e) then
 						addLong(tc(e))
+					elseif block.extern[e] then
+						if not lex then
+							lerror(v, "can't leave hanging symbols in a flat binary")
+							return false
+						end
+
+						addFixup(e)
+						addLong(0)
 					else
 						lerror(v, "invalid longlist")
 						return false
@@ -673,7 +725,7 @@ function asm.binary(block, lex)
 
 	if lex then
 		-- make header
-		local size = 40
+		local size = 44
 		-- symtaboff
 		local u1, u2, u3, u4 = splitInt32(size)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
@@ -685,6 +737,9 @@ function asm.binary(block, lex)
 		u1, u2, u3, u4 = splitInt32(size)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		size = size + strtabsize
+		-- strtabsize
+		u1, u2, u3, u4 = splitInt32(strtabsize)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		-- reloctaboff
 		u1, u2, u3, u4 = splitInt32(size)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
@@ -701,6 +756,9 @@ function asm.binary(block, lex)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		-- codeoff
 		u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		-- codesize
+		u1, u2, u3, u4 = splitInt32(codesize)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 		block.binary = header .. symtab .. strtab .. reloctab .. fixuptab .. code

@@ -24,7 +24,7 @@ local source = arg[1]
 local dest = arg[2]
 
 if (not source) or (not dest) then
-	print("argument mismatch")
+	print("asm: argument mismatch")
 	printhelp()
 	return
 end
@@ -32,21 +32,21 @@ end
 local srcf = io.open(source, "r")
 
 if not srcf then
-	print(string.format("error opening source file %s", source))
+	print(string.format("asm: error opening source file %s", source))
 	return
 end
 
 local destf = io.open(dest, "w")
 
 if not destf then
-	print(string.format("error opening destination file %s", dest))
+	print(string.format("asm: error opening destination file %s", dest))
 	return
 end
 
 local output = asm.assemble(srcf:read("*a"), source, arg)
 
 if not output then
-	print("Failed to assemble "..source)
+	print("asm: Failed to assemble "..source)
 else
 	destf:write(output)
 end

@@ -186,6 +186,10 @@ function asm.labels(block)
 					else
 						curLabel = word:sub(1,-2)
 
+						if block.extern[curLabel] then
+							block.extern[curLabel] = false
+						end
+
 						block.labels[curLabel] = byteCount
 
 						block.localLabels[curLabel] = {}
@@ -769,7 +773,7 @@ function asm.binary(block, lex)
 	return true
 end
 
-function asm.assembleBlock(source, filename, arg)
+function asm.assembleBlock(source, filename, flat)
 	local block = {}
 
 	block.lines = {}
@@ -784,13 +788,13 @@ function asm.assembleBlock(source, filename, arg)
 
 	if not asm.decode(block) then return false end
 
-	if not asm.binary(block, (arg[3] ~= "-flat")) then return false end
+	if not asm.binary(block, not flat) then return false end
 
 	return block
 end
 
-function asm.assemble(source, filename, arg)
-	local block = asm.assembleBlock(source, filename, arg)
+function asm.assemble(source, filename, flat)
+	local block = asm.assembleBlock(source, filename, flat)
 
 	if not block then return false end
 

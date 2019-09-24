@@ -15,6 +15,10 @@ function reverse(l)
   return m
 end
 
+local function lerror(token, err)
+	print(string.format("%s:%d: %s", token[4], token[3], err))
+end
+
 local df = {}
 
 local lexer = dofile(sd.."lexer.lua")
@@ -28,12 +32,22 @@ iwords = {
 		local name = stream:extract()
 
 		if name[2] ~= "tag" then
-			print("unexpected "..name[2].." at procedure")
+			lerror(name, "unexpected "..name[2].." at procedure")
+			return false
+		end
+
+		local public = true
+
+		if stream:peek()[1] == "private" then
+			public = false
+			stream:extract()
 		end
 
 		out:a(name[1]..":")
 
-		out:a(".global "..name[1])
+		if public then
+			out:a(".global "..name[1])
+		end
 
 		df.cblock(out, stream, "end")
 
@@ -42,24 +56,31 @@ iwords = {
 		out.auto = {}
 		out.auto._LAU = 6
 		out.rauto = {}
+
+		return true
 	end,
 	["return"] = function (out, stream)
 		out:a("ret")
+		return true
 	end,
 	["var"] = function (out, stream)
 		local name = stream:extract()
 
 		if name[2] ~= "tag" then
-			print("unexpected "..name[2].." at var")
+			lerror(name, "unexpected "..name[2].." at var")
+			return false
 		end
 
 		local initv = stream:extract()
 
 		if initv[2] ~= "number" then
-			print("unexpected "..name[2].." at var")
+			lerror(initv, "unexpected "..name[2].." at var")
+			return false
 		end
 
 		out:newvar(name[1], initv[1])
+
+		return true
 	end,
 	["asm"] = function (out, stream)
 		local con = stream:extract()
@@ -69,22 +90,27 @@ iwords = {
 
 			out:ap(str[1])
 
-			return
+			return true
 		end
 
 		out:a(con[1])
+
+		return true
 	end,
 	["while"] = function (out, stream)
-		if stream:extract()[1] ~= "(" then
-			print("malformed while")
+		if stream:peek()[1] ~= "(" then
+			lerror(stream:peek(), "malformed while")
+			return false
 		end
+
+		stream:extract()
 
 		local expr = out:asym()
 		local o = out:asym()
 
 		out:a(out:syms(expr)..":")
 
-		df.cblock(out, stream, ")")
+		if not df.cblock(out, stream, ")") then return false end
 
 		out:a("popv r5, r0")
 		out:a("cmpi r0, 0")
@@ -92,26 +118,32 @@ iwords = {
 
 		out:wenter(o)
 
-		df.cblock(out, stream, "end")
+		if not df.cblock(out, stream, "end") then return false end
 
 		out:wexit()
 
 		out:a("b "..out:syms(expr))
 		out:a(out:syms(o)..":")
+
+		return true
 	end,
 	["break"] = function (out, stream)
 		out:a("b "..out:syms(out.wc[#out.wc]))
+		return true
 	end,
 	["if"] = function (out, stream)
-		if stream:extract()[1] ~= "(" then
-			print("malformed if")
+		if stream:peek()[1] ~= "(" then
+			lerror(stream:peek(), "malformed if")
+			return false
 		end
+
+		stream:extract()
 
 		local f = out:asym() -- false
 
 		-- expression block
 
-		df.cblock(out, stream, ")")
+		if not df.cblock(out, stream, ")") then return false end
 
 		out:a("popv r5, r0")
 		out:a("cmpi r0, 0")
@@ -131,25 +163,29 @@ iwords = {
 
 			-- else block
 
-			df.cblock(out, stream, "end")
+			if not df.cblock(out, stream, "end") then return false end
 
 			out:a(out:syms(o)..":")
 		else
 			out:a(out:syms(f)..":")
 		end
+
+		return true
 	end,
 	["const"] = function (out, stream)
 		local name = stream:extract()
 
 		if name[2] ~= "tag" then
-			print("unexpected "..name[2].." at const")
+			lerror(name, "unexpected "..name[2].." at const")
+			return false
 		end
 
 		local initv = stream:extract()
 
 		if initv[2] ~= "number" then
 			if initv[2] ~= "string" then
-				print("unexpected "..name[2].." at const")
+				lerror(initv, "unexpected "..name[2].." at const")
+				return false
 			else
 				local s = out:newsym()
 				out.ds = out.ds .. "	.ds "
@@ -171,12 +207,15 @@ iwords = {
 		end
 
 		out:newconst(name[1], initv[1])
+
+		return true
 	end,
 	["struct"] = function (out, stream)
 		local name = stream:extract()
 
 		if name[2] ~= "tag" then
-			print("unexpected "..name[2].." at struct")
+			lerror(name, "unexpected "..name[2].." at struct")
+			return false
 		end
 
 		local t = stream:extract()
@@ -191,17 +230,16 @@ iwords = {
 				if (t[2] == "tag") and out.const[t[1]] then
 					t[1] = out.const[t[1]]
 				else
-					print(t[1])
-					print("unexpected "..t[2].." inside struct, wanted number or const")
-					break
+					lerror(t, "unexpected "..t[2].." inside struct, wanted number or const")
+					return false
 				end
 			end
 
 			local n = stream:extract()
 
 			if n[2] ~= "tag" then
-				print("unexpected "..n[2].." inside struct, wanted tag")
-				break
+				lerror(n, "unexpected "..n[2].." inside struct, wanted tag")
+				return false
 			end
 
 			out:newconst(name[1].."_"..n[1], off)
@@ -212,12 +250,15 @@ iwords = {
 		end
 
 		out:newconst(name[1].."_SIZEOF", off)
+
+		return true
 	end,
 	["table"] = function (out, stream)
 		local name = stream:extract()
 
 		if name[2] ~= "tag" then
-			print("unexpected "..name[2].." at table")
+			lerror(name, "unexpected "..name[2].." at table")
+			return false
 		end
 
 		out.var[name[1]] = name[1]
@@ -232,8 +273,6 @@ iwords = {
 
 		tcad(name[1]..":")
 
-		tcad(".global "..name[1])
-
 		while t do
 			if t[1] == "endtable" then
 				break
@@ -246,7 +285,8 @@ iwords = {
 					local fname = stream:extract()
 
 					if fname[2] ~= "tag" then
-						print("unexpected "..fname[2].." at pointerof")
+						lerror(fname, "unexpected "..fname[2].." at pointerof")
+						return false
 					end
 
 					p = fname[1]
@@ -256,12 +296,12 @@ iwords = {
 					tcad("	.dl "..tostring(out.const[t[1]]))
 				end
 			elseif t[2] == "string" then
-				local string = t[1]
+				local str = t[1]
 
 				local s = out:newsym()
 				out.ds = out.ds .. "	.ds "
-				for i = 1, #string do
-					local c = string:sub(i,i)
+				for i = 1, #str do
+					local c = str:sub(i,i)
 					if c == "\n" then
 						out.ds = out.ds .. "\n"
 						out:d("	.db 0xA")
@@ -277,41 +317,64 @@ iwords = {
 
 				out.oc = out.oc + 1
 			else
-				print("unexpected "..t[2].." in table")
+				lerror(t, "unexpected "..t[2].." in table")
+				return false
 			end
 
 			t = stream:extract()
 		end
 
 		out:d(tca)
+
+		return true
 	end,
 	["auto"] = function (out, stream)
 		local name = stream:extract()
 
 		if name[2] ~= "tag" then
-			print("unexpected "..name[2].." at auto")
+			lerror(name, "unexpected "..name[2].." at auto")
+			return false
 		end
 
 		if iwords[name[1]] then
-			error("autos can't share a name with a iword: "..name[1])
+			lerror(name, "autos can't share a name with a iword: "..name[1])
+			return false
 		end
 
 		out:newauto(name[1])
+
+		return true
 	end,
 	["extern"] = function (out, stream)
 		local symbol = stream:extract()
 
 		if symbol[2] ~= "tag" then
-			print("unexpected "..symbol[2].." at auto")
+			lerror(symbol, "unexpected "..symbol[2].." at extern")
+			return false
 		end
 
 		out:a(".extern "..symbol[1])
+
+		return true
+	end,
+	["public"] = function (out, stream)
+		local symbol = stream:extract()
+
+		if symbol[2] ~= "tag" then
+			lerror(symbol, "unexpected "..symbol[2].." at public")
+			return false
+		end
+
+		out:d(".global "..symbol[1])
+
+		return true
 	end,
 	["pointerof"] = function (out, stream)
 		local name = stream:extract()
 
 		if name[2] ~= "tag" then
-			print("unexpected "..name[2].." at pointerof")
+			lerror(name, "unexpected "..name[2].." at pointerof")
+			return false
 		end
 
 		local p = 0
@@ -319,11 +382,14 @@ iwords = {
 		p = name[1]
 
 		out:a("pushvi r5, "..tostring(p))
+
+		return true
 	end,
 	["bswap"] = function (out, stream)
 		out:a("popv r5, r0")
 		out:a("bswap r0, r0")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["=="] = function (out, stream)
 		out:a("popv r5, r1")
@@ -331,6 +397,7 @@ iwords = {
 		out:a("cmp r0, r1")
 		out:a("andi r0, rf, 0x1") -- isolate eq bit in flag register
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["~="] = function (out, stream)
 		out:a("popv r5, r1")
@@ -339,6 +406,7 @@ iwords = {
 		out:a("not rf, rf")
 		out:a("andi r0, rf, 0x1") -- isolate eq bit in flag register
 		out:a("pushv r5, r0")
+		return true
 	end,
 	[">"] = function (out, stream)
 		out:a("popv r5, r1")
@@ -347,6 +415,7 @@ iwords = {
 		out:a("rshi r0, rf, 0x1") -- isolate gt bit in flag register
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["<"] = function (out, stream) -- NOT FLAG:1 and NOT FLAG:0
 		out:a("popv r5, r1")
@@ -359,6 +428,7 @@ iwords = {
 		out:a("and r0, r0, rf")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	[">="] = function (out, stream)
 		out:a("popv r5, r1")
@@ -369,6 +439,7 @@ iwords = {
 		out:a("ior r0, r0, rf")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["<="] = function (out, stream)
 		out:a("popv r5, r1")
@@ -378,6 +449,7 @@ iwords = {
 		out:a("rshi r0, rf, 0x1") -- isolate gt bit in flag register
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["s>"] = function (out, stream)
 		out:a("popv r5, r1")
@@ -386,6 +458,7 @@ iwords = {
 		out:a("rshi r0, rf, 0x1") -- isolate gt bit in flag register
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["s<"] = function (out, stream) -- NOT FLAG:1 and NOT FLAG:0
 		out:a("popv r5, r1")
@@ -398,6 +471,7 @@ iwords = {
 		out:a("and r0, r0, rf")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["s>="] = function (out, stream)
 		out:a("popv r5, r1")
@@ -408,6 +482,7 @@ iwords = {
 		out:a("ior r0, r0, rf")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["s<="] = function (out, stream)
 		out:a("popv r5, r1")
@@ -417,23 +492,27 @@ iwords = {
 		out:a("rshi r0, rf, 0x1") -- isolate gt bit in flag register
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["~"] = function (out, stream)
 		out:a("popv r5, r0")
 		out:a("not r0, r0")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["~~"] = function (out, stream)
 		out:a("popv r5, r0")
 		out:a("not r0, r0")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["|"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("ior r0, r0, r1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["||"] = function (out, stream)
 		out:a("popv r5, r1")
@@ -441,12 +520,14 @@ iwords = {
 		out:a("ior r0, r0, r1")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["&"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("and r0, r0, r1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["&&"] = function (out, stream)
 		out:a("popv r5, r1")
@@ -454,62 +535,73 @@ iwords = {
 		out:a("and r0, r0, r1")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	[">>"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("rsh r0, r0, r1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["<<"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("lsh r0, r0, r1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["dup"] = function (out, stream)
 		out:a("popv r5, r0")
 		out:a("pushv r5, r0")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["swap"] = function (out, stream)
 		out:a("popv r5, r0")
 		out:a("popv r5, r1")
 		out:a("pushv r5, r0")
 		out:a("pushv r5, r1")
+		return true
 	end,
 	["drop"] = function (out, stream)
 		out:a("popv r5, r0")
+		return true
 	end,
 	["+"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("add r0, r1, r0")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["-"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("sub r0, r0, r1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["*"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("mul r0, r1, r0")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["/"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("div r0, r0, r1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["%"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("mod r0, r0, r1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["["] = function (out, stream)
 		df.cblock(out, stream, "]")
@@ -517,50 +609,51 @@ iwords = {
 		local tab = stream:extract()
 
 		if tab[2] ~= "tag" then
-			print("unexpected "..tab[2].." at [")
+			lerror(tab, "unexpected "..tab[2].." at [")
+			return false
 		end
 
 		out:a("popv r5, r0")
 		out:a("muli r0, r0, 4")
 		out:a("addi r0, r0, "..tab[1])
 		out:a("pushv r5, r0")
-	end,
-	["("] = function (out, stream)
-		local t = stream:extract()
-
-		while t and (t[1] ~= ")") do
-			t = stream:extract()
-		end
+		return true
 	end,
 	["gb"] = function (out, stream)
 		out:a("popv r5, r0")
 		out:a("lrr.b r0, r0")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["gi"] = function (out, stream)
 		out:a("popv r5, r0")
 		out:a("lrr.i r0, r0")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["@"] = function (out, stream)
 		out:a("popv r5, r0")
 		out:a("lrr.l r0, r0")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["sb"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("srr.b r1, r0")
+		return true
 	end,
 	["si"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("srr.i r1, r0")
+		return true
 	end,
 	["!"] = function (out, stream)
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("srr.l r1, r0")
+		return true
 	end,
 	["bitget"] = function (out, stream) -- (v bit -- bit)
 		out:a("popv r5, r1")
@@ -568,24 +661,28 @@ iwords = {
 		out:a("rsh r0, r0, r1")
 		out:a("andi r0, r0, 1")
 		out:a("pushv r5, r0")
+		return true
 	end,
 	["bitset"] = function (out, stream) -- (v bit -- v)
 		out:a("popv r5, r0")
 		out:a("popv r5, r1")
 		out:a("bset r1, r1, r0")
 		out:a("pushv r5, r1")
+		return true
 	end,
 	["bitclear"] = function (out, stream) -- (v bit -- v)
 		out:a("popv r5, r0")
 		out:a("popv r5, r1")
 		out:a("bclr r1, r1, r0")
 		out:a("pushv r5, r1")
+		return true
 	end,
 	["buffer"] = function (out, stream)
 		local name = stream:extract()
 
 		if name[2] ~= "tag" then
-			print("unexpected "..name[2].." at buffer")
+			lerror(name, "unexpected "..name[2].." at buffer")
+			return false
 		end
 
 		local sz = stream:extract()
@@ -596,7 +693,8 @@ iwords = {
 			if (sz[2] == "tag") and out.const[sz[1]] then
 				rsz = out.const[sz[1]]
 			else
-				print("unexpected "..sz[2].." at buffer")
+				lerror(sz, "unexpected "..sz[2].." at buffer")
+				return false
 			end
 		end
 
@@ -604,6 +702,8 @@ iwords = {
 
 		out:d(name[1]..":")
 		out:d("	.bytes "..tostring(rsz.." 0x0"))
+
+		return true
 	end,
 }
 
@@ -612,8 +712,8 @@ local directives = {
 		local e = stream:extract()
 
 		if e[2] ~= "string" then
-			print("include paths should be strings")
-			return
+			lerror(e, "include paths should be strings")
+			return false
 		end
 
 		if e[1]:sub(1,5) == "<df>/" then
@@ -624,13 +724,15 @@ local directives = {
 		local f = io.open(bd..e[1])
 
 		if not f then
-			print("error opening "..e[1])
-			return
+			lerror(e, "error opening "..e[1])
+			return false
 		end
 
-		stream:insert(f:read("*a").."\n")
+		stream:insertCurrent(f:read("*a"), e[1])
 
 		f:close()
+
+		return true
 	end,
 }
 
@@ -641,19 +743,22 @@ local function ckeyc(out, stream, c, bd)
 		if directives[d] then
 			directives[d](out, stream, bd)
 		else
-			print("unknown directive "..d)
+			lerror(d, "unknown directive "..d)
+			return false
 		end
 	elseif iwords[c] then
-		iwords[c](out, stream, bd)
+		if not iwords[c](out, stream, bd) then return false end
 	end
+
+	return true
 end
 
 local function cauto(out, stream, reg)
 	local t = stream:extract()
 
 	if t[2] ~= "keyc" then
-		print("unexpected "..t[1].." after auto reference")
-		return
+		lerror(t, "unexpected "..t[1].." after auto reference")
+		return false
 	end
 
 	if t[1] == "!" then
@@ -663,35 +768,42 @@ local function cauto(out, stream, reg)
 		out:a("mov r0, r"..tostring(reg))
 		out:a("pushv r5, r0")
 	else
-		print("unexpected "..t[2].." operator on auto reference")
+		lerror(t, "unexpected "..t[2].." operator on auto reference")
+		return false
 	end
+
+	return true
 end
 
 local function cword(out, stream, word)
 	if iwords[word] then
-		iwords[word](out, stream)
+		if not iwords[word](out, stream) then return false end
 	elseif out.var[word] then
 		out:a("pushvi r5, "..word)
 	elseif out.const[word] then
 		out:a("pushvi r5, "..tostring(out.const[word]))
 	elseif out.auto[word] then
-		cauto(out, stream, out.auto[word])
+		if not cauto(out, stream, out.auto[word]) then return false end
 	else
 		out:contextEnter()
 		out:a("call "..word)
 		out:contextExit()
 	end
+
+	return true
 end
 
 local function cnumber(out, stream, number)
 	out:a("pushvi r5, "..tostring(number))
+
+	return true
 end
 
-local function cstring(out, stream, string)
+local function cstring(out, stream, str)
 	local s = out:newsym()
 	out.ds = out.ds .. "	.ds "
-	for i = 1, #string do
-		local c = string:sub(i,i)
+	for i = 1, #str do
+		local c = str:sub(i,i)
 		if c == "\n" then
 			out.ds = out.ds .. "\n"
 			out:d("	.db 0xA")
@@ -704,6 +816,8 @@ local function cstring(out, stream, string)
 	out:d("	.db 0x0")
 
 	out:a("pushvi r5, "..out:syms(s))
+
+	return true
 end
 
 function df.cblock(out, stream, endt)
@@ -715,25 +829,28 @@ function df.cblock(out, stream, endt)
 		if t[1] == endt then
 			break
 		elseif t[2] == "keyc" then
-			ckeyc(out, stream, t[1], bd)
+			if not ckeyc(out, stream, t[1], bd) then return false end
 		elseif t[2] == "tag" then -- word
-			cword(out, stream, t[1])
+			if not cword(out, stream, t[1]) then return false end
 		elseif t[2] == "number" then -- number
-			cnumber(out, stream, t[1])
+			if not cnumber(out, stream, t[1]) then return false end
 		elseif t[2] == "string" then -- string
-			cstring(out, stream, t[1])
+			if not cstring(out, stream, t[1]) then return false end
 		end
 
 		t = stream:extract()
 
 		if (not t) and endt then
-			error("no matching "..endt)
+			lerror(t, "no matching "..endt)
+			return false
 		end
 	end
+
+	return true
 end
 
 function df.compile(stream, out)
-	df.cblock(out, stream, nil)
+	return df.cblock(out, stream, nil)
 end
 
 function df.c(src, path)
@@ -810,7 +927,6 @@ function df.c(src, path)
 
 	function out:newvar(name, initv)
 		self:d(name..":")
-		self:d(".global "..name)
 		self:d("	.dl "..tostring(initv))
 
 		self.var[name] = name
@@ -837,25 +953,11 @@ function df.c(src, path)
 		out.auto._LAU = out.auto._LAU + 1
 	end
 
-	local kc = {
-		["!"] = true,
-		["@"] = true,
-		["#"] = true,
-		["("] = true,
-		[")"] = true,
-		["["] = true,
-		["]"] = true,
-	}
+	local s = lexer.new(src, path)
 
-	local whitespace = {
-		[" "] = true,
-		["\t"] = true,
-		["\n"] = true,
-	}
+	if not s then return false end
 
-	local s = lexer.new(src, kc, whitespace)
-
-	df.compile(s, out)
+	if not df.compile(s, out) then return false end
 
 	return df.opt(out.as .. "\n" .. out.ds)
 end

@@ -1,13 +1,17 @@
-VPATH = src:include:object
+GENERICDFILES := $(shell find ./src/generic -type f -name '*.d')
+GENERICSFILES := $(shell find ./src/generic -type f -name '*.s')
+GENERICOBJ    := $(GENERICDFILES:.d=.o)
+GENERICSOBJ   := $(GENERICSFILES:.s=.o)
 
-lib.o: rt.o list.o tree.o
-	../../link.sh link object/lib.o src/rt.o src/list.o src/tree.o
+DC  =  ../../dragonc.sh
+AS  =  ../../asm.sh
+LD  =  ../../link.sh link
 
-rt.o: Runtime.d
-	../../dragonc-nolib.sh src/Runtime.d src/rt.o
+all: $(GENERICOBJ) $(GENERICSOBJ)
+	$(LD) lib/generic.o $(GENERICOBJ) $(GENERICSOBJ)
 
-list.o: List.d
-	../../dragonc-nolib.sh src/List.d src/list.o
+%.o: %.d
+	$(DC) $< $@
 
-tree.o: Tree.d
-	../../dragonc-nolib.sh src/Tree.d src/tree.o
+%.o: %.s
+	$(AS) $< $@

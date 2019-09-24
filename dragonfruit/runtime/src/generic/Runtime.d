@@ -3,19 +3,10 @@
 extern Putc
 extern Malloc
 
-(* any new procedures or changes to structs should be updated in <df>/rt.h *)
+(* any new procedures should be updated in <df>/rt.h *)
 
 procedure CR (* -- *)
 	'\n' Putc
-end
-
-procedure Call (* ... ptr -- ... *)
-	asm "
-
-	popv r5, r0
-	br r0
-
-	"
 end
 
 procedure abs (* v -- absv *)

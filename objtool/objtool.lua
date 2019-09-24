@@ -9,19 +9,19 @@ local function getdirectory(p)
 end
 local sd = getdirectory(arg[0])
 
-local lex = dofile(sd.."lex.lua")
+local aixo = dofile(sd.."aixo.lua")
 
 local dimg = arg[1]
 
 local function usage()
-	print("== lextool.lua ==")
-	print("utility to manipulate LIMN EXecutable (LEX) images")
-	print("usage: lextool.lua [command] [args] ...")
+	print("== objtool.lua ==")
+	print("utility to manipulate AIsiX Object (AIXO) images")
+	print("usage: objtool.lua [command] [args] ...")
 	print([[commands:
-	symbols [lex]: dump symbols
-	fixups [lex]: dump hanging symbols
-	flatten [lex] <relocation base>: flatten a lex file (convert to raw binary) !!! OVERWRITES ORIGINAL !!!
-	link [output] [lex1 lex2 ... ]: link 2 or more lex files
+	symbols [aixo]: dump symbols
+	fixups [aixo]: dump hanging symbols
+	flatten [aixo] <relocation base>: flatten an aixo file (convert to raw binary)
+	link [output] [aixo1 aixo2 ... ]: link 2 or more aixo files
 ]])
 end
 
@@ -36,7 +36,7 @@ if arg[1] == "symbols" then
 		return
 	end
 
-	local image = lex.new(arg[2])
+	local image = aixo.new(arg[2])
 	if not image then
 		return
 	end
@@ -53,7 +53,7 @@ if arg[1] == "symbols" then
 	end
 
 	if not x then
-		print("lextool: no symbols exposed!")
+		print("objtool: no symbols exposed!")
 	end
 elseif arg[1] == "fixups" then
 	if not arg[2] then
@@ -61,7 +61,7 @@ elseif arg[1] == "fixups" then
 		return
 	end
 
-	local image = lex.new(arg[2])
+	local image = aixo.new(arg[2])
 	if not image then
 		return
 	end
@@ -78,7 +78,7 @@ elseif arg[1] == "fixups" then
 	end
 
 	if not x then
-		print("lextool: no unresolved symbols!")
+		print("objtool: no unresolved symbols!")
 	end
 elseif arg[1] == "flatten" then
 	if not arg[2] then
@@ -86,7 +86,7 @@ elseif arg[1] == "flatten" then
 		return
 	end
 
-	local image = lex.new(arg[2])
+	local image = aixo.new(arg[2])
 	if not image then
 		return
 	end
@@ -104,13 +104,13 @@ elseif arg[1] == "link" then
 		return
 	end
 
-	local out = lex.new(arg[2])
+	local out = aixo.new(arg[2])
 	if not out then
 		return
 	end
 
 	for i = 3, #arg do
-		local image = lex.new(arg[i])
+		local image = aixo.new(arg[i])
 		if not image then
 			return
 		end
@@ -128,7 +128,9 @@ elseif arg[1] == "link" then
 		end
 	end
 else
-	print("lextool: not a command: "..arg[1])
+	print("objtool: not a command: "..arg[1])
 	usage()
 	return
 end
+
+return true

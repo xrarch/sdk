@@ -1,4 +1,5 @@
 #include "<df>/const.h"
+#include "<df>/list.h"
 
 extern Free
 extern Malloc
@@ -6,20 +7,7 @@ extern Calloc
 
 (* stolen and ported to dragonfruit from toaruos list.c *)
 
-(* any new procedures or changes to structs should be updated in <df>/list.h *)
-
-struct ListNode
-	4 Next
-	4 Prev
-	4 Value
-	4 Owner
-endstruct
-
-struct List
-	4 Head
-	4 Tail
-	4 Length
-endstruct
+(* any new procedures should be updated in <df>/list.h *)
 
 procedure ListLength (* list -- length *)
 	List_Length + @

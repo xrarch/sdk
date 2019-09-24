@@ -20,35 +20,43 @@ local function printhelp()
 	print("usage: asm.lua [source] [dest]")
 end
 
-local source = arg[1]
-local dest = arg[2]
+local flat = false
+if arg[1] == "-flat" then
+	table.remove(arg, 1)
+	flat = true
+end
 
-if (not source) or (not dest) then
-	print("asm: argument mismatch")
+if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
+	print("argument mismatch")
 	printhelp()
 	return
 end
 
-local srcf = io.open(source, "r")
+for i = 1, #arg/2 do
+	local source = arg[i]
+	local dest = arg[#arg/2 + i]
 
-if not srcf then
-	print(string.format("asm: error opening source file %s", source))
-	return
+	local srcf = io.open(source, "r")
+
+	if not srcf then
+		print(string.format("asm: error opening source file %s", source))
+		return
+	end
+
+	local destf = io.open(dest, "w")
+
+	if not destf then
+		print(string.format("asm: error opening destination file %s", dest))
+		return
+	end
+
+	local o = asm.assemble(srcf:read("*a"), source, flat)
+
+	if not o then
+		print("asm: couldn't assemble "..source.."!")
+		return
+	else
+		destf:write(o)
+		return true
+	end
 end
-
-local destf = io.open(dest, "w")
-
-if not destf then
-	print(string.format("asm: error opening destination file %s", dest))
-	return
-end
-
-local output = asm.assemble(srcf:read("*a"), source, arg)
-
-if not output then
-	print("asm: Failed to assemble "..source)
-else
-	destf:write(output)
-end
-
-destf:close()

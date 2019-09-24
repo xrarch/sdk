@@ -11,36 +11,46 @@ local sd = getdirectory(arg[0])
 
 local df = dofile(sd.."compiler.lua")
 
--- dragonc.lua [source] [dest]
+-- dragonc.lua [source1 source2 ...] [dest1 dest2 ...]
 -- tested under lua 5.1
 
 local function printhelp()
 	print("== dragonc.lua ==")
-	print("compiler for dragonfruit, targeting aisav2 asm")
-	print("usage: dragonc.lua [source] [dest]")
+	print("compiler for dragonfruit, targeting limn1k asm")
+	print("usage: dragonc.lua [source1 source2 ...] [dest1 dest2 ...]")
 end
 
-local source = arg[1]
-local dest = arg[2]
-
-if (not source) or (not dest) then
+if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
 	print("argument mismatch")
 	printhelp()
-	return
+	return false
 end
 
-local srcf = io.open(source, "r")
+for i = 1, #arg/2 do
+	local source = arg[i]
+	local dest = arg[#arg/2 + i]
 
-if not srcf then
-	print(string.format("error opening source file %s", source))
-	return
+	local srcf = io.open(source, "r")
+
+	if not srcf then
+		print(string.format("dragonc: error opening source file %s", source))
+		return false
+	end
+
+	local destf = io.open(dest, "w")
+
+	if not destf then
+		print(string.format("dragonc: error opening destination file %s", dest))
+		return false
+	end
+
+	local o = df.c(srcf:read("*a"), source)
+
+	if not o then
+		print("dragonc: couldn't compile "..source.."!")
+		return false
+	else
+		destf:write(o)
+		return true
+	end
 end
-
-local destf = io.open(dest, "w")
-
-if not destf then
-	print(string.format("error opening destination file %s", dest))
-	return
-end
-
-destf:write(df.c(srcf:read("*a"), source))

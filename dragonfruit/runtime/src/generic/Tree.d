@@ -1,5 +1,6 @@
 #include "<df>/const.h"
 #include "<df>/list.h"
+#include "<df>/tree.h"
 
 extern Calloc
 extern Malloc
@@ -7,18 +8,7 @@ extern Free
 
 (* stolen and ported to dragonfruit from toaruos tree.c *)
 
-(* any new procedures or changes to structs should be updated in <df>/tree.h *)
-
-struct TreeNode
-	4 Value
-	4 Children
-	4 Parent
-endstruct
-
-struct Tree
-	4 Nodes
-	4 Root
-endstruct
+(* any new procedures should be updated in <df>/tree.h *)
 
 procedure TreeNodes (* tree -- nodes *)
 	Tree_Nodes + @

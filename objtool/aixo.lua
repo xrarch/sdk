@@ -11,7 +11,7 @@ local sd = getdirectory(arg[0])
 
 dofile(sd.."misc.lua")
 
-local lex = {}
+local aixo = {}
 
 local header_s = struct {
 	{4, "magic"},
@@ -41,26 +41,26 @@ local uint32_s = struct {
 	{4, "value"}
 }
 
-function lex.new(filename)
-	local ilex = {}
+function aixo.new(filename)
+	local iaixo = {}
 
-	ilex.path = filename
+	iaixo.path = filename
 
-	ilex.bin = {}
+	iaixo.bin = {}
 
-	ilex.fixups = {}
+	iaixo.fixups = {}
 
-	ilex.symbols = {}
+	iaixo.symbols = {}
 
-	ilex.relocs = {}
+	iaixo.relocs = {}
 
-	ilex.code = {}
+	iaixo.code = {}
 
-	function ilex:load()
+	function iaixo:load()
 		local file = io.open(self.path, "rb")
 
 		if not file then
-			print("lextool: can't open " .. self.path)
+			print("objtool: can't open " .. self.path)
 			return false
 		end
 
@@ -77,7 +77,7 @@ function lex.new(filename)
 		local hdr = self.header
 
 		if hdr.gv("magic") ~= 0x4C455830 then
-			print(string.format("lextool: '%s' has bad magic %X", self.path, hdr.gv("magic")))
+			print(string.format("objtool: '%s' has bad magic %X", self.path, hdr.gv("magic")))
 			return false
 		end
 
@@ -182,19 +182,19 @@ function lex.new(filename)
 			base = base or 0
 
 			if #self.fixups > 0 then
-				print(string.format("lextool: I refuse to flatten a LEX file '%s' with hanging symbols", self.path))
+				print(string.format("objtool: I refuse to flatten an object file '%s' with hanging symbols", self.path))
 				return false
 			end
 
 			local file = io.open(self.path, "wb")
 
 			if not file then
-				print("lextool: can't open " .. self.path .. " for writing")
+				print("objtool: can't open " .. self.path .. " for writing")
 				return false
 			end
 
 			if #self.relocs > 0 then
-				print("lextool: relocation table available: relocating to $"..string.format("%X", base))
+				print("objtool: relocation table available: relocating to $"..string.format("%X", base))
 
 				self:relocBy(base)
 			end
@@ -211,11 +211,11 @@ function lex.new(filename)
 		return true
 	end
 
-	function ilex:write()
+	function iaixo:write()
 		local file = io.open(self.path, "wb")
 
 		if not file then
-			print("lextool: can't open " .. self.path .. " for writing")
+			print("objtool: can't open " .. self.path .. " for writing")
 			return false
 		end
 
@@ -348,7 +348,7 @@ function lex.new(filename)
 		return true
 	end
 
-	function ilex:link(with)
+	function iaixo:link(with)
 		--print(with.path)
 
 		-- relocate by width of my own code
@@ -369,7 +369,7 @@ function lex.new(filename)
 		for k,v in pairs(with.symbols) do
 			--print(k)
 			if self.symbols[k] then
-				print(string.format("lextool: symbol conflict: '%s' is already defined! conflict caused by: '%s'", k, with.path))
+				print(string.format("objtool: symbol conflict: '%s' is already defined! conflict caused by: '%s'", k, with.path))
 				return false
 			else
 				self.symbols[k] = v
@@ -407,7 +407,7 @@ function lex.new(filename)
 		return true
 	end
 
-	return ilex
+	return iaixo
 end
 
-return lex
+return aixo

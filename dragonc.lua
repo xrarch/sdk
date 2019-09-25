@@ -25,6 +25,7 @@ end
 local function printhelp()
 	print("== dragonc.lua ==")
 	print("compiler for dragonfruit to aixo/limn1k object files")
+	print("(or flat binaries with the -flat argument)")
 	print("usage: dragonc.lua [source1 source2 ...] [dest1 dest2 ...]")
 end
 

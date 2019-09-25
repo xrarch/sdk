@@ -56,6 +56,8 @@ function aixo.new(filename)
 
 	iaixo.code = {}
 
+	iaixo.codeSize = 0
+
 	function iaixo:load()
 		local file = io.open(self.path, "rb")
 
@@ -89,6 +91,8 @@ function aixo.new(filename)
 		for i = 0, codesize - 1 do
 			self.code[i] = self.bin[i + codeoff]
 		end
+
+		self.codeSize = codesize
 
 		local function getString(offset)
 			local off = self.header.gv("stringTableOffset") + offset
@@ -199,7 +203,7 @@ function aixo.new(filename)
 				self:relocBy(base)
 			end
 
-			for i = 0, #self.code do
+			for i = 0, self.codeSize - 1 do
 				file:write(string.char(self.code[i]))
 			end
 
@@ -339,7 +343,7 @@ function aixo.new(filename)
 
 		file:write(header .. symtab .. strtab .. reloctab .. fixuptab)
 
-		for i = 0, #self.code do
+		for i = 0, self.codeSize - 1 do
 			file:write(string.char(self.code[i]))
 		end
 
@@ -353,15 +357,17 @@ function aixo.new(filename)
 
 		-- relocate by width of my own code
 
-		with:relocInFile(#self.code)
+		with:relocInFile(self.codeSize)
 
 		-- merge code
 
-		local sc = #self.code -- weirdness because one-indexing, thanks lua
+		local sc = self.codeSize
 
-		for i = 0, #with.code do
+		for i = 0, with.codeSize - 1 do
 			self.code[sc + i] = with.code[i]
 		end
+
+		self.codeSize = self.codeSize + with.codeSize
 
 		-- merge symbols
 		--print("merge symbols")

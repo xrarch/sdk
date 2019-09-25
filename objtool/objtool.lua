@@ -110,7 +110,13 @@ elseif arg[1] == "link" then
 	end
 
 	for i = 3, #arg do
-		local image = aixo.new(arg[i])
+		local imgname = arg[i]
+
+		if imgname:sub(1,2) == "L/" then
+			imgname = sd.."../dragonfruit/runtime/lib/"..imgname:sub(3)
+		end
+
+		local image = aixo.new(imgname)
 		if not image then
 			return
 		end

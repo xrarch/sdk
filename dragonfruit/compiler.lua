@@ -357,6 +357,20 @@ iwords = {
 
 		return true
 	end,
+	["externconst"] = function (out, stream)
+		local symbol = stream:extract()
+
+		if symbol[2] ~= "tag" then
+			lerror(symbol, "unexpected "..symbol[2].." at extern")
+			return false
+		end
+
+		out:a(".extern "..symbol[1])
+
+		out.var[symbol[1]] = symbol[1]
+
+		return true
+	end,
 	["public"] = function (out, stream)
 		local symbol = stream:extract()
 

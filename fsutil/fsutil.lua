@@ -39,22 +39,24 @@ if cmd == "f" then -- format
 else
 	local fs = fat.mount(dimg)
 	if not fs then
-		print("error: couldn't mount image")
+		print("fsutil: error: couldn't mount image")
 		return
 	end
 
 	if cmd == "ls" then
 		if arg[3] then
-			local d = fs:path(arg[3])
+			local d, dir = fs:path(arg[3])
 			if not d then
-				print("couldn't open "..arg[3].." as a directory")
+				print("fsutil: couldn't open "..arg[3])
 			elseif d.type ~= "dir" then
-				print("not a directory")
+				print("fsutil: "..arg[3].." not a directory")
+			elseif d.f then
+				print("fsutil: "..arg[3].." not opened as a directory, add a slash to the end")
 			else
 				local l = d:list()
 				d:close()
 
-				print("listing for "..arg[3]..":")
+				print("fsutil: listing for "..arg[3]..":")
 				for k,v in ipairs(l) do
 					io.write("\t"..v[2])
 					if v[1] == 2 then
@@ -71,11 +73,13 @@ else
 		if arg[3] and arg[4] then
 			local f, dir = fs:path(arg[3])
 			if not f then
-				print("couldn't open "..arg[3])
+				print("fsutil: couldn't open "..arg[3])
+			elseif f.type == "dir" then
+				print("fsutil: "..arg[3].." is a directory")
 			else
 				local inf = io.open(arg[4], "rb")
 				if not inf then
-					print("couldn't open "..arg[4])
+					print("fsutil: couldn't open "..arg[4])
 				else
 					f:write(inf:read("*all"))
 					inf:close()
@@ -89,7 +93,9 @@ else
 		if arg[3] then
 			local f, dir = fs:path(arg[3])
 			if not f then
-				print("couldn't open "..arg[3])
+				print("fsutil: couldn't open "..arg[3])
+			elseif f.type == "dir" then
+				print("fsutil: "..arg[3].." is a directory")
 			else
 				io.write(f:read())
 			end
@@ -101,7 +107,9 @@ else
 		if arg[3] then
 			local f, dir = fs:path(arg[3])
 			if not f then
-				print("couldn't open "..arg[3])
+				print("fsutil: couldn't open "..arg[3])
+			elseif not f.f then
+				print("fsutil: couldn't open "..arg[3].." for deletion; remove any slashes at the end of the path")
 			else
 				f:delete()
 			end

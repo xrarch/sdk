@@ -87,7 +87,7 @@ function fat.mount(image)
 	end
 
 	function fs:changeNumDirs(off)
-		superblock.sv("numdirs", superblock.gv("numfiles") + off)
+		superblock.sv("numdirs", superblock.gv("numdirs") + off)
 	end
 
 	function fs:getBlockStatus(bn)
@@ -229,11 +229,7 @@ function fat.mount(image)
 				local dirent = cast(dirent_s, self.block, i*64)
 				if dirent.gv("type") ~= 0 then
 					if dirent.gs("name") == name then
-						if dirent.gv("type") == st then
-							return dirent
-						else
-							return false
-						end
+						return dirent
 					end
 				else
 					lf = i*64
@@ -260,7 +256,12 @@ function fat.mount(image)
 			local sblock = fs:allocateBlock()
 			dirent.sv("startblock", sblock)
 			dirent.sv("size", 1)
-			dirent.sv("bytesize", 0)
+
+			if st == 1 then
+				dirent.sv("bytesize", 0)
+			elseif st == 2 then
+				dirent.sv("bytesize", 4096)
+			end
 
 			return dirent
 		end
@@ -275,25 +276,44 @@ function fat.mount(image)
 			local file = {}
 			file.f = f
 
-			file.type = "file"
+			if f.gv("type") == 1 then
+				file.type = "file"
 
-			function file:write(data)
-				fs:freeBlockChain(f.gv("startblock"))
+				function file:write(data)
+					fs:freeBlockChain(f.gv("startblock"))
 
-				local ls, bs, ss = fs:writeData(data)
-				f.sv("startblock", ss)
-				f.sv("bytesize", bs)
-				f.sv("size", ls)
-			end
+					local ls, bs, ss = fs:writeData(data)
+					f.sv("startblock", ss)
+					f.sv("bytesize", bs)
+					f.sv("size", ls)
+				end
 
-			function file:read()
-				return fs:readData(f.gv("startblock")):sub(1, f.gv("bytesize"))
+				function file:read()
+					return fs:readData(f.gv("startblock")):sub(1, f.gv("bytesize"))
+				end
+			else
+				file.type = "dir"
 			end
 
 			function file:delete()
+				print("fsutil: deleting "..self.f.gs("name"))
+
+				if self.type == "file" then
+					fs:changeNumFiles(-1)
+				elseif self.type == "dir" then
+					local mdir = fs:bdir(self.f.gv("startblock"))
+					local e = mdir:list()
+					for k,v in ipairs(e) do
+						local fe = mdir:file(v[2])
+						fe:delete()
+					end
+					mdir:close()
+
+					fs:changeNumDirs(-1)
+				end
+
 				fs:freeBlockChain(f.gv("startblock"))
 				f.sv("type", 0)
-				fs:changeNumFiles(-1)
 			end
 
 			return file
@@ -360,7 +380,12 @@ function fat.mount(image)
 					return false
 				end
 				cdir:close()
-				cdir = self:bdir(ndir.gv("startblock"))
+
+				if ndir.gv("type") == 2 then
+					cdir = self:bdir(ndir.gv("startblock"))
+				else
+					return false
+				end
 			end
 		end
 

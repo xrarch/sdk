@@ -2,6 +2,7 @@
 
 extern Putc
 extern Malloc
+extern Getc
 
 (* any new procedures should be updated in <df>/rt.h *)
 
@@ -486,4 +487,45 @@ procedure Printf (* ... fmt -- *)
 
 		i@ 1 + i!
 	end
+end
+
+procedure Gets (* s max -- *)
+	auto max
+	max!
+
+	auto s
+	s!
+
+	auto len
+	0 len!
+
+	while (1)
+		auto c
+		ERR c!
+		while (c@ ERR ==)
+			Getc c!
+		end
+
+		if (c@ '\n' ==)
+			'\n' Putc
+			break
+		end
+
+		if (c@ '\b' ==)
+			if (len@ 0 >)
+				len@ 1 - len!
+				0 s@ len@ + sb
+				'\b' Putc
+				' ' Putc
+				'\b' Putc
+			end
+		end else if (len@ max@ <)
+			c@ s@ len@ + sb
+
+			len@ 1 + len!
+			c@ Putc
+		end end
+	end
+
+	0 s@ len@ + sb
 end

@@ -14,10 +14,14 @@ end
 local sd = getdirectory(arg[0])
 
 local flat = false
+local incdir = ""
 
 for k,v in pairs(arg) do
 	if v == "-flat" then
 		flat = true
+		table.remove(arg, k)
+	elseif v:sub(1,7) == "incdir=" then
+		incdir = v
 		table.remove(arg, k)
 	end
 end
@@ -53,7 +57,7 @@ for k,v in ipairs(sourcef) do
 	local eout = ed..".__out.s "
 
 	-- is there a better way to do this? probably.
-	os.execute(lua..dragonc..v.." "..eout)
+	os.execute(lua..dragonc..v.." "..eout..incdir)
 	if flat then
 		os.execute(lua..asm.."-flat "..eout..destf[k])
 	else

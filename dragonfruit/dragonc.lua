@@ -20,8 +20,17 @@ local function printhelp()
 	print("usage: dragonc.lua [source1 source2 ...] [dest1 dest2 ...]")
 end
 
+local incdir
+
+for k,v in pairs(arg) do
+	if v:sub(1,7) == "incdir=" then
+		incdir = v:sub(8)
+		table.remove(arg, k)
+	end
+end
+
 if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
-	print("argument mismatch")
+	print("dragonc: argument mismatch")
 	printhelp()
 	return false
 end
@@ -37,19 +46,19 @@ for i = 1, #arg/2 do
 		return false
 	end
 
-	local destf = io.open(dest, "w")
-
-	if not destf then
-		print(string.format("dragonc: error opening destination file %s", dest))
-		return false
-	end
-
-	local o = df.c(srcf:read("*a"), source)
+	local o = df.c(srcf:read("*a"), source, incdir)
 
 	if not o then
 		print("dragonc: couldn't compile "..source.."!")
 		return false
 	else
+		destf = io.open(dest, "w")
+
+		if not destf then
+			print(string.format("dragonc: error opening destination file %s", dest))
+			return false
+		end
+
 		destf:write(o)
 		return true
 	end

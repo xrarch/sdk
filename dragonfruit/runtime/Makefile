@@ -12,13 +12,14 @@ DC  =  ../../dragonc.sh
 AS  =  ../../asm.sh
 LD  =  ../../link.sh link
 
-all:
-	make generic a3x
+LIBS = lib/generic/lib.o lib/a3x/lib.o
 
-generic: $(GENERICOBJ) $(GENERICSOBJ)
+all: $(LIBS)
+
+lib/generic/lib.o: $(GENERICOBJ) $(GENERICSOBJ)
 	$(LD) lib/generic/lib.o $(GENERICOBJ) $(GENERICSOBJ)
 
-a3x: $(A3XOBJ)
+lib/a3x/lib.o: $(A3XOBJ)
 	$(LD) lib/a3x/lib.o $(A3XOBJ)
 	$(AS) ./src/a3x/_start.s ./lib/a3x/_start.o
 	$(AS) ./src/a3x/_boot.s ./lib/a3x/_boot.o

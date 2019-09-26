@@ -29,18 +29,18 @@ local lexer = dofile(sd.."lexer.lua")
 
 iwords = {
 	["procedure"] = function (out, stream)
-		local name = stream:extract()
-
-		if name[2] ~= "tag" then
-			lerror(name, "unexpected "..name[2].." at procedure")
-			return false
-		end
-
 		local public = true
 
 		if stream:peek()[1] == "private" then
 			public = false
 			stream:extract()
+		end
+	
+		local name = stream:extract()
+
+		if name[2] ~= "tag" then
+			lerror(name, "unexpected "..name[2].." at procedure")
+			return false
 		end
 
 		out:a(name[1]..":")
@@ -733,6 +733,14 @@ local directives = {
 		if e[1]:sub(1,5) == "<df>/" then
 			bd = sd.."/runtime/include/"
 			e[1] = e[1]:sub(6)
+		elseif e[1]:sub(1,6) == "<inc>/" then
+			if not out.incdir then
+				lerror(e, "can't include relative to <inc>/ when no 'incdir=' option was given")
+				return false
+			end
+
+			bd = out.incdir
+			e[1] = e[1]:sub(7)
 		end
 
 		local f = io.open(bd..e[1])
@@ -867,7 +875,7 @@ function df.compile(stream, out)
 	return df.cblock(out, stream, nil)
 end
 
-function df.c(src, path)
+function df.c(src, path, incdir)
 	local out = {}
 	out.ds = ""
 	out.as = ""
@@ -882,6 +890,8 @@ function df.c(src, path)
 	out.wc = {}
 
 	out.rauto = {}
+
+	out.incdir = incdir
 
 	local automax = 25
 

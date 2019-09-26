@@ -27,7 +27,7 @@ if arg[1] == "-flat" then
 end
 
 if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
-	print("argument mismatch")
+	print("asm: argument mismatch")
 	printhelp()
 	return
 end
@@ -43,19 +43,19 @@ for i = 1, #arg/2 do
 		return
 	end
 
-	local destf = io.open(dest, "w")
-
-	if not destf then
-		print(string.format("asm: error opening destination file %s", dest))
-		return
-	end
-
 	local o = asm.assemble(srcf:read("*a"), source, flat)
 
 	if not o then
 		print("asm: couldn't assemble "..source.."!")
 		return
 	else
+		destf = io.open(dest, "w")
+
+		if not destf then
+			print(string.format("asm: error opening destination file %s", dest))
+			return
+		end
+
 		destf:write(o)
 		return true
 	end

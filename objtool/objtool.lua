@@ -104,6 +104,8 @@ elseif arg[1] == "link" then
 		return
 	end
 
+	local linked = {}
+
 	local out = aixo.new(arg[2])
 	if not out then
 		return
@@ -112,25 +114,31 @@ elseif arg[1] == "link" then
 	for i = 3, #arg do
 		local imgname = arg[i]
 
-		if imgname:sub(1,2) == "L/" then
-			imgname = sd.."../dragonfruit/runtime/lib/"..imgname:sub(3)
-		end
+		if linked[arg[i]] then
+			print("objtool: warning: ignoring duplicate object "..arg[i])
+		else
+			linked[arg[i]] = true
 
-		local image = aixo.new(imgname)
-		if not image then
-			return
-		end
+			if imgname:sub(1,2) == "L/" then
+				imgname = sd.."../dragonfruit/runtime/lib/"..imgname:sub(3)
+			end
 
-		if not image:load() then
-			return
-		end
+			local image = aixo.new(imgname)
+			if not image then
+				return
+			end
 
-		if not out:link(image) then
-			return
-		end
+			if not image:load() then
+				return
+			end
 
-		if not out:write() then
-			return
+			if not out:link(image) then
+				return
+			end
+
+			if not out:write() then
+				return
+			end
 		end
 	end
 else

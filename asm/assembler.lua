@@ -86,7 +86,7 @@ function asm.lines(block, source, filename)
 			if tt[1] == ".include" then
 				local srcf = io.open(block.basedir .. "/" .. tt[2], "r")
 				if not srcf then
-					print(string.format("%s:%d: file not found", filename, lnum))
+					print(string.format("asm: %s:%d: file not found", filename, lnum))
 					return false
 				end
 

@@ -4,11 +4,6 @@
 
 asm "
 
-; buffer maxchars --
-Gets:
-.global Gets
-	b a3xGets
-
 ; char -- 
 Putc:
 .global Putc

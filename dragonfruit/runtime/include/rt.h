@@ -55,3 +55,5 @@ extern Free (* ptr -- *)
 extern Gets (* s max -- *)
 
 extern Getc (* -- c *)
+
+extern Putc (* c -- *)

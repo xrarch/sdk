@@ -54,8 +54,10 @@ function asm.lines(block, source, filename)
 		if tt[1] ~= ".ds" then
 			for i = 1, #line do
 				if line:sub(i,i) == ";" then
-					line = line:sub(1, i-1)
-					break
+					if (line:sub(i-1,i-1) ~= '"') or (line:sub(i+1,i+1) ~= '"') then
+						line = line:sub(1, i-1)
+						break
+					end
 				end
 			end
 
@@ -207,21 +209,8 @@ function asm.labels(block)
 					lerror(v, "can't define constant; symbol '"..word.."' cannot be defined twice.")
 					return false
 				end
-
-				if value:sub(1,1) == "#" then
-					local file = io.open(block.basedir .. "/" .. value:sub(2), "r")
-
-					if not file then
-						lerror(v, "can't open file '"..value:sub(2).."'.")
-						return false
-					end
-
-					block.labels[word] = file:read("*a")
-
-					file:close()
-				else
-					block.labels[word] = value
-				end
+				
+				block.labels[word] = value
 
 				block.constants[word] = true
 

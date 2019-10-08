@@ -27,6 +27,59 @@ local lexer = dofile(sd.."lexer.lua")
 -- possibly bad design as it messes up retargetability
 -- but whatever :D
 
+local function compileif(out, stream, outsm)
+	if stream:peek()[1] ~= "(" then
+		lerror(stream:peek(), "malformed if")
+		return false
+	end
+
+	stream:extract()
+
+	local f = out:asym() -- false
+
+	local outsym = outsm or out:asym()
+
+	-- expression block
+
+	if not df.cblock(out, stream, ")") then return false end
+
+	out:a("popv r5, r0")
+	out:a("cmpi r0, 0")
+	out:a("be "..out:syms(f))
+
+	-- true block
+
+	df.cblock(out, stream, "end")
+
+	local etok = stream:peek()[1]
+
+	if (etok == "else") or (etok == "elseif") then
+		stream:extract()
+
+		out:a("b "..out:syms(outsym))
+
+		out:a(out:syms(f)..":")
+
+		-- else block
+
+		if etok == "elseif" then
+			if not compileif(out, stream, outsym) then return false end
+		elseif etok == "else" then
+			if not df.cblock(out, stream, "end") then return false end
+		else
+			error("you messed something up, call 911")
+		end
+	else
+		out:a(out:syms(f)..":")
+	end
+
+	if not outsm then
+		out:a(out:syms(outsym)..":")
+	end
+
+	return true
+end
+
 iwords = {
 	["procedure"] = function (out, stream)
 		local public = true
@@ -53,6 +106,7 @@ iwords = {
 
 		out:a("ret")
 
+		out.pushed = false
 		out.auto = {}
 		out.auto._LAU = 6
 		out.rauto = {}
@@ -60,6 +114,7 @@ iwords = {
 		return true
 	end,
 	["return"] = function (out, stream)
+		out:autoMod()
 		out:a("ret")
 		return true
 	end,
@@ -98,6 +153,8 @@ iwords = {
 		return true
 	end,
 	["while"] = function (out, stream)
+		out:autoMod()
+	
 		if stream:peek()[1] ~= "(" then
 			lerror(stream:peek(), "malformed while")
 			return false
@@ -128,49 +185,13 @@ iwords = {
 		return true
 	end,
 	["break"] = function (out, stream)
+		out:autoMod()
 		out:a("b "..out:syms(out.wc[#out.wc]))
 		return true
 	end,
 	["if"] = function (out, stream)
-		if stream:peek()[1] ~= "(" then
-			lerror(stream:peek(), "malformed if")
-			return false
-		end
-
-		stream:extract()
-
-		local f = out:asym() -- false
-
-		-- expression block
-
-		if not df.cblock(out, stream, ")") then return false end
-
-		out:a("popv r5, r0")
-		out:a("cmpi r0, 0")
-		out:a("be "..out:syms(f))
-
-		-- true block
-
-		df.cblock(out, stream, "end")
-
-		if stream:peek()[1] == "else" then
-			stream:extract()
-
-			local o = out:asym()
-			out:a("b "..out:syms(o))
-
-			out:a(out:syms(f)..":")
-
-			-- else block
-
-			if not df.cblock(out, stream, "end") then return false end
-
-			out:a(out:syms(o)..":")
-		else
-			out:a(out:syms(f)..":")
-		end
-
-		return true
+		out:autoMod()
+		return compileif(out, stream)
 	end,
 	["const"] = function (out, stream)
 		local name = stream:extract()
@@ -783,12 +804,12 @@ local function cauto(out, stream, reg)
 		return false
 	end
 
+	out:autoMod()
+
 	if t[1] == "!" then
-		out:a("popv r5, r0")
-		out:a("mov r"..tostring(reg)..", r0")
+		out:a("popv r5, r"..tostring(reg))
 	elseif t[1] == "@" then
-		out:a("mov r0, r"..tostring(reg))
-		out:a("pushv r5, r0")
+		out:a("pushv r5, r"..tostring(reg))
 	else
 		lerror(t, "unexpected "..t[2].." operator on auto reference")
 		return false
@@ -809,7 +830,6 @@ local function cword(out, stream, word)
 	else
 		out:contextEnter()
 		out:a("call "..word)
-		out:contextExit()
 	end
 
 	return true
@@ -868,6 +888,10 @@ function df.cblock(out, stream, endt)
 		end
 	end
 
+	if endt then
+		out:autoMod()
+	end
+
 	return true
 end
 
@@ -889,6 +913,8 @@ function df.c(src, path, incdir)
 
 	out.wc = {}
 
+	out.pushed = false
+
 	out.rauto = {}
 
 	out.incdir = incdir
@@ -905,17 +931,27 @@ function df.c(src, path, incdir)
 		table.remove(out.wc,#out.wc)
 	end
 
+	out.rrauto = {}
+
 	function out:contextEnter()
-		for k,v in ipairs(out.rauto) do
-			out:a("push r"..tostring(v))
+		if not out.pushed then
+			for k,v in ipairs(out.rauto) do
+				out:a("push r"..tostring(v))
+			end
+			out.pushed = true
+
+			out.rrauto = reverse(out.rauto)
 		end
 	end
 
-	function out:contextExit()
-		local rauto = reverse(out.rauto)
+	function out:autoMod()
+		if out.pushed then
+			local rauto = out.rrauto
 
-		for k,v in ipairs(rauto) do
-			out:a("pop r"..tostring(v))
+			for k,v in ipairs(rauto) do
+				out:a("pop r"..tostring(v))
+			end
+			out.pushed = false
 		end
 	end
 

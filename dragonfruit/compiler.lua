@@ -16,7 +16,7 @@ function reverse(l)
 end
 
 local function lerror(token, err)
-	print(string.format("%s:%d: %s", token[4], token[3], err))
+	print(string.format("dragonc: %s:%d: %s", token[4], token[3], err))
 end
 
 local df = {}
@@ -102,9 +102,54 @@ iwords = {
 			out:a(".global "..name[1])
 		end
 
+		out.outv = false
+
+		if stream:peek()[1] == "{" then
+			stream:extract()
+
+			local outp = true
+			local inv = {}
+
+			out.outv = {}
+
+			local t = stream:extract()
+
+			while t do
+				if t[1] == "}" then
+					break
+				end
+
+				if outp then
+					if t[1] == "--" then
+						outp = false
+					else
+						if not out:newauto(t[1]) then
+							lerror(t, "couldn't create input variable")
+							return false
+						end
+
+						table.insert(inv, 1, out.auto[t[1]])
+					end
+				else
+					if not out:newauto(t[1]) then
+						lerror(t, "couldn't create output variable")
+						return false
+					end
+
+					out.outv[#out.outv + 1] = out.auto[t[1]]
+				end
+
+				t = stream:extract()
+			end
+
+			for k,v in ipairs(inv) do
+				out:a("popv r5, r"..tostring(v))
+			end
+		end
+
 		df.cblock(out, stream, "end")
 
-		out:a("ret")
+		out:exitF()
 
 		out.pushed = false
 		out.auto = {}
@@ -114,8 +159,7 @@ iwords = {
 		return true
 	end,
 	["return"] = function (out, stream)
-		out:autoMod()
-		out:a("ret")
+		out:exitF()
 		return true
 	end,
 	["var"] = function (out, stream)
@@ -362,7 +406,10 @@ iwords = {
 			return false
 		end
 
-		out:newauto(name[1])
+		if not out:newauto(name[1]) then
+			lerror(name, "couldn't create auto " ..name[1])
+			return false
+		end
 
 		return true
 	end,
@@ -418,6 +465,46 @@ iwords = {
 
 		out:a("pushvi r5, "..tostring(p))
 
+		return true
+	end,
+	["+="] = function (out, stream)
+		out:a("popv r5, r1")
+		out:a("popv r5, r0")
+		out:a("lrr.l r2, r1")
+		out:a("add r0, r0, r2")
+		out:a("srr.l r1, r0")
+		return true
+	end,
+	["-="] = function (out, stream)
+		out:a("popv r5, r1")
+		out:a("popv r5, r0")
+		out:a("lrr.l r2, r1")
+		out:a("sub r0, r0, r2")
+		out:a("srr.l r1, r0")
+		return true
+	end,
+	["*="] = function (out, stream)
+		out:a("popv r5, r1")
+		out:a("popv r5, r0")
+		out:a("lrr.l r2, r1")
+		out:a("mul r0, r0, r2")
+		out:a("srr.l r1, r0")
+		return true
+	end,
+	["/="] = function (out, stream)
+		out:a("popv r5, r1")
+		out:a("popv r5, r0")
+		out:a("lrr.l r2, r1")
+		out:a("div r0, r0, r2")
+		out:a("srr.l r1, r0")
+		return true
+	end,
+	["%="] = function (out, stream)
+		out:a("popv r5, r1")
+		out:a("popv r5, r0")
+		out:a("lrr.l r2, r1")
+		out:a("mod r0, r0, r2")
+		out:a("srr.l r1, r0")
 		return true
 	end,
 	["bswap"] = function (out, stream)
@@ -799,17 +886,27 @@ end
 local function cauto(out, stream, reg)
 	local t = stream:extract()
 
-	if t[2] ~= "keyc" then
-		lerror(t, "unexpected "..t[1].." after auto reference")
-		return false
-	end
-
 	out:autoMod()
 
 	if t[1] == "!" then
 		out:a("popv r5, r"..tostring(reg))
 	elseif t[1] == "@" then
 		out:a("pushv r5, r"..tostring(reg))
+	elseif t[1] == "+=" then
+		out:a("popv r5, r0")
+		out:a("add r"..tostring(reg)..", r"..tostring(reg)..", r0")
+	elseif t[1] == "-=" then
+		out:a("popv r5, r0")
+		out:a("sub r"..tostring(reg)..", r"..tostring(reg)..", r0")
+	elseif t[1] == "*=" then
+		out:a("popv r5, r0")
+		out:a("mul r"..tostring(reg)..", r"..tostring(reg)..", r0")
+	elseif t[1] == "/=" then
+		out:a("popv r5, r0")
+		out:a("div r"..tostring(reg)..", r"..tostring(reg)..", r0")
+	elseif t[1] == "%=" then
+		out:a("popv r5, r0")
+		out:a("mod r"..tostring(reg)..", r"..tostring(reg)..", r0")
 	else
 		lerror(t, "unexpected "..t[2].." operator on auto reference")
 		return false
@@ -913,6 +1010,8 @@ function df.c(src, path, incdir)
 
 	out.wc = {}
 
+	out.outv = {}
+
 	out.pushed = false
 
 	out.rauto = {}
@@ -953,6 +1052,18 @@ function df.c(src, path, incdir)
 			end
 			out.pushed = false
 		end
+	end
+
+	function out:exitF()
+		out:autoMod()
+
+		if out.outv then
+			for k,v in ipairs(out.outv) do
+				out:a("pushv r5, r"..tostring(v))
+			end
+		end
+
+		out:a("ret")
 	end
 
 	function out:d(str)
@@ -999,18 +1110,20 @@ function df.c(src, path, incdir)
 
 	function out:newauto(name)
 		if out.auto._LAU >= automax then
-			print("can't create new auto var "..name..": ran out of registers")
-			return
+			print("dragonc: can't create new auto var "..name..": ran out of registers")
+			return false
 		end
 
 		if (out.auto[name]) then
-			print("can't create new auto var "..name..": already exists")
-			return
+			print("dragonc: can't create new auto var "..name..": already exists")
+			return false
 		end
 
 		out.auto[name] = out.auto._LAU
 		out.rauto[#out.rauto + 1] = out.auto._LAU
 		out.auto._LAU = out.auto._LAU + 1
+
+		return true
 	end
 
 	local s = lexer.new(src, path)

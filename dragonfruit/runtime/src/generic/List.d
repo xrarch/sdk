@@ -37,10 +37,7 @@ procedure ListNodeValue (* node -- value *)
 	ListNode_Value + @
 end
 
-procedure ListDestroy (* list -- *)
-	auto list
-	list!
-
+procedure ListDestroy { list -- }
 	auto n
 	list@ List_Head + @ n!
 
@@ -50,10 +47,7 @@ procedure ListDestroy (* list -- *)
 	end
 end
 
-procedure ListFree (* list -- *)
-	auto list
-	list!
-
+procedure ListFree { list -- }
 	auto n
 	list@ List_Head + @ n!
 
@@ -65,13 +59,7 @@ procedure ListFree (* list -- *)
 	end
 end
 
-procedure ListAppend (* node list -- *)
-	auto list
-	list!
-
-	auto node
-	node!
-
+procedure ListAppend { node list -- }
 	0 node@ ListNode_Next + !
 	list@ node@ ListNode_Owner + !
 
@@ -87,57 +75,36 @@ procedure ListAppend (* node list -- *)
 	node@ list@ List_Tail + @ ListNode_Next + !
 	list@ List_Tail + @ node@ ListNode_Prev + !
 	node@ list@ List_Tail + !
-	list@ List_Length + dup @ 1 + swap !
+	1 list@ List_Length + +=
 end
 
-procedure ListInsert1 (* item list -- node *)
-	auto list
-	list!
-
-	auto item
-	item!
-
-	auto node
+procedure ListInsert1 { item list -- node }
 	ListNode_SIZEOF Malloc node!
 	item@ node@ ListNode_Value + !
 	0 node@ ListNode_Next + !
 	0 node@ ListNode_Prev + !
 	0 node@ ListNode_Owner + !
 	node@ list@ ListAppend
-
-	node@
 end
 
 procedure ListInsert (* item list -- *)
 	ListInsert1 drop
 end
 
-procedure ListCreate (* -- list *)
-	auto out
+procedure ListCreate { -- out }
 	List_SIZEOF Malloc out!
 
 	0 out@ List_Head + !
 	0 out@ List_Tail + !
 	0 out@ List_Length + !
-
-	out@
 end
 
-procedure ListTakeHead (* list -- head *)
-	auto list
-	list!
-
+procedure ListTakeHead { list } (* -- head *)
 	0 list@ ListRemoveRR
 end
 
-procedure ListRemoveRR (* index list -- ref *)
-	auto list
-	list!
-
-	auto index
-	index!
-
-	if (index@ list@ List_Length + @ >) ERR return end
+procedure ListRemoveRR { index list -- ref }
+	if (index@ list@ List_Length + @ >) ERR ref! return end
 
 	auto n
 	list@ List_Head + @ n!
@@ -147,25 +114,19 @@ procedure ListRemoveRR (* index list -- ref *)
 
 	while (i@ index@ <)
 		n@ ListNode_Next + @ n!
-		i@ 1 + i!
+		1 i +=
 	end
 
 	n@ list@ ListDelete
 
-	n@
+	n@ ref!
 end
 
 procedure ListRemove (* index list -- *)
 	ListRemoveRR drop
 end
 
-procedure ListDelete (* node list -- *)
-	auto list
-	list!
-
-	auto node
-	node!
-
+procedure ListDelete { node list -- }
 	if (node@ list@ List_Head + @ ==)
 		node@ ListNode_Next + @ list@ List_Head + !
 	end
@@ -188,13 +149,7 @@ procedure ListDelete (* node list -- *)
 	list@ List_Length + dup @ 1 - swap !
 end
 
-procedure ListFind (* value list -- item *)
-	auto list
-	list!
-
-	auto value
-	value!
-
+procedure ListFind { value list } (* -- item *)
 	auto n
 	list@ List_Head + @ n!
 
@@ -206,7 +161,7 @@ procedure ListFind (* value list -- item *)
 			i@ return
 		end
 
-		i@ 1 + i!
+		1 i +=
 		n@ ListNode_Next + @ n!
 	end
 end

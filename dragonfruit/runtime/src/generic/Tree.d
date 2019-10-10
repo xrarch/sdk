@@ -30,36 +30,21 @@ procedure TreeNodeChildren (* node -- children *)
 	TreeNode_Children + @
 end
 
-procedure TreeCreate (* -- tree *)
-	auto out
+procedure TreeCreate { -- out }
 	Tree_SIZEOF Calloc out!
 
 	0 out@ Tree_Nodes + !
 	0 out@ Tree_Root + !
-
-	out@
 end
 
-procedure TreeSetRoot (* value tree -- node *)
-	auto tree
-	tree!
-
-	auto value
-	value!
-
-	auto root
+procedure TreeSetRoot { value tree -- root }
 	value@ TreeNodeCreate root!
 
 	root@ tree@ Tree_Root + !
 	1 tree@ Tree_Nodes + !
-
-	root@
 end
 
-procedure TreeNodeDestroy (* node -- *)
-	auto node
-	node!
-
+procedure TreeNodeDestroy { node -- }
 	auto n
 	node@ TreeNode_Children + @ List_Head + @ n!
 	while (n@ 0 ~=)
@@ -71,19 +56,13 @@ procedure TreeNodeDestroy (* node -- *)
 	node@ TreeNode_Value + @ Free
 end
 
-procedure TreeDestroy (* tree -- *)
-	auto tree
-	tree!
-
+procedure TreeDestroy { tree -- }
 	if (tree@ Tree_Root + @ 0 ~=)
 		tree@ Tree_Root + @ TreeNodeDestroy
 	end
 end
 
-procedure TreeNodeFree (* node -- *)
-	auto node
-	node!
-
+procedure TreeNodeFree { node -- }
 	if (node@ 0 ==)
 		return
 	end
@@ -99,17 +78,11 @@ procedure TreeNodeFree (* node -- *)
 	node@ Free
 end
 
-procedure TreeFree (* tree -- *)
-	auto tree
-	tree!
-
+procedure TreeFree { tree -- }
 	tree@ Tree_Root + @ TreeNodeFree
 end
 
-procedure TreeNodeCreate (* value -- *)
-	auto value
-	value!
-
+procedure TreeNodeCreate { value -- }
 	auto out
 	TreeNode_SIZEOF Calloc out!
 
@@ -120,36 +93,15 @@ procedure TreeNodeCreate (* value -- *)
 	out@
 end
 
-procedure TreeInsertChildNode (* node parent tree -- *)
-	auto tree
-	tree!
-
-	auto parent
-	parent!
-
-	auto node
-	node!
-
+procedure TreeInsertChildNode { node parent tree -- }
 	node@ parent@ TreeNode_Children + @ ListInsert
 	parent@ node@ TreeNode_Parent + !
-	tree@ Tree_Nodes + dup @ 1 + swap !
+	1 tree@ Tree_Nodes + +=
 end
 
-procedure TreeInsertChild (* value parent tree -- node *)
-	auto out
-
-	auto tree
-	tree!
-
-	auto parent
-	parent!
-
-	auto value
-	value!
-
-	value@ TreeNodeCreate out!
-	out@ parent@ tree@ TreeInsertChildNode
-	out@
+procedure TreeInsertChild { value parent tree -- node }
+	value@ TreeNodeCreate node!
+	node@ parent@ tree@ TreeInsertChildNode
 end
 
 procedure TreeNodeGetValue (* node -- value *)

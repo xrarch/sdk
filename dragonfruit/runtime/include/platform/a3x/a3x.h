@@ -26,11 +26,15 @@ extern a3xDGetMethod
 
 extern a3xDCallMethod
 
+extern a3xDSetProperty
+
 extern a3xDeviceExit
 
 extern a3xInit
 
 extern a3xReturn
+
+extern a3xDCallMethodPtr
 
 externconst a3xCIPtr (* var *)
 

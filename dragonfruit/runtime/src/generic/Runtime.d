@@ -337,30 +337,14 @@ procedure Printf (* ... fmt -- *)
 
 			if (char@ 'd' ==)
 				Putn
-			end else
-
-			if (char@ 'x' ==)
+			end elseif (char@ 'x' ==)
 				Putx
-			end else
-
-			if (char@ 's' ==)
+			end elseif (char@ 's' ==)
 				Puts
-			end else
-
-			if (char@ '%' ==)
+			end elseif (char@ '%' ==)
 				'%' Putc
-			end else
-
-			if (char@ 'l' ==)
+			end elseif (char@ 'l' ==)
 				Putc
-			end
-
-			end
-
-			end
-
-			end
-
 			end
 		end
 
@@ -392,12 +376,12 @@ procedure Gets { s max -- }
 				' ' Putc
 				'\b' Putc
 			end
-		end else if (len@ max@ <)
+		end elseif (len@ max@ <)
 			c@ s@ len@ + sb
 
 			1 len +=
 			c@ Putc
-		end end
+		end
 	end
 
 	0 s@ len@ + sb

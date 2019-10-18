@@ -21,11 +21,16 @@ lib/generic/lib.o: $(GENERICOBJ) $(GENERICSOBJ)
 
 lib/a3x/lib.o: $(A3XOBJ)
 	$(LD) lib/a3x/lib.o $(A3XOBJ)
-	$(AS) ./src/a3x/_start.s ./lib/a3x/_start.o
-	$(AS) ./src/a3x/_boot.s ./lib/a3x/_boot.o
+	$(AS) ./src/a3x/_start.s ./src/a3x/_start.o
+	$(AS) ./src/a3x/_boot.s ./src/a3x/_boot.o
+	cp ./src/a3x/_start.o ./lib/a3x/_start.o
+	cp ./src/a3x/_boot.o ./lib/a3x/_boot.o
 
 %.o: %.d
 	$(DC) $< $@
 
 %.o: %.s
 	$(AS) $< $@
+
+cleanup:
+	rm $(GENERICOBJ) $(GENERICSOBJ) $(A3XOBJ) $(A3XSOBJ)

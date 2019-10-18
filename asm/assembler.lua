@@ -14,8 +14,10 @@ local sd = getdirectory(arg[0])
 
 dofile(sd.."misc.lua")
 
-local tinst = dofile(sd.."inst.lua")
-local inst, regs = tinst[1], tinst[2]
+local targets = {
+	["limn1k"] = "0x1",
+	["pec"] = "0x2",
+}
 
 local function lerror(line, err)
 	print(string.format("asm: %s:%d: %s", line.file, line.number, err))
@@ -119,20 +121,18 @@ function asm.lines(block, source, filename)
 end
 
 function asm.labels(block)
-	block.labels = {}
-
-	block.labels["__DATE"] = os.date()
-
 	block.globals = {}
 	block.extern = {}
 	block.structs = {}
 	block.localLabels = {}
-	block.constants = {}
 	local byteCount = 0
 	local rawByteCount = 0
 	local curStruct = false
 	local strCount = 0
 	local curLabel
+
+	local inst = block.inst
+	local regs = block.regs
 
 	for k,v in ipairs(block.lines) do
 		local tokens = tokenize(v.text)
@@ -391,6 +391,9 @@ function asm.decode(block) -- decode labels, registers, strings
 
 	local curLabel
 
+	local inst = block.inst
+	local regs = block.regs
+
 	for k,v in ipairs(block.lines) do
 		if v.text then
 			local tokens = tokenize(v.text)
@@ -484,6 +487,9 @@ function asm.decode(block) -- decode labels, registers, strings
 end
 
 function asm.binary(block, lex)
+	local inst = block.inst
+	local regs = block.regs
+
 	local header = "0XEL"
 
 	local code = ""
@@ -718,7 +724,7 @@ function asm.binary(block, lex)
 
 	if lex then
 		-- make header
-		local size = 44
+		local size = 45
 		-- symtaboff
 		local u1, u2, u3, u4 = splitInt32(size)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
@@ -753,6 +759,8 @@ function asm.binary(block, lex)
 		-- codesize
 		u1, u2, u3, u4 = splitInt32(codesize)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		-- machine type
+		header = header .. string.char(targets[block.target])
 
 		block.binary = header .. symtab .. strtab .. reloctab .. fixuptab .. code
 	else
@@ -762,8 +770,29 @@ function asm.binary(block, lex)
 	return true
 end
 
-function asm.assembleBlock(source, filename, flat)
+function asm.assembleBlock(target, source, filename, flat)
 	local block = {}
+
+	block.target = target
+
+	if not targets[target] then
+		print("asm: no such target "..target)
+		return false
+	end
+
+	local tinst = dofile(sd.."inst-"..target..".lua")
+	block.inst, block.regs = tinst[1], tinst[2]
+
+	block.constants = {}
+
+	block.labels = {}
+	
+	block.labels["__DATE"] = os.date()
+
+	for k,v in pairs(tinst[3]) do
+		block.constants[k] = true
+		block.labels[k] = v
+	end
 
 	block.lines = {}
 
@@ -782,8 +811,8 @@ function asm.assembleBlock(source, filename, flat)
 	return block
 end
 
-function asm.assemble(source, filename, flat)
-	local block = asm.assembleBlock(source, filename, flat)
+function asm.assemble(target, source, filename, flat)
+	local block = asm.assembleBlock(target, source, filename, flat)
 
 	if not block then return false end
 

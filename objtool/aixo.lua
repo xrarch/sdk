@@ -24,7 +24,8 @@ local header_s = struct {
 	{4, "fixupTableOffset"},
 	{4, "fixupCount"},
 	{4, "codeOffset"},
-	{4, "codeSize"}
+	{4, "codeSize"},
+	{1, "codeType"},
 }
 
 local symbol_s = struct {
@@ -93,6 +94,8 @@ function aixo.new(filename)
 		end
 
 		self.codeSize = codesize
+
+		self.codeType = self.header.gv("codeType")
 
 		local function getString(offset)
 			local off = self.header.gv("stringTableOffset") + offset
@@ -305,7 +308,7 @@ function aixo.new(filename)
 		end
 
 		-- make header
-		local size = 44
+		local size = 45
 		-- symtaboff
 		local u1, u2, u3, u4 = splitInt32(size)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
@@ -340,6 +343,8 @@ function aixo.new(filename)
 		-- codesize
 		u1, u2, u3, u4 = splitInt32(#self.code + 1)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		-- codetype
+		header = header .. string.char(self.codeType)
 
 		file:write(header .. symtab .. strtab .. reloctab .. fixuptab)
 
@@ -353,6 +358,14 @@ function aixo.new(filename)
 	end
 
 	function iaixo:link(with)
+		if not self.codeType then
+			self.codeType = with.codeType
+		end
+
+		if with.codeType ~= self.codeType then
+			print(string.format("objtool: warning: linking 2 object files of differing code types, %d and %d", with.codeType, self.codeType))
+		end
+
 		--print(with.path)
 
 		-- relocate by width of my own code

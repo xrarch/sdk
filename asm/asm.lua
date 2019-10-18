@@ -20,6 +20,15 @@ local function printhelp()
 	print("usage: asm.lua [source] [dest]")
 end
 
+local target = "limn1k"
+
+for k,v in pairs(arg) do
+	if v:sub(1,7) == "target=" then
+		target = v:sub(8)
+		table.remove(arg, k)
+	end
+end
+
 local flat = false
 if arg[1] == "-flat" then
 	table.remove(arg, 1)
@@ -43,7 +52,7 @@ for i = 1, #arg/2 do
 		return
 	end
 
-	local o = asm.assemble(srcf:read("*a"), source, flat)
+	local o = asm.assemble(target, srcf:read("*a"), source, flat)
 
 	if not o then
 		print("asm: couldn't assemble "..source.."!")

@@ -56,6 +56,7 @@ _a3xCIC_DeviceDGetMethod === 52
 _a3xCIC_DeviceDCallMethod === 56
 _a3xCIC_DeviceExit === 60
 _a3xCIC_DeviceDSetProperty === 64
+_a3xCIC_DeviceDCallMethodPtr === 68
 
 ; buffer maxchars --
 a3xGets:
@@ -228,6 +229,17 @@ a3xDSetProperty:
 	push r30
 
 	li r30, _a3xCIC_DeviceDSetProperty
+	call _a3xCIC_Call
+
+	pop r30
+	ret
+
+; ptr --
+a3xDCallMethodPtr:
+.global a3xDCallMethodPtr
+	push r30
+
+	li r30, _a3xCIC_DeviceDCallMethodPtr
 	call _a3xCIC_Call
 
 	pop r30

@@ -182,7 +182,7 @@ local regs = {
 	["k3"] = 41,
 }
 
-return {inst, regs}
+return {inst, regs, {}}
 
 
 

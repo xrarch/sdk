@@ -206,14 +206,12 @@ procedure strntok { str buf del n -- next }
 	end
 
 	while (str@ i@ + gb del@ ~=)
-		if (i@ n@ >)
-			break
-		end
-
 		auto char
 		str@ i@ + gb char!
 
-		char@ buf@ i@ + sb
+		if (i@ n@ <)
+			char@ buf@ i@ + sb
+		end
 
 		if (char@ 0 ==)
 			0 next!

@@ -83,6 +83,8 @@ function lex.extractAll(src, filename, stream, spot)
 								t = t.."\n"
 							elseif c == "t" then
 								t = t.."\t"
+							elseif c == "r" then
+								t = t..string.char(0xD)
 							elseif c == "[" then
 								t = t..string.char(0x1b)
 							else
@@ -111,6 +113,8 @@ function lex.extractAll(src, filename, stream, spot)
 
 					if rc == "n" then
 						rc = "\n"
+					elseif rc == "r" then
+						rc = string.char(0xD)
 					elseif rc == "t" then
 						rc = "\t"
 					elseif rc == "b" then

@@ -33,6 +33,11 @@ function lex.extractAll(src, filename, stream, spot)
 		local o = src:sub(cpt,cpt)
 		cpt = cpt + 1
 
+		while o == string.char(0xD) do
+			o = src:sub(cpt,cpt)
+			cpt = cpt + 1
+		end
+
 		return o
 	end
 

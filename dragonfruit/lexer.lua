@@ -33,9 +33,8 @@ function lex.extractAll(src, filename, stream, spot)
 		local o = src:sub(cpt,cpt)
 		cpt = cpt + 1
 
-		while o == string.char(0xD) do
-			o = src:sub(cpt,cpt)
-			cpt = cpt + 1
+		if o == string.char(0xD) then
+			error("dragonc: lexer: Windows/DOS line endings aren't supported.")
 		end
 
 		return o

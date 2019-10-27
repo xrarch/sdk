@@ -1,11 +1,11 @@
-GENERICDFILES := $(shell find ./src/generic -type f -name '*.d')
+GENERICDFILES := $(shell find ./src/generic -type f -name '*.df')
 GENERICSFILES := $(shell find ./src/generic -type f -name '*.s')
-GENERICOBJ    := $(GENERICDFILES:.d=.o)
+GENERICOBJ    := $(GENERICDFILES:.df=.o)
 GENERICSOBJ   := $(GENERICSFILES:.s=.o)
 
-A3XDFILES := $(shell find ./src/a3x -type f -name '*.d')
+A3XDFILES := $(shell find ./src/a3x -type f -name '*.df')
 A3XSFILES := $(shell find ./src/a3x -type f -name '*.s')
-A3XOBJ    := $(A3XDFILES:.d=.o)
+A3XOBJ    := $(A3XDFILES:.df=.o)
 A3XSOBJ   := $(A3XSFILES:.s=.o)
 
 DC  =  ../../dragonc.sh
@@ -26,7 +26,7 @@ lib/a3x/lib.o: $(A3XOBJ)
 	cp ./src/a3x/_start.o ./lib/a3x/_start.o
 	cp ./src/a3x/_boot.o ./lib/a3x/_boot.o
 
-%.o: %.d
+%.o: %.df
 	$(DC) $< $@
 
 %.o: %.s

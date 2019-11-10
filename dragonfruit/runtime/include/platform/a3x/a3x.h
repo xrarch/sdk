@@ -36,6 +36,12 @@ extern a3xReturn
 
 extern a3xDCallMethodPtr
 
+extern a3xDevIteratorInit
+
+extern a3xDevIterate
+
+extern a3xDGetName
+
 externconst a3xCIPtr (* var *)
 
 externconst a3xFwctx (* var *)

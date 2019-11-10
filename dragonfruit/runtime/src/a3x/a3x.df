@@ -57,12 +57,9 @@ _a3xCIC_DeviceDCallMethod === 56
 _a3xCIC_DeviceExit === 60
 _a3xCIC_DeviceDSetProperty === 64
 _a3xCIC_DeviceDCallMethodPtr === 68
-
-_a3xCIC_NVRAMDeleteVar === 72
-_a3xCIC_NVRAMSetVar === 76
-_a3xCIC_NVRAMSetVarNum === 80
-_a3xCIC_NVRAMGetVar === 84
-_a3xCIC_NVRAMGetVarNum === 88
+_a3xCIC_DevIteratorInit === 72
+_a3xCIC_DevIterate === 76
+_a3xCIC_DeviceDGetName === 80
 
 ; buffer maxchars --
 a3xGets:
@@ -251,56 +248,34 @@ a3xDCallMethodPtr:
 	pop r30
 	ret
 
-; name --
-a3xNVRAMDeleteVar:
-.global a3xNVRAMDeleteVar
+; -- iter
+a3xDevIteratorInit:
+.global a3xDevIteratorInit
 	push r30
 
-	li r30, _a3xCIC_NVRAMDeleteVar
+	li r30, _a3xCIC_DevIteratorInit
 	call _a3xCIC_Call
 
 	pop r30
 	ret
 
-; str name --
-a3xNVRAMSetVar:
-.global a3xNVRAMSetVar
+; iter -- iter
+a3xDevIterate:
+.global a3xDevIterate
 	push r30
 
-	li r30, _a3xCIC_NVRAMSetVar
+	li r30, _a3xCIC_DevIterate
 	call _a3xCIC_Call
 
 	pop r30
 	ret
 
-; num name --
-a3xNVRAMSetVarNum:
-.global a3xNVRAMSetVarNum
+; -- name
+a3xDGetName:
+.global a3xDGetName
 	push r30
 
-	li r30, _a3xCIC_NVRAMSetVarNum
-	call _a3xCIC_Call
-
-	pop r30
-	ret
-
-; name -- ptr
-a3xNVRAMGetVar:
-.global a3xNVRAMGetVar
-	push r30
-
-	li r30, _a3xCIC_NVRAMGetVar
-	call _a3xCIC_Call
-
-	pop r30
-	ret
-
-; name -- num
-a3xNVRAMGetVarNum:
-.global a3xNVRAMGetVarNum
-	push r30
-
-	li r30, _a3xCIC_NVRAMGetVarNum
+	li r30, _a3xCIC_DeviceDGetName
 	call _a3xCIC_Call
 
 	pop r30

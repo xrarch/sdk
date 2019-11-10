@@ -25,6 +25,7 @@ lib/a3x/lib.o: $(A3XOBJ)
 	$(AS) ./src/a3x/_boot.s ./src/a3x/_boot.o
 	cp ./src/a3x/_start.o ./lib/a3x/_start.o
 	cp ./src/a3x/_boot.o ./lib/a3x/_boot.o
+	cp ./src/a3x/a3x.o ./lib/a3x/a3x.o
 
 %.o: %.df
 	$(DC) $< $@

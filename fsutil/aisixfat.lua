@@ -469,7 +469,7 @@ function fat.format(image)
 	end
 
 	print("reserving root")
-	fs:setBlockStatus(fsize+16, 0xFFFFFFFF)
+	fs:setBlockStatus(fsize + reservedblocks + 1, 0xFFFFFFFF)
 
 	print("unmounting")
 	fs:unmount()

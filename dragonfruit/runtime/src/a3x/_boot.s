@@ -3,6 +3,8 @@
 
 .extern Main
 
+.extern a3xReturn ;see a3x.df
+
 Entry:
 
 push ivt
@@ -19,4 +21,8 @@ pushv r5, r1
 ;r2 contains args
 pushv r5, r2
 
-b Main
+call Main
+
+pushvi r5, 0
+
+call a3xReturn

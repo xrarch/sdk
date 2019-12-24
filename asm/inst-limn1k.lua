@@ -133,6 +133,9 @@ local inst = {
 
 	["cmps"]   = {3, 0x52, {1, 1}},
 	["cmpsi"]  = {6, 0x53, {1, 4}},
+
+	["imask"]   = {2, 0x54, {1}},
+	["iunmask"]  = {2, 0x55, {1}},
 }
 
 local regs = {

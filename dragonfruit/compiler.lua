@@ -479,7 +479,7 @@ iwords = {
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("lrr.l r2, r1")
-		out:a("sub r0, r0, r2")
+		out:a("sub r0, r2, r0")
 		out:a("srr.l r1, r0")
 		return true
 	end,
@@ -495,7 +495,7 @@ iwords = {
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("lrr.l r2, r1")
-		out:a("div r0, r0, r2")
+		out:a("div r0, r2, r0")
 		out:a("srr.l r1, r0")
 		return true
 	end,
@@ -503,7 +503,7 @@ iwords = {
 		out:a("popv r5, r1")
 		out:a("popv r5, r0")
 		out:a("lrr.l r2, r1")
-		out:a("mod r0, r0, r2")
+		out:a("mod r0, r2, r0")
 		out:a("srr.l r1, r0")
 		return true
 	end,

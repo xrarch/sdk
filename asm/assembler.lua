@@ -724,7 +724,7 @@ function asm.binary(block, lex)
 
 	if lex then
 		-- make header
-		local size = 45
+		local size = 53
 		-- symtaboff
 		local u1, u2, u3, u4 = splitInt32(size)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
@@ -761,6 +761,12 @@ function asm.binary(block, lex)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		-- machine type
 		header = header .. string.char(targets[block.target])
+		-- stack size
+		u1, u2, u3, u4 = splitInt32(1024)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		-- heap size
+		u1, u2, u3, u4 = splitInt32(65536)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 		block.binary = header .. symtab .. strtab .. reloctab .. fixuptab .. code
 	else

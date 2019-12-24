@@ -26,6 +26,8 @@ local header_s = struct {
 	{4, "codeOffset"},
 	{4, "codeSize"},
 	{1, "codeType"},
+	{4, "stackSize"},
+	{4, "heapSize"}
 }
 
 local symbol_s = struct {
@@ -59,6 +61,10 @@ function aixo.new(filename)
 
 	iaixo.codeSize = 0
 
+	iaixo.heapSize = 0
+
+	iaixo.stackSize = 0
+
 	function iaixo:load()
 		local file = io.open(self.path, "rb")
 
@@ -86,6 +92,9 @@ function aixo.new(filename)
 
 		local codeoff = self.header.gv("codeOffset")
 		local codesize = self.header.gv("codeSize")
+
+		self.heapSize = self.header.gv("heapSize")
+		self.stackSize = self.header.gv("stackSize")
 
 		self.code = {}
 
@@ -308,7 +317,7 @@ function aixo.new(filename)
 		end
 
 		-- make header
-		local size = 45
+		local size = 53
 		-- symtaboff
 		local u1, u2, u3, u4 = splitInt32(size)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
@@ -345,6 +354,12 @@ function aixo.new(filename)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		-- codetype
 		header = header .. string.char(self.codeType)
+		-- stack size
+		u1, u2, u3, u4 = splitInt32(self.stackSize)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		-- heap size
+		u1, u2, u3, u4 = splitInt32(self.heapSize)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 		file:write(header .. symtab .. strtab .. reloctab .. fixuptab)
 
@@ -422,6 +437,9 @@ function aixo.new(filename)
 				end
 			end
 		end
+
+		self.stackSize = math.max(self.stackSize, with.stackSize)
+		self.heapSize = math.max(self.heapSize, with.heapSize)
 
 		return true
 	end

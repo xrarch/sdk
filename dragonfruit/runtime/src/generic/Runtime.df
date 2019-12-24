@@ -264,17 +264,122 @@ procedure strncat { dest src max -- }
 	ds@ dest@ + src@ md@ strncpy
 end
 
-procedure atoi { str -- res }
+procedure atoi10 { str -- res }
 	auto i
 	0 i!
 	0 res!
+
 	while (str@ i@ + gb 0 ~=)
-		res@ 10 *
-		str@ i@ + gb '0' -
-		+
-		res!
+		auto c
+		str@ i@ + gb c!
+
+		if (c@ '0' >= c@ '9' <= &&)
+			res@ 10 *
+			c@ '0' -
+			+
+			res!
+		end else
+			0 res! return
+		end
 
 		1 i +=
+	end
+end
+
+procedure atoi8 { str -- res }
+	auto i
+	0 i!
+	0 res!
+
+	while (str@ i@ + gb 0 ~=)
+		auto c
+		str@ i@ + gb c!
+
+		if (c@ '0' >= c@ '7' <= &&)
+			res@ 8 *
+			c@ '0' -
+			+
+			res!
+		end else
+			0 res! return
+		end
+
+		1 i +=
+	end
+end
+
+procedure private HexDigitToNum { digit -- num }
+	-1 num!
+
+	if (digit@ '0' >= digit@ '9' <= &&)
+		digit@ '0' - num!
+		return
+	end elseif (digit@ 'a' >= digit@ 'f' <= &&)
+		digit@ 'a' - 10 + num!
+		return
+	end elseif (digit@ 'A' >= digit@ 'F' <= &&)
+		digit@ 'A' - 10 + num!
+		return
+	end
+end
+
+procedure atoi16 { str -- res }
+	auto i
+	0 i!
+	0 res!
+
+	while (str@ i@ + gb 0 ~=)
+		auto n
+		str@ i@ + gb HexDigitToNum n!
+
+		if (n@ -1 ==)
+			0 res!
+			return
+		end
+
+		res@ 16 * n@ + res!
+
+		1 i +=
+	end
+end
+
+procedure atoi { str -- res }
+	auto base
+	10 base!
+
+	if (str@ gb 0 ==)
+		0 return
+	end
+
+	auto neg
+	0 neg!
+
+	if (str@ gb '-' ==)
+		1 neg!
+
+		1 str +=
+	end
+
+	if (str@ gb '0' ==)
+		8 base!
+		1 str +=
+
+		if (str@ gb 'x' ==)
+			16 base!
+			1 str +=
+		end
+	end
+
+	if (base@ 10 ==)
+		str@ atoi10 res!
+	end elseif (base@ 8 ==)
+		str@ atoi8 res!
+	end elseif (base@ 16 ==)
+		str@ atoi16 res!
+	end
+
+	if (neg@)
+		0 res@ - res!
 	end
 end
 

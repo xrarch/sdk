@@ -888,25 +888,27 @@ local function cauto(out, stream, reg)
 
 	out:autoMod()
 
+	local rs = tostring(reg)
+
 	if t[1] == "!" then
-		out:a("popv r5, r"..tostring(reg))
+		out:a("popv r5, r"..rs)
 	elseif t[1] == "@" then
-		out:a("pushv r5, r"..tostring(reg))
+		out:a("pushv r5, r"..rs)
 	elseif t[1] == "+=" then
 		out:a("popv r5, r0")
-		out:a("add r"..tostring(reg)..", r"..tostring(reg)..", r0")
+		out:a("add r"..rs..", r"..rs..", r0")
 	elseif t[1] == "-=" then
 		out:a("popv r5, r0")
-		out:a("sub r"..tostring(reg)..", r"..tostring(reg)..", r0")
+		out:a("sub r"..rs..", r"..rs..", r0")
 	elseif t[1] == "*=" then
 		out:a("popv r5, r0")
-		out:a("mul r"..tostring(reg)..", r"..tostring(reg)..", r0")
+		out:a("mul r"..rs..", r"..rs..", r0")
 	elseif t[1] == "/=" then
 		out:a("popv r5, r0")
-		out:a("div r"..tostring(reg)..", r"..tostring(reg)..", r0")
+		out:a("div r"..rs..", r"..rs..", r0")
 	elseif t[1] == "%=" then
 		out:a("popv r5, r0")
-		out:a("mod r"..tostring(reg)..", r"..tostring(reg)..", r0")
+		out:a("mod r"..rs..", r"..rs..", r0")
 	else
 		lerror(t, "unexpected "..t[2].." operator on auto reference")
 		return false

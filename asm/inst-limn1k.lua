@@ -122,8 +122,6 @@ local inst = {
 -- extensions
 
 	["bswap"] = {3, 0x49, {1, 1}},
-	["httl"]  = {1, 0x4A, {}},
-	["htts"]  = {1, 0x4B, {}},
 	["cpu"]   = {1, 0x4C, {}},
 	["rsp"]   = {2, 0x4D, {1}},
 	["ssp"]   = {2, 0x4E, {1}},

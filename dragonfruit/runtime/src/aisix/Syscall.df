@@ -19,3 +19,88 @@ procedure Yield { -- }
 
 	"
 end
+
+procedure ServiceByName { name -- pid }
+	auto slen
+	name@ strlen slen!
+
+	name@ slen@ asm "
+
+	li r0, 6
+	popv r5, r2
+	popv r5, r1
+	sys 0
+	pushv r5, r0
+
+	" pid!
+end
+
+procedure GetPID { -- pid }
+	asm "
+
+	li r0, 7
+	sys 0
+
+	pushv r5, r0
+
+	" pid!
+end
+
+extern _thread_start
+
+struct ThreadData
+	4 pc
+	1024 r5
+endstruct
+
+procedure NewThread { pc -- ret }
+	auto data
+	ThreadData_SIZEOF Calloc data!
+
+	pc@ data@ ThreadData_pc + !
+
+	data@ pointerof _thread_start asm "
+
+	li r0, 9
+	popv r5, r1
+	popv r5, r2
+	sys 0
+
+	pushv r5, r0
+
+	" ret!
+end
+
+procedure AtomicLock { lock -- ret }
+	lock@ asm "
+
+	li r0, 10
+	popv r5, r1
+	sys 0
+
+	pushv r5, r0
+
+	" ret!
+end
+
+procedure Wait { pid -- child ret }
+	pid@ asm "
+
+	popv r5, r1
+	li r0, 11
+	sys 0
+
+	pushv r5, r0
+	pushv r5, r1
+
+	" child! ret!
+end
+
+procedure ThreadExit { -- }
+	asm "
+
+	li r0, 12
+	sys 0
+
+	"
+end

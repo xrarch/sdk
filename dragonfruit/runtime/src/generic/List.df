@@ -123,7 +123,7 @@ procedure ListRemoveRR { index list -- ref }
 end
 
 procedure ListRemove (* index list -- *)
-	ListRemoveRR drop
+	ListRemoveRR Free
 end
 
 procedure ListDelete { node list -- }

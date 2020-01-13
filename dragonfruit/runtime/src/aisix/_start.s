@@ -7,4 +7,4 @@ _aisix_start:
 	pushv r5, r0
 	pushv r5, r1
 
-	call _DF_DF0
+	b _DF_DF0

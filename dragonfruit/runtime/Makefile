@@ -42,4 +42,4 @@ lib/aisix/lib.o: $(AISIXOBJ) $(AISIXSOBJ)
 	$(AS) $< $@
 
 cleanup:
-	rm $(GENERICOBJ) $(GENERICSOBJ) $(A3XOBJ) $(A3XSOBJ)
+	rm $(GENERICOBJ) $(GENERICSOBJ) $(A3XOBJ) $(A3XSOBJ) $(AISIXOBJ) $(AISIXSOBJ)

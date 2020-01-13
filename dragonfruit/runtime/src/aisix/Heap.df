@@ -5,7 +5,12 @@ var KHeapStart 0
 var KHeapSize 0
 var KHeapLast 0
 
+var KHeapLock 0
+
+const MAGIC 0xCAFEBABE
+
 struct KHeapHeader
+	4 magic
 	4 size
 	4 last
 	4 next
@@ -19,9 +24,13 @@ procedure HeapInit { heapstart heapsize -- }
 	KHeapSize@ KHeapStart@ KHeapHeader_size + !
 	0 KHeapStart@ KHeapHeader_last + !
 	0 KHeapStart@ KHeapHeader_allocated + !
+
+	MAGIC KHeapStart@ KHeapHeader_magic + !
 end
 
 procedure HeapDump (* -- *)
+	KHeapLock Spinlock
+
 	auto ept
 	KHeapStart@ ept!
 
@@ -53,12 +62,16 @@ procedure HeapDump (* -- *)
 		auto last
 		ept@ KHeapHeader_last + @ last!
 
+		auto magic
+		ept@ KHeapHeader_magic + @ magic!
+
 		i@ "block %d:\n" Printf
 		ept@ "	ptr: 0x%x\n" Printf
 		size@ "	size: %d bytes\n" Printf
 		asz@ "	real size: %d bytes\n" Printf
 		last@ "	last: 0x%x\n" Printf
 		alloc@ "	allocated: %d\n" Printf
+		magic@ "	magic: %x\n" Printf
 
 		if (alloc@ 1 ==)
 			talloc@ size@ + talloc!
@@ -71,12 +84,19 @@ procedure HeapDump (* -- *)
 			break
 		end
 
+		if (magic@ MAGIC ~=)
+			magic@ "bad magic %x, very weird, breaking\n" Printf
+			break
+		end
+
 		stotal@ size@ + stotal!
 		ept@ size@ + ept!
 		1 i +=
 	end
 
 	tfree@ talloc@ stotal@ "heap size: 0x%x bytes.\n%d bytes taken, %d bytes free.\n" Printf
+
+	0 KHeapLock!
 end
 
 (* first-fit *)
@@ -101,6 +121,10 @@ procedure private Malloc1 { max last sz } (* -- ptr *)
 	end
 
 	while (ept@ max@ <)
+		if (ept@ KHeapHeader_magic + @ MAGIC ~=)
+			ept@ "Malloc: bad magic on block %x\n" Abort
+		end
+
 		auto size
 		ept@ KHeapHeader_size + @ size!
 
@@ -140,6 +164,8 @@ procedure private Malloc1 { max last sz } (* -- ptr *)
 					ept@ nept@ KHeapHeader_last + !
 					0 nept@ KHeapHeader_allocated + sb
 
+					MAGIC nept@ KHeapHeader_magic + !
+
 					sz@ KHeapHeader_SIZEOF + ept@ KHeapHeader_size + !
 				end
 
@@ -159,17 +185,21 @@ procedure private Malloc1 { max last sz } (* -- ptr *)
 end
 
 procedure Malloc { sz -- ptr }
+	KHeapLock Spinlock
+
 	0 KHeapLast@ sz@ Malloc1 ptr!
 
 	if (ptr@ ERR ~=)
-		return
+		0 KHeapLock! return
 	end
 
 	KHeapLast@ 0 sz@ Malloc1 ptr!
 
 	if (ptr@ ERR ~=)
-		return
+		0 KHeapLock! return
 	end
+
+	0 KHeapLock!
 
 	ERR ptr! return
 end
@@ -198,6 +228,10 @@ procedure private HeapMerge { ptr msize -- }
 	ptr@ KHeapHeader_last + @ last!
 
 	if (last@ 0 ~=) (* we're not the first block *)
+		if (last@ KHeapHeader_magic + @ MAGIC ~=)
+			last@ ptr@ "%x: heapmerge left: bad magic on block 0x%x\n" Abort
+		end
+
 		if (last@ KHeapHeader_allocated + gb 0 ==) (* free, merge the boyo *)
 			if (ptr@ KHeapLast@ ==)
 				last@ KHeapLast!
@@ -215,6 +249,8 @@ procedure private HeapMerge { ptr msize -- }
 			end
 
 			last@ ptr!
+
+			ns@ msize!
 		end
 	end
 
@@ -223,6 +259,10 @@ procedure private HeapMerge { ptr msize -- }
 	ptr@ msize@ + next!
 
 	if (next@ KHeapStart@ KHeapSize@ + <) (* we aren't the last block *)
+		if (next@ KHeapHeader_magic + @ MAGIC ~=)
+			next@ ptr@ "%x: heapmerge right: bad magic on block 0x%x\n" Abort
+		end
+
 		if (next@ KHeapHeader_allocated + gb 0 ==) (* free, merge the boyo *)
 			if (next@ KHeapLast@ ==)
 				ptr@ KHeapLast!
@@ -250,10 +290,18 @@ procedure Free { ptr -- }
 	auto nptr
 	ptr@ KHeapHeader_SIZEOF - nptr!
 
+	if (nptr@ KHeapHeader_magic + @ MAGIC ~=)
+		ptr@ "Free: bad magic on block 0x%x\n" Abort
+	end
+
+	KHeapLock Spinlock
+
 	0 nptr@ KHeapHeader_allocated + sb
 
 	auto msize
 	nptr@ KHeapHeader_size + @ msize!
 
 	nptr@ msize@ HeapMerge
+
+	0 KHeapLock!
 end

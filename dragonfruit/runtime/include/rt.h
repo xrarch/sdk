@@ -40,10 +40,6 @@ extern atoi (* str -- n *)
 
 extern Puts (* s -- *)
 
-extern Putx (* nx -- *)
-
-extern Putn (* n -- *)
-
 extern Printf (* ... fmt -- *)
 
 extern Malloc (* size -- ptr *)
@@ -54,6 +50,6 @@ extern Free (* ptr -- *)
 
 extern Gets (* s max -- *)
 
-extern Getc (* -- c *)
-
 extern Putc (* c -- *)
+
+extern Getc (* -- c *)

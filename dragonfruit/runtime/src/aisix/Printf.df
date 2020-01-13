@@ -1,0 +1,91 @@
+#include "<df>/dragonfruit.h"
+#include "<df>/platform/aisix/aisix.h"
+
+table KConsoleDigits
+	'0' '1' '2' '3' '4' '5' '6' '7' '8' '9' 'a' 'b' 'c' 'd' 'e' 'f'
+endtable
+
+procedure Puts { s -- }
+	if (s@ 0 ==)
+		"(nullptr)" Puts
+	end
+
+	while (s@ gb 0 ~=)
+		s@ gb Putc
+		1 s +=
+	end
+end
+
+procedure Puti { n -- }
+	if (n@ 0 s<)
+		'-' Putc
+		n@ ~ 1 + n!
+	end
+
+	n@ Putn
+end
+
+procedure Putx { nx -- }
+	if (nx@ 15 >)
+		auto a
+		nx@ 16 / a!
+
+		nx@ 16 a@ * - nx!
+		a@ Putx
+	end
+
+	[nx@]KConsoleDigits@ Putc
+end
+
+procedure Putn { n -- }
+	if (n@ 9 >)
+		auto a
+		n@ 10 / a!
+
+		n@ 10 a@ * - n!
+		a@ Putn
+	end
+
+	[n@]KConsoleDigits@ Putc
+end
+
+procedure Printf (* ... fmt -- *)
+	auto f
+	f!
+	auto i
+	0 i!
+	auto sl
+	f@ strlen sl!
+	while (i@ sl@ <)
+		auto char
+		f@ i@ + gb char!
+		if (char@ '%' ~=)
+			char@ Putc
+		end else
+			1 i +=
+			if (i@ sl@ >=)
+				return
+			end
+
+			f@ i@ + gb char!
+
+			if (char@ 'd' ==)
+				Putn
+			end elseif (char@ 'i' ==)
+				Puti
+			end elseif (char@ 'x' ==)
+				Putx
+			end elseif (char@ 's' ==)
+				Puts
+			end elseif (char@ '%' ==)
+				'%' Putc
+			end elseif (char@ 'l' ==)
+				Putc
+			end else
+				'%' Putc char@ Putc
+			end
+		end
+
+		1 i +=
+	end
+end

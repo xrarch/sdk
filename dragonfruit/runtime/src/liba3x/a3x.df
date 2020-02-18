@@ -42,6 +42,7 @@ _a3xCIC_Call:
 _a3xCIC_Putc === 0
 _a3xCIC_Getc === 4
 _a3xCIC_Gets === 8
+_a3xCIC_Puts === 12
 _a3xCIC_DevTree === 16
 _a3xCIC_Malloc === 20
 _a3xCIC_Calloc === 24
@@ -89,6 +90,17 @@ a3xGetc:
 	push r30
 
 	li r30, _a3xCIC_Getc
+	call _a3xCIC_Call
+
+	pop r30
+	ret
+
+; str --
+a3xPuts:
+.global a3xPuts
+	push r30
+
+	li r30, _a3xCIC_Puts
 	call _a3xCIC_Call
 
 	pop r30

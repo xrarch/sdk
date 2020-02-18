@@ -1,29 +1,9 @@
-#include "<df>/dragonfruit.h"
-#include "<df>/platform/aisix/aisix.h"
+#include "<df>/const.h"
+#include "<df>/rt.h"
 
 table KConsoleDigits
 	'0' '1' '2' '3' '4' '5' '6' '7' '8' '9' 'a' 'b' 'c' 'd' 'e' 'f'
 endtable
-
-procedure Puts { s -- }
-	if (s@ 0 ==)
-		"(nullptr)" Puts
-	end
-
-	while (s@ gb 0 ~=)
-		s@ gb Putc
-		1 s +=
-	end
-end
-
-procedure Puti { n -- }
-	if (n@ 0 s<)
-		'-' Putc
-		n@ ~ 1 + n!
-	end
-
-	n@ Putn
-end
 
 procedure Putx { nx -- }
 	if (nx@ 15 >)
@@ -49,6 +29,14 @@ procedure Putn { n -- }
 	[n@]KConsoleDigits@ Putc
 end
 
+procedure Puti { n -- }
+	if (n@ 0 s<)
+		'-' Putc
+	end
+
+	n@ abs Putn
+end
+
 procedure Printf (* ... fmt -- *)
 	auto f
 	f!
@@ -71,8 +59,6 @@ procedure Printf (* ... fmt -- *)
 
 			if (char@ 'd' ==)
 				Putn
-			end elseif (char@ 'i' ==)
-				Puti
 			end elseif (char@ 'x' ==)
 				Putx
 			end elseif (char@ 's' ==)
@@ -81,8 +67,8 @@ procedure Printf (* ... fmt -- *)
 				'%' Putc
 			end elseif (char@ 'l' ==)
 				Putc
-			end else
-				'%' Putc char@ Putc
+			end elseif (char@ 'i' ==)
+				Puti
 			end
 		end
 

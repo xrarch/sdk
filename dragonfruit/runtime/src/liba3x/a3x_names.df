@@ -4,16 +4,6 @@
 
 asm "
 
-; char -- 
-Putc:
-.global Putc
-	b a3xPutc
-
-; -- char
-Getc:
-.global Getc
-	b a3xGetc
-
 ; sz -- ptr
 Malloc:
 .global Malloc
@@ -28,5 +18,27 @@ Calloc:
 Free:
 .global Free
 	b a3xFree
+
+.extern a3xPuts
+
+; str --
+Puts:
+.global Puts
+	b a3xPuts
+
+; buf maxchars --
+Gets:
+.global Gets
+	b a3xGets
+
+; c --
+Putc:
+.global Putc
+	b a3xPutc
+
+; -- c
+Getc:
+.global Getc
+	b a3xGetc
 
 "

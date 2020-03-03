@@ -25,7 +25,7 @@ function lex.extractAll(src, filename, stream, spot)
 
 	local srclen = #src
 
-	local function extractChar()
+	local function extractChar(com)
 		if cpt > srclen then
 			return false
 		end
@@ -37,32 +37,53 @@ function lex.extractAll(src, filename, stream, spot)
 			error("dragonc: lexer: Windows/DOS line endings aren't supported.")
 		end
 
+		while ((com) and (o == "(")) do
+			if src:sub(cpt, cpt) == "*" then
+				cpt = cpt + 1
+
+				o = src:sub(cpt,cpt)
+
+				while true do
+					if o == "*" then
+						if src:sub(cpt,cpt) == ")" then
+							cpt = cpt + 1
+
+							o = src:sub(cpt,cpt)
+							cpt = cpt + 1
+
+							break
+						end
+					elseif o == "\n" then
+						line = line + 1
+					end
+
+					o = src:sub(cpt,cpt)
+					cpt = cpt + 1
+
+					if not o then
+						break
+					end
+				end
+			else
+				break
+			end
+		end
+
 		return o
 	end
 
 	while cpt <= srclen do
-		local c = extractChar()
+		local c = extractChar(true)
 
 		while whitespace[c] do
 			if c == "\n" then
 				line = line + 1
 			end
 
-			c = extractChar()
+			c = extractChar(true)
 		end
 
 		if not c then break end
-
-		if c == "(" then
-			local ocpt = cpt
-			if extractChar() == "*" then
-				while c ~= ")" do
-					c = extractChar()
-				end
-			else
-				cpt = ocpt
-			end
-		end
 
 		if kc[c] then
 			table.insert(tokens, spot, {c, "keyc", line, filename})
@@ -136,7 +157,7 @@ function lex.extractAll(src, filename, stream, spot)
 				table.insert(tokens, spot, {string.byte(rc), "number", line, filename})
 				spot = spot + 1
 			else
-				while (not whitespace[c]) and (not kc[c]) and (c ~= false) do
+				while (not whitespace[c]) and (not kc[c]) and (c) do
 					t = t..c
 					c = extractChar()
 				end
@@ -193,6 +214,16 @@ function lex.new(src, filename)
 
 	function s:peek()
 		return s.tokens[s.token]
+	end
+
+	function s:expect(kind)
+		local t = self:extract()
+
+		if not t then return {0, "EOF"}, false end
+
+		if t[2] ~= kind then return t, false end
+
+		return t, true
 	end
 
 	return s

@@ -1,3 +1,5 @@
+--- misc technical notes, don't try to get useful info off this, its a scratchpad ---
+
 == auto variables ==
 
 autos/locals are stored in registers.

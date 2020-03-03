@@ -23,7 +23,7 @@ all: $(LIBS)
 
 lib/libsa/lib.o: $(GENERICOBJ) $(GENERICSOBJ)
 	$(LD) lib/libsa/lib.o $(GENERICOBJ) $(GENERICSOBJ)
-	$(AS) ./src/libsa/_i6l_start.s ./src/libsa/_i6l_start.o
+	$(AS) ./src/libsa/_i6l_start.S ./src/libsa/_i6l_start.o
 	cp ./src/libsa/_i6l_start.o ./lib/libsa/_i6l_start.o
 
 lib/liba3x/lib.o: $(A3XOBJ)

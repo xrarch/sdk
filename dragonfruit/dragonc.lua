@@ -9,7 +9,27 @@ local function getdirectory(p)
 end
 local sd = getdirectory(arg[0])
 
-local df = dofile(sd.."compiler.lua")
+local lexer = dofile(sd.."lexer.lua")
+
+local parser = dofile(sd.."parser.lua")
+
+local function explode(d,p)
+	local t, ll
+	t={}
+	ll=0
+	if(#p == 1) then return {p} end
+		while true do
+			l=string.find(p,d,ll,true) -- find the next d in the string
+			if l~=nil then -- if "not not" found then..
+				table.insert(t, string.sub(p,ll,l-1)) -- Save it in our array.
+				ll=l+1 -- save just after where we found it for searching next time.
+			else
+				table.insert(t, string.sub(p,ll)) -- Save what's left in our array.
+				break -- Break at end, as it should be, according to the lua manual.
+			end
+		end
+	return t
+end
 
 -- dragonc.lua [source1 source2 ...] [dest1 dest2 ...]
 -- tested under lua 5.1
@@ -20,14 +40,31 @@ local function printhelp()
 	print("usage: dragonc.lua [source1 source2 ...] [dest1 dest2 ...]")
 end
 
-local incdir
+local incdir = {}
+
+local targets = {
+	["limn1k"] = "cg-limn1k.lua",
+}
+
+local target = "limn1k"
 
 for k,v in pairs(arg) do
 	if v:sub(1,7) == "incdir=" then
-		incdir = v:sub(8)
+		local incs = v:sub(8)
+		table.remove(arg, k)
+
+		incdir = explode(":", incs)
+	elseif v:sub(1,7) == "target=" then
+		target = v:sub(8)
 		table.remove(arg, k)
 	end
 end
+
+if not targets[target] then
+	print("dragonc: no such target "..target)
+end
+
+local codegen = dofile(sd..targets[target])
 
 if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
 	print("dragonc: argument mismatch")
@@ -46,7 +83,7 @@ for i = 1, #arg/2 do
 		return false
 	end
 
-	local o = df.c(srcf:read("*a"), source, incdir)
+	local o = codegen.gen(parser.parse(lexer, srcf:read("*a"), source, incdir))
 
 	if not o then
 		print("dragonc: couldn't compile "..source.."!")

@@ -62,6 +62,7 @@ end
 
 if not targets[target] then
 	print("dragonc: no such target "..target)
+	os.exit(1)
 end
 
 local codegen = dofile(sd..targets[target])
@@ -69,7 +70,7 @@ local codegen = dofile(sd..targets[target])
 if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
 	print("dragonc: argument mismatch")
 	printhelp()
-	return false
+	os.exit(1)
 end
 
 for i = 1, #arg/2 do
@@ -80,20 +81,20 @@ for i = 1, #arg/2 do
 
 	if not srcf then
 		print(string.format("dragonc: error opening source file %s", source))
-		return false
+		os.exit(1)
 	end
 
 	local o = codegen.gen(parser.parse(lexer, srcf:read("*a"), source, incdir))
 
 	if not o then
 		print("dragonc: couldn't compile "..source.."!")
-		return false
+		os.exit(1)
 	else
 		destf = io.open(dest, "w")
 
 		if not destf then
 			print(string.format("dragonc: error opening destination file %s", dest))
-			return false
+			os.exit(1)
 		end
 
 		destf:write(o)

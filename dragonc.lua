@@ -56,12 +56,23 @@ for k,v in ipairs(sourcef) do
 
 	local eout = ed..".__out.s "
 
+	local err
+
 	-- is there a better way to do this? probably.
-	os.execute(lua..dragonc..v.." "..eout..incdir)
+	err = os.execute(lua..dragonc..v.." "..eout..incdir)
+
+	if err > 0 then os.exit(1) end
+
 	if flat then
-		os.execute(lua..asm.."-flat "..eout..destf[k])
+		err = os.execute(lua..asm.."-flat "..eout..destf[k])
+
+		if err > 0 then os.exit(1) end
 	else
-		os.execute(lua..asm..eout..destf[k])
+		err = os.execute(lua..asm..eout..destf[k])
+
+		if err > 0 then os.exit(1) end
 	end
-	os.execute("rm "..eout)
+	err = os.execute("rm "..eout)
+
+	if err > 0 then os.exit(1) end
 end

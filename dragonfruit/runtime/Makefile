@@ -22,18 +22,18 @@ LIBS = lib/libsa/lib.o lib/liba3x/lib.o lib/libaisix/lib.o
 all: $(LIBS)
 
 lib/libsa/lib.o: $(GENERICOBJ) $(GENERICSOBJ)
-	$(LD) lib/libsa/lib.o $(GENERICOBJ) $(GENERICSOBJ)
+	$(LD) -f lib/libsa/lib.o $(GENERICOBJ) $(GENERICSOBJ)
 	$(AS) ./src/libsa/_i6l_start.S ./src/libsa/_i6l_start.o
 	cp ./src/libsa/_i6l_start.o ./lib/libsa/_i6l_start.o
 
 lib/liba3x/lib.o: $(A3XOBJ)
-	$(LD) lib/liba3x/lib.o $(A3XOBJ)
+	$(LD) -f lib/liba3x/lib.o $(A3XOBJ)
 	$(AS) ./src/liba3x/_boot.s ./src/liba3x/_boot.o
 	cp ./src/liba3x/_boot.o ./lib/liba3x/_boot.o
 	cp ./src/liba3x/a3x.o ./lib/liba3x/a3x.o
 
 lib/libaisix/lib.o: $(AISIXOBJ) $(AISIXSOBJ)
-	$(LD) lib/libaisix/lib.o $(AISIXOBJ) $(AISIXSOBJ)
+	$(LD) -f lib/libaisix/lib.o $(AISIXOBJ) $(AISIXSOBJ)
 
 %.o: %.df
 	$(DC) $< $@

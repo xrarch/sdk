@@ -29,7 +29,7 @@ end
 
 if #arg < 2 then
 	usage()
-	return
+	os.exit(1)
 end
 
 local cmd = arg[2]
@@ -40,7 +40,7 @@ else
 	local fs = fat.mount(dimg)
 	if not fs then
 		print("fsutil: error: couldn't mount image")
-		return
+		os.exit(1)
 	end
 
 	if cmd == "ls" then
@@ -68,18 +68,22 @@ else
 			end
 		else
 			usage()
+			os.exit(1)
 		end
 	elseif cmd == "w" then
 		if arg[3] and arg[4] then
 			local f, dir = fs:path(arg[3])
 			if not f then
 				print("fsutil: couldn't open "..arg[3])
+				os.exit(1)
 			elseif f.type == "dir" then
 				print("fsutil: "..arg[3].." is a directory")
+				os.exit(1)
 			else
 				local inf = io.open(arg[4], "rb")
 				if not inf then
 					print("fsutil: couldn't open "..arg[4])
+					os.exit(1)
 				else
 					f:write(inf:read("*all"))
 					inf:close()
@@ -88,34 +92,41 @@ else
 			if dir then dir:close() end
 		else
 			usage()
+			os.exit(1)
 		end
 	elseif cmd == "r" then
 		if arg[3] then
 			local f, dir = fs:path(arg[3])
 			if not f then
 				print("fsutil: couldn't open "..arg[3])
+				os.exit(1)
 			elseif f.type == "dir" then
 				print("fsutil: "..arg[3].." is a directory")
+				os.exit(1)
 			else
 				io.write(f:read())
 			end
 			if dir then dir:close() end
 		else
 			usage()
+			os.exit(1)
 		end
 	elseif cmd == "d" then
 		if arg[3] then
 			local f, dir = fs:path(arg[3])
 			if not f then
 				print("fsutil: couldn't open "..arg[3])
+				os.exit(1)
 			elseif not f.f then
 				print("fsutil: couldn't open "..arg[3].." for deletion; remove any slashes at the end of the path")
+				os.exit(1)
 			else
 				f:delete()
 			end
 			if dir then dir:close() end
 		else
 			usage()
+			os.exit(1)
 		end
 	elseif cmd == "i" then
 		fs:dumpinfo()

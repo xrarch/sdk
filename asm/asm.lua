@@ -38,7 +38,7 @@ end
 if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
 	print("asm: argument mismatch")
 	printhelp()
-	return
+	os.exit(1)
 end
 
 for i = 1, #arg/2 do
@@ -49,20 +49,20 @@ for i = 1, #arg/2 do
 
 	if not srcf then
 		print(string.format("asm: error opening source file %s", source))
-		return
+		os.exit(1)
 	end
 
 	local o = asm.assemble(target, srcf:read("*a"), source, flat)
 
 	if not o then
 		print("asm: couldn't assemble "..source.."!")
-		return
+		os.exit(1)
 	else
 		destf = io.open(dest, "w")
 
 		if not destf then
 			print(string.format("asm: error opening destination file %s", dest))
-			return
+			os.exit(1)
 		end
 
 		destf:write(o)

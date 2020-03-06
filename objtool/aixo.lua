@@ -65,6 +65,8 @@ function aixo.new(filename)
 
 	iaixo.stackSize = 0
 
+	iaixo.fixupCount = 0
+
 	function iaixo:load()
 		local file = io.open(self.path, "rb")
 
@@ -132,7 +134,7 @@ function aixo.new(filename)
 			local name = getString(sym.gv("name"))
 			local value = sym.gv("value")
 
-			self.symbols[name] = value
+			self.symbols[name] = {["value"] = value, ["file"] = self.path}
 
 			ptr = ptr + 8
 		end
@@ -140,6 +142,7 @@ function aixo.new(filename)
 		self.fixups = {}
 		local fixcount = hdr.gv("fixupCount")
 		ptr = hdr.gv("fixupTableOffset")
+		self.fixupCount = fixcount
 
 		for i = 1, fixcount do
 			local f = cast(fixup_s, self.bin, ptr)
@@ -147,7 +150,7 @@ function aixo.new(filename)
 			local name = getString(f.gv("name"))
 			local addr = f.gv("addr")
 
-			self.fixups[#self.fixups + 1] = {name, addr}
+			self.fixups[#self.fixups + 1] = {name, addr, self.path}
 
 			ptr = ptr + 8
 		end
@@ -186,11 +189,11 @@ function aixo.new(filename)
 			end
 
 			for k,v in pairs(self.symbols) do
-				self.symbols[k] = v + offset
+				self.symbols[k].value = v.value + offset
 			end
 
 			for k,v in ipairs(self.fixups) do
-				self.fixups[k] = {v[1], v[2] + offset}
+				self.fixups[k] = {v[1], v[2] + offset, v[3]}
 			end
 		end
 
@@ -307,7 +310,7 @@ function aixo.new(filename)
 		end
 
 		for k,v in pairs(self.symbols) do
-			addSymbol(k, v)
+			addSymbol(k, v.value)
 		end
 
 		for k,v in ipairs(self.fixups) do
@@ -403,7 +406,7 @@ function aixo.new(filename)
 		for k,v in pairs(with.symbols) do
 			--print(k)
 			if self.symbols[k] then
-				print(string.format("objtool: symbol conflict: '%s' is already defined! conflict caused by: '%s'", k, with.path))
+				print(string.format("objtool: symbol conflict: '%s' is defined in both:\n %s\n %s", k, self.symbols[k].file, v.file))
 				return false
 			else
 				self.symbols[k] = v
@@ -415,7 +418,7 @@ function aixo.new(filename)
 
 		for k,v in ipairs(with.fixups) do
 			--print(v[1])
-			self.fixups[#self.fixups + 1] = {v[1], v[2]}
+			self.fixups[#self.fixups + 1] = {v[1], v[2], v[3]}
 		end
 
 		-- merge relocs
@@ -423,17 +426,21 @@ function aixo.new(filename)
 			self.relocs[#self.relocs + 1] = v
 		end
 
+		self.fixupCount = 0
+
 		-- try to resolve fixups
 		for k,v in ipairs(self.fixups) do
 			if v[1] then
 				if self.symbols[v[1]] then
 					--print(string.format("resolving %s @ %X", v[1], v[2]))
 					local addrs = cast(uint32_s, self.code, v[2])
-					addrs.sv("value", self.symbols[v[1]])
+					addrs.sv("value", self.symbols[v[1]].value)
 					v[1] = nil -- can't take element out of array entirely because lua is weird, this marks it as dead
 
 					-- convert fixup to a reloc
 					self.relocs[#self.relocs + 1] = v[2]
+				else
+					self.fixupCount = self.fixupCount + 1
 				end
 			end
 		end

@@ -127,7 +127,7 @@ elseif arg[1] == "link" then
 			linked[arg[i]] = true
 
 			if imgname:sub(1,2) == "L/" then
-				imgname = sd.."../dragonfruit/runtime/lib/"..imgname:sub(3)
+				imgname = sd.."../lib/"..imgname:sub(3)
 			end
 
 			local image = aixo.new(imgname)
@@ -150,7 +150,9 @@ elseif arg[1] == "link" then
 			print("objtool: error: unresolved symbols:")
 
 			for k,v in ipairs(out.fixups) do
-				print("  "..v[1].." in "..v[3])
+				if v[1] then
+					print("  "..v[1].." in "..v[3])
+				end
 			end
 
 			os.exit(1)

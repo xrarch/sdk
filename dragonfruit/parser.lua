@@ -90,7 +90,9 @@ function parser.directive()
 		local f
 
 		if incpath:sub(1,5) == "<df>/" then
-			f = io.open(sd.."/runtime/include/"..incpath:sub(6), "r")
+			f = io.open(sd.."/../headers/dfrt/"..incpath:sub(6), "r")
+		elseif incpath:sub(1,5) == "<ll>/" then
+			f = io.open(sd.."/../headers/"..incpath:sub(6), "r")
 		elseif incpath:sub(1,6) == "<inc>/" then
 			local rpath = incpath:sub(7)
 

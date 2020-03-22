@@ -32,6 +32,10 @@ function splitInt32(n)
 	return (math.modf(n/16777216))%256, (math.modf(n/65536))%256, (math.modf(n/256))%256, n%256
 end
 
+function splitInt24(n) 
+	return (math.modf(n/65536))%256, (math.modf(n/256))%256, n%256
+end
+
 function splitInt16(n)
 	return (math.modf(n/256))%256, n%256
 end

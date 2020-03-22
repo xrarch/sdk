@@ -16,7 +16,7 @@ dofile(sd.."misc.lua")
 
 local targets = {
 	["limn1k"] = "0x1",
-	["pec"] = "0x2",
+	["auc"] = "0x3",
 }
 
 local function lerror(line, err)
@@ -509,6 +509,14 @@ function asm.binary(block, lex)
 		codesize = codesize + 2
 	end
 
+	local function addThree(three)
+		local u1, u2, u3 = splitInt24(three)
+
+		code = code .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		codesize = codesize + 3
+	end
+
 	local function addLong(long)
 		local u1, u2, u3, u4 = splitInt32(long)
 
@@ -686,36 +694,62 @@ function asm.binary(block, lex)
 
 				local rands = e[3] -- the names 'rand, operand
 
-				if #tokens-1 ~= #rands then
+				local tx = 0
+
+				for k,v in ipairs(rands) do
+					if v > 0 then
+						tx = tx + 1
+					end
+				end
+
+				if #tokens-1 ~= tx then
 					lerror(v, "operand count mismatch: "..word.." wants "..tostring(#rands).." operands, "..tostring(#tokens-1).." given.")
 					return false
 				end
 
-				for n,s in ipairs(rands) do
-					local operand = tokens[n+1]
-					if not tonumber(operand) then
-						if not ((s == 4) and block.extern[operand]) then
-							lerror(v, "malformed number "..operand)
-							return false
-						end
-					end
+				local tn = 1
 
-					if s == 1 then
-						addByte(tc(operand))
-					elseif s == 2 then
-						addInt(tc(operand))
-					elseif s == 4 then
-						if not tonumber(operand) then -- already checked to make sure its an extern
-							if not lex then
-								lerror(v, "can't leave hanging symbols in a flat binary")
+				for n,s in ipairs(rands) do
+					if s < 0 then
+						if s == -1 then
+							addByte(0)
+						elseif s == -2 then
+							addInt(0)
+						elseif s == -3 then
+							addThree(0)
+						elseif s == -4 then
+							addLong(0)
+						end
+					else
+						local operand = tokens[tn+1]
+						if not tonumber(operand) then
+							if not ((s == 4) and block.extern[operand]) then
+								lerror(v, "malformed number "..operand)
 								return false
 							end
-
-							addFixup(operand)
-							addLong(0)
-						else
-							addLong(tc(operand))
 						end
+
+						if s == 1 then
+							addByte(tc(operand))
+						elseif s == 2 then
+							addInt(tc(operand))
+						elseif s == 3 then
+							addThree(tc(operand))
+						elseif s == 4 then
+							if not tonumber(operand) then -- already checked to make sure its an extern
+								if not lex then
+									lerror(v, "can't leave hanging symbols in a flat binary")
+									return false
+								end
+
+								addFixup(operand)
+								addLong(0)
+							else
+								addLong(tc(operand))
+							end
+						end
+
+						tn = tn + 1
 					end
 				end
 			end

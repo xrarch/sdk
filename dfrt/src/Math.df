@@ -1,0 +1,17 @@
+#include "<inc>/const.h"
+
+procedure abs { v -- absv }
+	v@ absv!
+
+	if (v@ 0 s<)
+		0 v@ - absv!
+	end
+end
+
+procedure max { n1 n2 } (* -- max *)
+	if (n2@ n1@ >) n2@ end else n1@ end
+end
+
+procedure min { n1 n2 } (* -- min *)
+	if (n2@ n1@ <) n2@ end else n1@ end
+end

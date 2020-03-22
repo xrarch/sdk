@@ -1,3 +1,8 @@
+-- requires luajit for bit ops
+
+lshift, rshift, tohex, arshift, band, bxor, bor, bnot, bror, brol = bit.lshift, bit.rshift, bit.tohex, bit.arshift, bit.band, bit.bxor, bit.bor, bit.bnot, bit.ror, bit.rol
+
+
 local codegen = {}
 
 local cg = {}
@@ -5,7 +10,7 @@ local cg = {}
 local cproc
 
 local function cerror(t, err)
-	print(string.format("dragonc: cg-limn1k: %s:%d: %s", (t.file or "not specified"), (t.line or "not specified"), err))
+	print(string.format("dragonc: cg-auc: %s:%d: %s", (t.file or "not specified"), (t.line or "not specified"), err))
 end
 
 local e_extern
@@ -16,17 +21,28 @@ local bpushdown = {}
 
 local cpushdown = {}
 
+local dataoff = 0
+
+local datainits = {}
+
+local dsection = {}
+
 function codegen.buffer(buffer)
 	for name,value in pairs(buffer) do
-		cg:data(name..":")
-		cg:data("\t.bytes "..tostring(value).." 0")
+		cg:data(name.." === "..tostring(dataoff))
+		dataoff = dataoff + value
+
+		dsection[name] = true
 	end
 end
 
 function codegen.var(var)
 	for name,value in pairs(var) do
-		cg:data(name..":")
-		cg:data("\t.dl "..value)
+		cg:data(name.." === "..tostring(dataoff))
+		datainits[#datainits + 1] = {dataoff, value}
+		dataoff = dataoff + 4
+
+		dsection[name] = true
 	end
 end
 
@@ -36,18 +52,21 @@ function codegen.table(deftable)
 	local strs = {}
 
 	for name,detail in pairs(deftable) do
-		cg:data(name..":")
+		cg:data(name.." === "..tostring(dataoff))
 
 		if detail.count then
-			cg:data("\t.bytes "..tostring(detail.count * 4).." 0")
+			dataoff = dataoff + (detail.count * 4)
 		else
 			for k,v in pairs(detail.words) do
 				if (v.typ == "num") or (v.typ == "ptr") then
-					cg:data("\t.dl "..tostring(v.name))
+					datainits[#datainits + 1] = {dataoff, v.name}
+					dataoff = dataoff + 4
 				elseif v.typ == "str" then
 					local n = "_df_sto_"..tostring(tsn)
 
-					cg:data("\t.dl "..n)
+					datainits[#datainits + 1] = {dataoff, n, true}
+
+					dataoff = dataoff + 4
 
 					strs[#strs + 1] = {v.name, n}
 
@@ -55,6 +74,8 @@ function codegen.table(deftable)
 				end
 			end
 		end
+
+		dsection[name] = true
 	end
 
 	for k,v in ipairs(strs) do
@@ -64,18 +85,20 @@ end
 
 function codegen.extern(extern, externconst)
 	for name,v in pairs(extern) do
-		cg:code(".extern "..name)
+		cerror({}, "no externconsts or externs allowed in ucode")
+		--cg:code(".extern "..name)
 	end
 
 	for name,v in pairs(externconst) do
-		cg:code(".extern "..name)
+		cerror({}, "no externconsts or externs allowed in ucode")
+		--cg:code(".extern "..name)
 	end
 end
 
 function codegen.export(export)
-	for name,v in pairs(export) do
-		cg:data(".global "..name)
-	end
+	--for name,v in pairs(export) do
+	--	cg:data(".global "..name)
+	--end
 end
 
 function codegen.data(var, deftable, buffer)
@@ -89,8 +112,6 @@ function codegen.asm(t)
 
 	return true
 end
-
-local cdummy = 0
 
 local prim_ops = {
 	["return"] = function (rn)
@@ -113,314 +134,377 @@ local prim_ops = {
 		cg:code("b "..cpushdown[#cpushdown])
 	end,
 	["Call"] = function (rn)
-		cg:code("popv r5, r0")
-		cg:code("pushi ._df_cleave_"..tostring(cdummy))
-		cg:code("br r0")
-		cg:code("._df_cleave_"..tostring(cdummy)..":")
-		cdummy = cdummy + 1
+		cg:code("pop r0")
+		cg:code("callr r0")
 	end,
 	["+="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("lrr.l r2, r1")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("l.l r2, r1")
 		cg:code("add r0, r0, r2")
-		cg:code("srr.l r1, r0")
+		cg:code("s.l r1, r0")
 	end,
 	["-="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("lrr.l r2, r1")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("l.l r2, r1")
 		cg:code("sub r0, r2, r0")
-		cg:code("srr.l r1, r0")
+		cg:code("s.l r1, r0")
 	end,
 	["*="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("lrr.l r2, r1")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("l.l r2, r1")
 		cg:code("mul r0, r0, r2")
-		cg:code("srr.l r1, r0")
+		cg:code("s.l r1, r0")
 	end,
 	["/="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("lrr.l r2, r1")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("l.l r2, r1")
 		cg:code("div r0, r2, r0")
-		cg:code("srr.l r1, r0")
+		cg:code("s.l r1, r0")
 	end,
 	["%="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("lrr.l r2, r1")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("l.l r2, r1")
 		cg:code("mod r0, r2, r0")
-		cg:code("srr.l r1, r0")
+		cg:code("s.l r1, r0")
 	end,
-	["bswap"] = function (rn)
-		cg:code("popv r5, r0")
-		cg:code("bswap r0, r0")
-		cg:code("pushv r5, r0")
-	end,
+	--["bswap"] = function (rn)
+	--	cg:code("pop r0")
+	--	cg:code("bswap r0, r0")
+	--	cg:code("push r0")
+	--end,
 	["=="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmp r0, r1")
-		cg:code("andi r0, rf, 0x1") -- isolate eq bit in flag register
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("e r0, r1")
+		cg:code("push rf")
 	end,
 	["~="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmp r0, r1")
-		cg:code("not rf, rf")
-		cg:code("andi r0, rf, 0x1") -- isolate eq bit in flag register
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("ne r0, r1")
+		cg:code("push rf")
 	end,
 	[">"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmp r0, r1")
-		cg:code("rshi r0, rf, 0x1") -- isolate gt bit in flag register
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("g r0, r1")
+		cg:code("push rf")
 	end,
 	["<"] = function (rn) -- NOT FLAG:1 and NOT FLAG:0
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmp r0, r1")
-		cg:code("not r1, rf")
-		cg:code("rshi r0, r1, 0x1") -- isolate gt bit in flag register
-		cg:code("andi r0, r0, 1")
-		cg:code("not rf, rf")
-		cg:code("and r0, r0, rf")
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("l r0, r1")
+		cg:code("push rf")
 	end,
 	[">="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmp r0, r1")
-		cg:code("mov r0, rf")
-		cg:code("rshi rf, rf, 1") -- bitwise magic
-		cg:code("ior r0, r0, rf")
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("g r0, r1")
+		cg:code("mov r2, rf")
+		cg:code("e r0, r1")
+		cg:code("or r2, r2, rf")
+		cg:code("push r2")
 	end,
 	["<="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmp r0, r1")
-		cg:code("not rf, rf")
-		cg:code("rshi r0, rf, 0x1") -- isolate gt bit in flag register
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("l r0, r1")
+		cg:code("mov r2, rf")
+		cg:code("e r0, r1")
+		cg:code("or r2, r2, rf")
+		cg:code("push r2")
 	end,
 	["s>"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmps r0, r1")
-		cg:code("rshi r0, rf, 0x1") -- isolate gt bit in flag register
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("gs r0, r1")
+		cg:code("push rf")
 	end,
 	["s<"] = function (rn) -- NOT FLAG:1 and NOT FLAG:0
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmps r0, r1")
-		cg:code("not r1, rf")
-		cg:code("rshi r0, r1, 0x1") -- isolate gt bit in flag register
-		cg:code("andi r0, r0, 1")
-		cg:code("not rf, rf")
-		cg:code("and r0, r0, rf")
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("ls r0, r1")
+		cg:code("push rf")
 	end,
 	["s>="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmps r0, r1")
-		cg:code("mov r0, rf")
-		cg:code("rshi rf, rf, 1") -- bitwise magic
-		cg:code("ior r0, r0, rf")
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("gs r0, r1")
+		cg:code("mov r2, rf")
+		cg:code("e r0, r1")
+		cg:code("or r2, r2, rf")
+		cg:code("push r2")
 	end,
 	["s<="] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmps r0, r1")
-		cg:code("not rf, rf")
-		cg:code("rshi r0, rf, 0x1") -- isolate gt bit in flag register
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("ls r0, r1")
+		cg:code("mov r2, rf")
+		cg:code("e r0, r1")
+		cg:code("or r2, r2, rf")
+		cg:code("push r2")
 	end,
 	["~"] = function (rn)
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
 		cg:code("not r0, r0")
-		cg:code("pushv r5, r0")
+		cg:code("push r0")
 	end,
 	["~~"] = function (rn)
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
 		cg:code("not r0, r0")
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("li r1, 1")
+		cg:code("and r0, r0, r1")
+		cg:code("push r0")
 	end,
 	["|"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("ior r0, r0, r1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r0")
+		cg:code("pop r1")
+		cg:code("or r0, r0, r1")
+		cg:code("push r0")
 	end,
 	["||"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("ior r0, r0, r1")
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("pop r0")
+		cg:code("pop r1")
+		cg:code("or r0, r0, r1")
+		cg:code("li r1, 1")
+		cg:code("and r0, r0, r1")
+		cg:code("push r0")
 	end,
 	["&"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
+		cg:code("pop r1")
 		cg:code("and r0, r0, r1")
-		cg:code("pushv r5, r0")
+		cg:code("push r0")
 	end,
 	["&&"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
+		cg:code("pop r1")
 		cg:code("and r0, r0, r1")
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("li r1, 1")
+		cg:code("and r0, r0, r1")
+		cg:code("push r0")
 	end,
 	[">>"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
+		cg:code("pop r1")
 		cg:code("rsh r0, r0, r1")
-		cg:code("pushv r5, r0")
+		cg:code("push r0")
 	end,
 	["<<"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
+		cg:code("pop r1")
 		cg:code("lsh r0, r0, r1")
-		cg:code("pushv r5, r0")
+		cg:code("push r0")
 	end,
 	["dup"] = function (rn)
-		cg:code("popv r5, r0")
-		cg:code("pushv r5, r0")
-		cg:code("pushv r5, r0")
+		cg:code("dup")
 	end,
 	["swap"] = function (rn)
-		cg:code("popv r5, r0")
-		cg:code("popv r5, r1")
-		cg:code("pushv r5, r0")
-		cg:code("pushv r5, r1")
+		cg:code("swap")
 	end,
 	["drop"] = function (rn)
-		cg:code("popv r5, r0")
+		cg:code("drop")
 	end,
 	["+"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
 		cg:code("add r0, r1, r0")
-		cg:code("pushv r5, r0")
+		cg:code("push r0")
 	end,
 	["-"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
 		cg:code("sub r0, r0, r1")
-		cg:code("pushv r5, r0")
+		cg:code("push r0")
 	end,
 	["*"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("mul r0, r1, r0")
-		cg:code("pushv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("mul r0, r0, r1")
+		cg:code("push r0")
 	end,
 	["/"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
 		cg:code("div r0, r0, r1")
-		cg:code("pushv r5, r0")
+		cg:code("push r0")
 	end,
 	["%"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
 		cg:code("mod r0, r0, r1")
-		cg:code("pushv r5, r0")
+		cg:code("push r0")
 	end,
 	["gb"] = function (rn)
-		cg:code("popv r5, r0")
-		cg:code("lrr.b r0, r0")
-		cg:code("pushv r5, r0")
+		cg:code("pop r0")
+		cg:code("l.b r0, r0")
+		cg:code("push r0")
 	end,
 	["gi"] = function (rn)
-		cg:code("popv r5, r0")
-		cg:code("lrr.i r0, r0")
-		cg:code("pushv r5, r0")
+		cg:code("pop r0")
+		cg:code("l.i r0, r0")
+		cg:code("push r0")
 	end,
 	["@"] = function (rn)
-		cg:code("popv r5, r0")
-		cg:code("lrr.l r0, r0")
-		cg:code("pushv r5, r0")
+		cg:code("pop r0")
+		cg:code("l.l r0, r0")
+		cg:code("push r0")
 	end,
 	["sb"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("srr.b r1, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("s.b r1, r0")
 	end,
 	["si"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("srr.i r1, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("s.i r1, r0")
 	end,
 	["!"] = function (rn)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("srr.l r1, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
+		cg:code("s.l r1, r0")
 	end,
 	["bitget"] = function (rn) -- (v bit -- bit)
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
+		cg:code("pop r1")
+		cg:code("pop r0")
 		cg:code("rsh r0, r0, r1")
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
+		cg:code("li r1, 1")
+		cg:code("and r0, r0, r1")
+		cg:code("push r0")
 	end,
 	["bitset"] = function (rn) -- (v bit -- v)
-		cg:code("popv r5, r0")
-		cg:code("popv r5, r1")
+		cg:code("pop r0")
+		cg:code("pop r1")
 		cg:code("bset r1, r1, r0")
-		cg:code("pushv r5, r1")
+		cg:code("push r1")
 	end,
 	["bitclear"] = function (rn) -- (v bit -- v)
-		cg:code("popv r5, r0")
-		cg:code("popv r5, r1")
+		cg:code("pop r0")
+		cg:code("pop r1")
 		cg:code("bclr r1, r1, r0")
-		cg:code("pushv r5, r1")
+		cg:code("push r1")
+	end,
+
+	-- a3x NCALLS
+
+	["DevTreeWalk"] = function (rn)
+		cg:code("a3x DevTreeWalk")
+	end,
+	["DeviceParent"] = function (rn)
+		cg:code("a3x DeviceParent")
+	end,
+	["DeviceSelectNode"] = function (rn)
+		cg:code("a3x DeviceSelectNode")
+	end,
+	["DeviceSelect"] = function (rn)
+		cg:code("a3x DeviceSelect")
+	end,
+	["DeviceNew"] = function (rn)
+		cg:code("a3x DeviceNew")
+	end,
+	["DeviceClone"] = function (rn)
+		cg:code("a3x DeviceClone")
+	end,
+	["DeviceCloneWalk"] = function (rn)
+		cg:code("a3x DeviceCloneWalk")
+	end,
+	["DSetName"] = function (rn)
+		cg:code("a3x DSetName")
+	end,
+	["DAddMethod"] = function (rn)
+		cg:code("a3x DAddMethod")
+	end,
+	["DSetProperty"] = function (rn)
+		cg:code("a3x DSetProperty")
+	end,
+	["DGetProperty"] = function (rn)
+		cg:code("a3x DGetProperty")
+	end,
+	["DGetMethod"] = function (rn)
+		cg:code("a3x GetMethod")
+	end,
+	["DCallMethod"] = function (rn)
+		cg:code("a3x DCallMethod")
+	end,
+	["DeviceExit"] = function (rn)
+		cg:code("a3x DeviceExit")
+	end,
+	["DGetName"] = function (rn)
+		cg:code("a3x DGetName")
+	end,
+	["Putc"] = function (rn)
+		cg:code("a3x Putc")
+	end,
+	["Getc"] = function (rn)
+		cg:code("a3x Getc")
+	end,
+	["Malloc"] = function (rn)
+		cg:code("a3x Malloc")
+	end,
+	["Calloc"] = function (rn)
+		cg:code("a3x Calloc")
+	end,
+	["Free"] = function (rn)
+		cg:code("a3x Free")
+	end,
+	["Puts"] = function (rn)
+		cg:code("a3x Puts")
+	end,
+	["Gets"] = function (rn)
+		cg:code("a3x Gets")
+	end,
+	["Printf"] = function (rn)
+		cg:code("a3x Printf")
+	end,
+	["DevIteratorInit"] = function (rn)
+		cg:code("a3x DevIteratorInit")
+	end,
+	["DevIterate"] = function (rn)
+		cg:code("a3x DevIterate")
+	end,
+
+	["code"] = function (rn)
+		cg:code("push code")
+	end,
+	["data"] = function (rn)
+		cg:code("push data")
+	end,
+	["slot"] = function (rn)
+		cg:code("push slot")
 	end,
 }
 
 local auto_ops = {
 	["@"] = function (rn)
-		cg:code("pushv r5, "..rn)
+		cg:code("push "..rn)
 	end,
 	["!"] = function (rn)
-		cg:code("popv r5, "..rn)
+		cg:code("pop "..rn)
 	end,
 	["+="] = function (rn)
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
 		cg:code("add "..rn..", "..rn..", r0")
 	end,
 	["-="] = function (rn)
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
 		cg:code("sub "..rn..", "..rn..", r0")
 	end,
 	["*="] = function (rn)
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
 		cg:code("mul "..rn..", "..rn..", r0")
 	end,
 	["/="] = function (rn)
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
 		cg:code("div "..rn..", "..rn..", r0")
 	end,
 	["%="] = function (rn)
-		cg:code("popv r5, r0")
+		cg:code("pop r0")
 		cg:code("mod "..rn..", "..rn..", r0")
 	end
 }
@@ -428,20 +512,21 @@ local auto_ops = {
 local inn = 0
 
 function codegen.genif(ifn)
-	local out = "._df_ifout_"..tostring(inn)
+	local out = "_df_ifout_"..tostring(inn)
 
 	inn = inn + 1
 
 	for k,v in ipairs(ifn.ifs) do
-		local nex = "._df_ifnex_"..tostring(inn)
+		local nex = "_df_ifnex_"..tostring(inn)
 
 		inn = inn + 1
 
 		codegen.block(v.conditional)
 
-		cg:code("popv r5, r0")
-		cg:code("cmpi r0, 0")
-		cg:code("be "..nex)
+		cg:code("pop r0")
+		cg:code("li r1, 0")
+		cg:code("e r0, r1")
+		cg:code("bt "..nex)
 
 		codegen.block(v.body)
 
@@ -461,13 +546,13 @@ end
 local wnn = 0
 
 function codegen.genwhile(wn)
-	local out = "._df_wout_"..tostring(wnn)
+	local out = "_df_wout_"..tostring(wnn)
 
 	bpushdown[#bpushdown + 1] = out
 
 	wnn = wnn + 1
 
-	local loop = "._df_wloop_"..tostring(wnn)
+	local loop = "_df_wloop_"..tostring(wnn)
 
 	cpushdown[#cpushdown + 1] = loop
 
@@ -477,9 +562,10 @@ function codegen.genwhile(wn)
 
 	codegen.block(wn.w.conditional)
 
-	cg:code("popv r5, r0")
-	cg:code("cmpi r0, 0")
-	cg:code("be "..out)
+	cg:code("pop r0")
+	cg:code("li r1, 0")
+	cg:code("e r0, r1")
+	cg:code("bt "..out)
 
 	codegen.block(wn.w.body)
 
@@ -527,8 +613,32 @@ function codegen.block(t)
 		if skip > 0 then
 			skip = skip - 1
 		else
-			if (v.tag == "putnumber") or (v.tag == "putextptr") or (v.tag == "putptr") then
-				cg:code("pushvi r5, "..tostring(v.name))
+			if v.tag == "putnumber" then
+				local i0 = band(v.name, 0xFFFF)
+				local i1 = rshift(v.name, 16)
+
+				cg:code("li r0, "..tostring(i0))
+
+				if v.name > 0xFFFF then
+					cg:code("lui r0, "..tostring(i1))
+				end
+
+				cg:code("push r0")
+			elseif v.tag == "putextptr" then
+				cerror(v, "a3x microcode doesn't support extern pointers (FIXME)")
+				return false
+			elseif v.tag == "putptr" then
+				if dsection[v.name] then
+					cg:code("push24 "..v.name)
+					cg:code("pop r0")
+					cg:code("add r0, r0, data")
+					cg:code("push r0")
+				else -- assume code
+					cg:code("push24 "..v.name)
+					cg:code("pop r0")
+					cg:code("add r0, r0, code")
+					cg:code("push r0")
+				end
 			elseif (v.tag == "pinput") or (v.tag == "poutput") or (v.tag == "pauto") then
 				local r = cproc.autos[v.name]
 
@@ -564,10 +674,14 @@ function codegen.block(t)
 			elseif v.tag == "index" then
 				if not codegen.block(v.block) then return false end
 
-				cg:code("popv r5, r0")
-				cg:code("muli r0, r0, 4")
-				cg:code("addi r0, r0, "..v.tab.name)
-				cg:code("pushv r5, r0")
+				cg:code("pop r0")
+				cg:code("li r1, 4")
+				cg:code("mul r0, r0, r1")
+				cg:code("push24 "..v.tab.name)
+				cg:code("pop r1")
+				cg:code("add r0, r0, r1")
+				cg:code("add r0, r0, data")
+				cg:code("push r0")
 			elseif v.tag == "if" then
 				if not codegen.genif(v) then return false end
 			elseif v.tag == "while" then
@@ -577,7 +691,10 @@ function codegen.block(t)
 			elseif v.tag == "putstring" then
 				local sno = codegen.string(v.name)
 
-				cg:code("pushvi r5, "..sno)
+				cg:code("push24 "..sno)
+				cg:code("pop r0")
+				cg:code("add r0, r0, code")
+				cg:code("push r0")
 			else
 				cerror(v, "weird AST node "..(v.tag or "NULL"))
 				return false
@@ -590,19 +707,19 @@ end
 
 function codegen.save()
 	for i = 1, #cproc.allocr do
-		cg:code("push "..cproc.allocr[i])
+		cg:code("rpush "..cproc.allocr[i])
 	end
 end
 
 function codegen.restore()
 	for i = #cproc.allocr, 1, -1 do
-		cg:code("pop "..cproc.allocr[i])
+		cg:code("rpop "..cproc.allocr[i])
 	end
 end
 
 function codegen.fret()
 	for i = 1, #cproc.outo do
-		cg:code("pushv r5, "..cproc.outo[i])
+		cg:code("push "..cproc.outo[i])
 	end
 
 	codegen.restore()
@@ -613,9 +730,9 @@ end
 function codegen.procedure(t)
 	cg:code(t.name..":")
 
-	if t.public then
-		cg:code(".global "..t.name)
-	end
+	--if t.public then
+	--	cg:code(".global "..t.name)
+	--end
 
 	cproc = {}
 	cproc.proc = t
@@ -630,7 +747,7 @@ function codegen.procedure(t)
 	local inv = {}
 
 	for _,name in ipairs(t.inputso) do
-		if ru > 29 then
+		if ru > 27 then
 			cerror(t, "couldn't allocate input "..name)
 			return false
 		end
@@ -647,7 +764,7 @@ function codegen.procedure(t)
 	end
 
 	for _,name in pairs(t.outputso) do
-		if ru > 29 then
+		if ru > 27 then
 			cerror(t, "couldn't allocate output "..name)
 			return false
 		end
@@ -664,7 +781,7 @@ function codegen.procedure(t)
 	end
 
 	for name,_ in pairs(t.autos) do
-		if ru > 29 then
+		if ru > 27 then
 			cerror(t, "couldn't allocate auto "..name)
 			return false
 		end
@@ -681,7 +798,7 @@ function codegen.procedure(t)
 	codegen.save()
 
 	for i = 1, #inv do
-		cg:code("popv r5, "..inv[i])
+		cg:code("pop "..inv[i])
 	end
 
 	if not codegen.block(t.block) then return false end
@@ -691,7 +808,25 @@ function codegen.procedure(t)
 	return true
 end
 
+function codegen.aucinit()
+	for k,v in ipairs(datainits) do
+		cg:code("push24 "..tostring(v[2]))
+		cg:code("push24 "..tostring(v[1]))
+		cg:code("pop r0")
+		cg:code("pop r1")
+		if v[3] then
+			cg:code("add r1, r1, code")
+		end
+		cg:code("add r0, r0, data")
+		cg:code("s.l r0, r1")
+	end
+
+	cg:code("b UcodeStart")
+end
+
 function codegen.code(ast)
+	codegen.aucinit()
+
 	for e,t in pairs(ast) do
 		if t.tag == "procedure" then
 			if not codegen.procedure(t) then return false end
@@ -742,9 +877,9 @@ function codegen.gen(ast, extern, externconst, var, deftable, export, defproc, b
 
 	codegen.extern(extern, externconst)
 
-	if not codegen.code(ast) then return false end
-
 	codegen.data(var, deftable, buffer)
+
+	if not codegen.code(ast) then return false end
 
 	codegen.export(export)
 
@@ -778,15 +913,11 @@ local function lineate(str)
 end
 
 local function ispushv(s)
-	return s:sub(1,10) == "pushv r5, "
+	return s:sub(1,5) == "push "
 end
 
 local function ispopv(s)
-	return s:sub(1,9) == "popv r5, " 
-end
-
-local function ispushvi(s)
-	return s:sub(1,11) == "pushvi r5, "
+	return s:sub(1,4) == "pop " 
 end
 
 -- extremely naive simple optimizer to straighten stack kinks
@@ -808,8 +939,8 @@ function codegen.opt(asm)
 		local vt = tokenize(v)
 		local at = tokenize(la)
 
-		local vr = vt[3] or "HMM"
-		local ar = at[3] or "HMMM"
+		local vr = vt[2] or "HMM"
+		local ar = at[2] or "HMMM"
 
 		i = i + 1
 
@@ -821,24 +952,6 @@ function codegen.opt(asm)
 					out = out .. "mov " .. ar .. ", " .. vr .. "\n"
 					i = i + 1
 				end
-			else
-				out = out .. v .. "\n"
-			end
-		elseif ispopv(v) then
-			if ispushv(la) then
-				if vr == ar then
-					out = out .. "lrr.l " .. vr .. ", r5\n"
-					i = i + 1
-				else
-					out = out .. v .. "\n"
-				end
-			else
-				out = out .. v .. "\n"
-			end
-		elseif ispushvi(v) then
-			if ispopv(la) then
-				out = out .. "li " .. ar .. ", " .. vr .. "\n"
-				i = i + 1
 			else
 				out = out .. v .. "\n"
 			end

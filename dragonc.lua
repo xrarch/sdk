@@ -15,14 +15,19 @@ local sd = getdirectory(arg[0])
 
 local flat = false
 local incdir = ""
+local target = "target=limn1k"
 
-for k,v in pairs(arg) do
+local narg = {}
+
+for k,v in ipairs(arg) do
 	if v == "-flat" then
 		flat = true
-		table.remove(arg, k)
 	elseif v:sub(1,7) == "incdir=" then
 		incdir = v
-		table.remove(arg, k)
+	elseif v:sub(1,7) == "target=" then
+		target = v
+	else
+		narg[#narg + 1] = v
 	end
 end
 
@@ -36,20 +41,24 @@ end
 local sourcef = {}
 local destf = {}
 
-if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
+if (#narg < 2) or (math.floor(#narg/2) ~= #narg/2) then
 	print("argument mismatch")
 	printhelp()
 	return
 end
 
-for i = 1, #arg/2 do
-	sourcef[#sourcef + 1] = arg[i]
-	destf[#destf + 1] = arg[#arg/2 + i]
+for i = 1, #narg/2 do
+	sourcef[#sourcef + 1] = narg[i]
+	destf[#destf + 1] = narg[#narg/2 + i]
 end
 
 local lua = sd.."lua.sh "
-local dragonc = sd.."dragonfruit/dragonc.lua "
-local asm = sd.."asm/asm.lua "
+local dragonc = sd.."dragonfruit/dragonc.lua "..target.." "..incdir.." "
+local asm = sd.."asm/asm.lua "..target.." "
+
+if flat then
+	asm = asm .. "-flat "
+end
 
 for k,v in ipairs(sourcef) do
 	local ed = getdirectory(v)
@@ -59,19 +68,14 @@ for k,v in ipairs(sourcef) do
 	local err
 
 	-- is there a better way to do this? probably.
-	err = os.execute(lua..dragonc..v.." "..eout..incdir)
+	err = os.execute(lua..dragonc..v.." "..eout)
 
 	if err > 0 then os.exit(1) end
 
-	if flat then
-		err = os.execute(lua..asm.."-flat "..eout..destf[k])
+	err = os.execute(lua..asm..eout..destf[k])
 
-		if err > 0 then os.exit(1) end
-	else
-		err = os.execute(lua..asm..eout..destf[k])
+	if err > 0 then os.exit(1) end
 
-		if err > 0 then os.exit(1) end
-	end
 	err = os.execute("rm "..eout)
 
 	if err > 0 then os.exit(1) end

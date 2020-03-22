@@ -44,21 +44,26 @@ local incdir = {}
 
 local targets = {
 	["limn1k"] = "cg-limn1k.lua",
+	["auc"] = "cg-auc.lua",
 }
 
 local target = "limn1k"
 
-for k,v in pairs(arg) do
+local narg = {}
+
+for k,v in ipairs(arg) do
 	if v:sub(1,7) == "incdir=" then
 		local incs = v:sub(8)
-		table.remove(arg, k)
 
 		incdir = explode(":", incs)
 	elseif v:sub(1,7) == "target=" then
 		target = v:sub(8)
-		table.remove(arg, k)
+	else
+		narg[#narg + 1] = v
 	end
 end
+
+arg = narg
 
 if not targets[target] then
 	print("dragonc: no such target "..target)

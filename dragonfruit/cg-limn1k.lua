@@ -170,46 +170,44 @@ local prim_ops = {
 		cg:code("popv r5, r1")
 		cg:code("popv r5, r0")
 		cg:code("cmp r0, r1")
-		cg:code("not rf, rf")
-		cg:code("andi r0, rf, 0x1") -- isolate eq bit in flag register
+		cg:code("not r0, rf")
+		cg:code("andi r0, r0, 0x1") -- isolate eq bit in flag register
 		cg:code("pushv r5, r0")
 	end,
 	[">"] = function (rn)
 		cg:code("popv r5, r1")
 		cg:code("popv r5, r0")
 		cg:code("cmp r0, r1")
-		cg:code("rshi r0, rf, 0x1") -- isolate gt bit in flag register
-		cg:code("andi r0, r0, 1")
-		cg:code("pushv r5, r0")
-	end,
-	["<"] = function (rn) -- NOT FLAG:1 and NOT FLAG:0
-		cg:code("popv r5, r1")
-		cg:code("popv r5, r0")
-		cg:code("cmp r0, r1")
+		cg:code("rshi r0, rf, 0x1") -- isolate carry bit in flag register
+		cg:code("not r0, r0")
 		cg:code("not r1, rf")
-		cg:code("rshi r0, r1, 0x1") -- isolate gt bit in flag register
-		cg:code("andi r0, r0, 1")
-		cg:code("not rf, rf")
-		cg:code("and r0, r0, rf")
+		cg:code("and r0, r0, r1")
 		cg:code("andi r0, r0, 1")
 		cg:code("pushv r5, r0")
 	end,
-	[">="] = function (rn)
+	["<"] = function (rn)
 		cg:code("popv r5, r1")
 		cg:code("popv r5, r0")
 		cg:code("cmp r0, r1")
-		cg:code("mov r0, rf")
-		cg:code("rshi rf, rf, 1") -- bitwise magic
-		cg:code("ior r0, r0, rf")
+		cg:code("rshi r0, rf, 0x1") -- isolate carry bit in flag register
 		cg:code("andi r0, r0, 1")
 		cg:code("pushv r5, r0")
 	end,
-	["<="] = function (rn)
+	[">="] = function (rn) -- not carry
 		cg:code("popv r5, r1")
 		cg:code("popv r5, r0")
 		cg:code("cmp r0, r1")
-		cg:code("not rf, rf")
-		cg:code("rshi r0, rf, 0x1") -- isolate gt bit in flag register
+		cg:code("rshi r0, rf, 1")
+		cg:code("not r0, r0")
+		cg:code("andi r0, r0, 1")
+		cg:code("pushv r5, r0")
+	end,
+	["<="] = function (rn) -- carry or zero
+		cg:code("popv r5, r1")
+		cg:code("popv r5, r0")
+		cg:code("cmp r0, r1")
+		cg:code("rshi r1, rf, 1")
+		cg:code("ior r0, rf, r1")
 		cg:code("andi r0, r0, 1")
 		cg:code("pushv r5, r0")
 	end,
@@ -217,19 +215,18 @@ local prim_ops = {
 		cg:code("popv r5, r1")
 		cg:code("popv r5, r0")
 		cg:code("cmps r0, r1")
-		cg:code("rshi r0, rf, 0x1") -- isolate gt bit in flag register
+		cg:code("rshi r0, rf, 0x1") -- isolate carry bit in flag register
+		cg:code("not r0, r0")
+		cg:code("not r1, rf")
+		cg:code("and r0, r0, r1")
 		cg:code("andi r0, r0, 1")
 		cg:code("pushv r5, r0")
 	end,
-	["s<"] = function (rn) -- NOT FLAG:1 and NOT FLAG:0
+	["s<"] = function (rn)
 		cg:code("popv r5, r1")
 		cg:code("popv r5, r0")
 		cg:code("cmps r0, r1")
-		cg:code("not r1, rf")
-		cg:code("rshi r0, r1, 0x1") -- isolate gt bit in flag register
-		cg:code("andi r0, r0, 1")
-		cg:code("not rf, rf")
-		cg:code("and r0, r0, rf")
+		cg:code("rshi r0, rf, 0x1") -- isolate carry bit in flag register
 		cg:code("andi r0, r0, 1")
 		cg:code("pushv r5, r0")
 	end,
@@ -237,9 +234,8 @@ local prim_ops = {
 		cg:code("popv r5, r1")
 		cg:code("popv r5, r0")
 		cg:code("cmps r0, r1")
-		cg:code("mov r0, rf")
-		cg:code("rshi rf, rf, 1") -- bitwise magic
-		cg:code("ior r0, r0, rf")
+		cg:code("rshi r0, rf, 1")
+		cg:code("not r0, r0")
 		cg:code("andi r0, r0, 1")
 		cg:code("pushv r5, r0")
 	end,
@@ -247,8 +243,8 @@ local prim_ops = {
 		cg:code("popv r5, r1")
 		cg:code("popv r5, r0")
 		cg:code("cmps r0, r1")
-		cg:code("not rf, rf")
-		cg:code("rshi r0, rf, 0x1") -- isolate gt bit in flag register
+		cg:code("rshi r1, rf, 1")
+		cg:code("ior r0, rf, r1")
 		cg:code("andi r0, r0, 1")
 		cg:code("pushv r5, r0")
 	end,

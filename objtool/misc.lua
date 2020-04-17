@@ -84,6 +84,7 @@ function cast(struct, tab, offset)
             s.t[s.s.o[n] + s.o + 2] = b2
             s.t[s.s.o[n] + s.o + 3] = b1
         elseif s.s.sz[n] == 1 then
+            val = val % 255
             s.t[s.s.o[n] + s.o] = val
         else
             error("no support for vals size "..tostring(s.s.sz[n]))

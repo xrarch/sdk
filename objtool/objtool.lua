@@ -9,19 +9,41 @@ local function getdirectory(p)
 end
 local sd = getdirectory(arg[0])
 
-local aixo = dofile(sd.."aixo.lua")
+local function explode(d,p)
+    local t, ll
+    t={}
+    ll=0
+    if(#p == 1) then return {p} end
+        while true do
+            l=string.find(p,d,ll,true) -- find the next d in the string
+            if l~=nil then -- if "not not" found then..
+                table.insert(t, string.sub(p,ll,l-1)) -- Save it in our array.
+                ll=l+1 -- save just after where we found it for searching next time.
+            else
+                table.insert(t, string.sub(p,ll)) -- Save what's left in our array.
+                break -- Break at end, as it should be, according to the lua manual.
+            end
+        end
+    return t
+end
+
+local loff = dofile(sd.."loff.lua")
 
 local dimg = arg[1]
 
 local function usage()
 	print("== objtool.lua ==")
-	print("utility to manipulate AIsiX Object (AIXO) images")
+	print("utility to manipulate LIMN Object File Format (LOFF) images")
 	print("usage: objtool.lua [command] [args] ...")
 	print([[commands:
-	symbols [aixo]: dump symbols
-	fixups [aixo]: dump hanging symbols
-	flatten [aixo] <relocation base>: flatten an aixo file (convert to raw binary)
-	link [output] [aixo1 aixo2 ... ]: link 2 or more aixo files
+	info [loff]: show info about the file
+	symbols [loff]: dump symbols
+	fixups [loff]: dump fixup table
+	externs [loff]: dump unresolved external symbols
+	move [loff] [move expression]: move a loff file in memory
+	strip [loff]: strip linking information from loff file
+	binary [loff] [base address] (bss address): flatten a loff file, will expand BSS section in file unless address is provided
+	link (-f) [output] [loff1 loff2 ... ]: link 2 or more loff files
 ]])
 end
 
@@ -30,13 +52,35 @@ if #arg < 1 then
 	os.exit(1)
 end
 
-if arg[1] == "symbols" then
+local symtypen = {"global","local","extern"}
+
+local sectionn = {"text","data","bss"}
+
+local archn = {"limn1k","limn2k","a3x ucode"}
+
+if arg[1] == "info" then
 	if not arg[2] then
 		usage()
 		os.exit(1)
 	end
 
-	local image = aixo.new(arg[2])
+	local image = loff.new(arg[2])
+	if not image then
+		os.exit(1)
+	end
+
+	if not image:load() then
+		os.exit(1)
+	end
+
+	print(string.format("architecture: %s", archn[image.codeType] or "UNKNOWN"))
+elseif arg[1] == "symbols" then
+	if not arg[2] then
+		usage()
+		os.exit(1)
+	end
+
+	local image = loff.new(arg[2])
 	if not image then
 		os.exit(1)
 	end
@@ -47,9 +91,13 @@ if arg[1] == "symbols" then
 
 	local x = false
 
-	for k,v in pairs(image.symbols) do
-		print(string.format("%s = $%X", k, v))
-		x = true
+	for i = 0, #image.symbols do
+		local v = image.symbols[i]
+
+		if v then
+			print(string.format("%s %s = %s: $%X", symtypen[v.symtype], v.name, (image.sections[v.section] or {["name"]="extern"}).name, v.value))
+			x = true
+		end
 	end
 
 	if not x then
@@ -61,7 +109,7 @@ elseif arg[1] == "fixups" then
 		os.exit(1)
 	end
 
-	local image = aixo.new(arg[2])
+	local image = loff.new(arg[2])
 	if not image then
 		os.exit(1)
 	end
@@ -70,23 +118,26 @@ elseif arg[1] == "fixups" then
 		os.exit(1)
 	end
 
-	local x = false
+	for i = 1, 2 do
+		local s = image.sections[i]
 
-	for k,v in ipairs(image.fixups) do
-		print(string.format("%s @ $%X", v[1], v[2]))
-		x = true
-	end
+		for k,v in ipairs(s.fixups) do
+			local sym = v.symbol
 
-	if not x then
-		print("objtool: no unresolved symbols!")
+			if sym then
+				print(string.format("%s: %x ref %s: %s (@%x) (target type: %x)", s.name, v.offset, (image.sections[sym.section] or {["name"]="extern"}).name, sym.name, sym.value, v.size))
+			else
+				print(string.format("%s: %x relocation (target type: %x)", s.name, v.offset, v.size))
+			end
+		end
 	end
-elseif arg[1] == "flatten" then
+elseif arg[1] == "strip" then
 	if not arg[2] then
 		usage()
 		os.exit(1)
 	end
 
-	local image = aixo.new(arg[2])
+	local image = loff.new(arg[2])
 	if not image then
 		os.exit(1)
 	end
@@ -95,7 +146,138 @@ elseif arg[1] == "flatten" then
 		os.exit(1)
 	end
 
-	if not image:flatten(tonumber(arg[3])) then
+	image.linkable = false
+
+	if not image:write() then
+		os.exit(1)
+	end
+elseif arg[1] == "externs" then
+	if not arg[2] then
+		usage()
+		os.exit(1)
+	end
+
+	local image = loff.new(arg[2])
+	if not image then
+		os.exit(1)
+	end
+
+	if not image:load() then
+		os.exit(1)
+	end
+
+	for i = 0, #image.symbols do
+		local v = image.symbols[i]
+
+		if v and v.symtype == 3 then
+			print(string.format("%s", v.name))
+		end
+	end
+elseif arg[1] == "move" then
+	if not arg[2] then
+		usage()
+		os.exit(1)
+	end
+
+	if not arg[3] then
+		usage()
+		os.exit(1)
+	end
+
+	local image = loff.new(arg[2])
+	if not image then
+		os.exit(1)
+	end
+
+	if not image:load() then
+		os.exit(1)
+	end
+
+	local textaddress = image.sections[1].linkedAddress
+	local dataaddress = image.sections[2].linkedAddress
+	local bssaddress = image.sections[3].linkedAddress
+
+	local expr = explode(",", arg[3])
+
+	local sectionnum = {
+		["text"] = 1,
+		["data"] = 2,
+		["bss"] = 3,
+	}
+
+	local reloced = {}
+
+	for k,v in ipairs(expr) do
+		local exp = explode("=", v)
+
+		local s = exp[1]
+
+		local section = sectionnum[s]
+
+		if not section then
+			print("objtool: not a section: '"..s.."'")
+			os.exit(1)
+		end
+
+		local x = exp[2]
+
+		local addends = explode("+", x)
+
+		local r = 0
+
+		for k,v in ipairs(addends) do
+			if v == "text" then
+				r = r + image.sections[1].linkedAddress
+			elseif v == "data" then
+				r = r + image.sections[2].linkedAddress
+			elseif v == "bss" then
+				r = r + image.sections[3].linkedAddress
+			elseif v == "text_size" then
+				r = r + image.sections[1].size
+			elseif v == "data_size" then
+				r = r + image.sections[2].size
+			elseif v == "bss_size" then
+				r = r + image.sections[3].size
+			elseif v == "text_offset" then
+				r = r + image.sections[1].offset
+			elseif v == "data_offset" then
+				r = r + image.sections[2].offset
+			elseif v == "bss_offset" then
+				r = r + image.sections[3].offset
+			elseif tonumber(v) then
+				r = r + tonumber(v)
+			else
+				print("objtool: I don't know what "..v.." is")
+				os.exit(1)
+			end
+		end
+
+		reloced[section] = true
+
+		if not image:relocTo(section, r) then
+			os.exit(1)
+		end
+	end
+
+	if not image:write() then
+		os.exit(1)
+	end
+elseif arg[1] == "binary" then
+	if not arg[2] then
+		usage()
+		os.exit(1)
+	end
+
+	local image = loff.new(arg[2])
+	if not image then
+		os.exit(1)
+	end
+
+	if not image:load() then
+		os.exit(1)
+	end
+
+	if not image:binary(tonumber(arg[3]), tonumber(arg[4])) then
 		os.exit(1)
 	end
 elseif arg[1] == "link" then
@@ -108,15 +290,17 @@ elseif arg[1] == "link" then
 
 	if not (arg[2] and arg[3]) then
 		usage()
-		return
+		os.exit(1)
 	end
 
 	local linked = {}
 
-	local out = aixo.new(arg[2])
+	local out = loff.new(arg[2])
 	if not out then
-		return
+		os.exit(1)
 	end
+
+	out.linkable = true
 
 	for i = 3, #arg do
 		local imgname = arg[i]
@@ -130,7 +314,7 @@ elseif arg[1] == "link" then
 				imgname = sd.."../lib/"..imgname:sub(3)
 			end
 
-			local image = aixo.new(imgname)
+			local image = loff.new(imgname)
 			if not image then
 				os.exit(1)
 			end
@@ -145,14 +329,24 @@ elseif arg[1] == "link" then
 		end
 	end
 
-	if out.fixupCount > 0 then
-		if not fragment then
+	if not fragment then
+		local unr = {}
+
+		for i = 0, #out.symbols do
+			local sym = out.symbols[i]
+
+			if sym and (not sym.resolved) then
+				if sym.symtype == 3 then
+					unr[#unr + 1] = sym
+				end
+			end
+		end
+
+		if #unr > 0 then
 			print("objtool: error: unresolved symbols:")
 
-			for k,v in ipairs(out.fixups) do
-				if v[1] then
-					print("  "..v[1].." in "..v[3])
-				end
+			for k,v in ipairs(unr) do
+				print(string.format("  %s: %s", v.file, v.name))
 			end
 
 			os.exit(1)

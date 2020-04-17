@@ -15,8 +15,9 @@ local sd = getdirectory(arg[0])
 dofile(sd.."misc.lua")
 
 local targets = {
-	["limn1k"] = "0x1",
-	["auc"] = "0x3",
+	["limn1k"] = 0x1,
+	["limn2k"] = 0x2,
+	["auc"] = 0x3,
 }
 
 local function lerror(line, err)
@@ -120,19 +121,125 @@ function asm.lines(block, source, filename)
 	return true
 end
 
+local function section(block, id, bss)
+	local me = {}
+
+	local symtab = block.symtab
+
+	me.bss = bss
+
+	me.contents = ""
+
+	me.size = 0
+
+	me.tbc = 0
+
+	me.id = id
+
+	me.fixups = {}
+
+	function me:addByte(byte)
+		if not self.bss then
+			self.contents = self.contents .. string.char(byte)
+		end
+
+		self.size = self.size + 1
+	end
+
+	function me:addInt(int)
+		if not self.bss then
+			local u1, u2 = splitInt16(int)
+
+			self.contents = self.contents .. string.char(u2) .. string.char(u1)
+		end
+
+		self.size = self.size + 2
+	end
+
+	function me:addTriplet(three)
+		if not self.bss then
+			local u1, u2, u3 = splitInt24(three)
+
+			self.contents = self.contents .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		end
+
+		self.size = self.size + 3
+	end
+
+	function me:addLong(long)
+		if not self.bss then
+			local u1, u2, u3, u4 = splitInt32(long)
+
+			self.contents = self.contents .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		end
+
+		self.size = self.size + 4
+	end
+
+	function me:setGlobal(name)
+		symtab:getSymbol(name).symtype = "global"
+	end
+
+	function me:addLocal(name, off)
+		symtab:addSymbol(name, self, "local", off)
+	end
+
+	function me:addFixup(sym, off, size)
+		self.fixups[#self.fixups + 1] = {}
+		self.fixups[#self.fixups].sym = sym
+		self.fixups[#self.fixups].value = off
+		self.fixups[#self.fixups].size = size
+	end
+
+	me.fixuptab = ""
+	me.fixupcount = 0
+
+	function me:addBinaryFixup(symindex, offset, size)
+		local u1, u2, u3, u4 = splitInt32(symindex)
+		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		u1, u2, u3, u4 = splitInt32(offset)
+		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		u1, u2, u3, u4 = splitInt32(size)
+		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		self.fixupcount = self.fixupcount + 1
+	end
+
+	return me
+end
+
 function asm.labels(block)
-	block.globals = {}
-	block.extern = {}
-	block.structs = {}
+	block.sections = {}
+	block.sections["text"] = section(block, 1)
+	block.sections["data"] = section(block, 2)
+	block.sections["bss"] = section(block, 3, true)
+
 	block.localLabels = {}
-	local byteCount = 0
-	local rawByteCount = 0
+
 	local curStruct = false
 	local strCount = 0
 	local curLabel
 
 	local inst = block.inst
 	local regs = block.regs
+
+	local section = block.sections["text"]
+
+	local symtab = block.symtab
+
+	symtab:addSymbol("_text", block.sections["text"], "special", 1)
+	symtab:addSymbol("_text_size", block.sections["text"], "special", 2)
+	symtab:addSymbol("_text_end", block.sections["text"], "special", 3)
+
+	symtab:addSymbol("_data", block.sections["data"], "special", 1)
+	symtab:addSymbol("_data_size", block.sections["data"], "special", 2)
+	symtab:addSymbol("_data_end", block.sections["data"], "special", 3)
+
+	symtab:addSymbol("_bss", block.sections["bss"], "special", 1)
+	symtab:addSymbol("_bss_size", block.sections["bss"], "special", 2)
+	symtab:addSymbol("_bss_end", block.sections["bss"], "special", 3)
 
 	for k,v in ipairs(block.lines) do
 		local tokens = tokenize(v.text)
@@ -141,11 +248,11 @@ function asm.labels(block)
 
 		if curStruct then
 			if word == "end-struct" then
-				block.labels[curStruct.."_sizeof"] = strCount
+				symtab:addConstant(curStruct.."_sizeof", strCount)
 				curStruct = false
 				strCount = 0
 			elseif #tokens == 2 then
-				block.labels[curStruct.."_"..word] = strCount
+				symtab:addConstant(curStruct.."_"..word, strCount)
 
 				local sz = tonumber(tokens[2])
 
@@ -162,7 +269,8 @@ function asm.labels(block)
 
 			v:destroy()
 		else
-			v.offset = rawByteCount
+			v.section = section
+			v.offset = {section.tbc}
 
 			if word:sub(-1,-1) == ":" then -- label
 				if word:sub(1,1) == "." then -- local label
@@ -178,21 +286,19 @@ function asm.labels(block)
 						return false
 					end
 
-					ll[word:sub(2,-2)] = byteCount
+					ll[word:sub(2,-2)] = section.tbc
 
 					v:destroy()
 				else
-					if block.labels[word:sub(1,-2)] then
-						lerror(v, "can't define label '"..word:sub(1,-2).."' twice.")
+					local sy = symtab:getSymbol(word:sub(1,-2))
+
+					if sy and sy.symtype ~= "extern" then
+						lerror(v, "can't define symbol '"..word:sub(1,-2).."' twice.")
 						return false
 					else
 						curLabel = word:sub(1,-2)
 
-						if block.extern[curLabel] then
-							block.extern[curLabel] = false
-						end
-
-						block.labels[curLabel] = byteCount
+						section:addLocal(curLabel, section.tbc)
 
 						block.localLabels[curLabel] = {}
 					end
@@ -205,16 +311,26 @@ function asm.labels(block)
 					return false
 				end
 
-				if block.labels[word] then
+				if symtab:getSymbol(word) then
 					lerror(v, "can't define constant; symbol '"..word.."' cannot be defined twice.")
 					return false
 				end
-				
-				block.labels[word] = value
 
-				block.constants[word] = true
+				symtab:addConstant(word, tonumber(tokens[3]))
 
 				v:destroy()
+			elseif word == ".section" then
+				if tokens[2] then
+					if not block.sections[tokens[2]] then
+						lerror(v, "not a section")
+						return false
+					else
+						section = block.sections[tokens[2]]
+					end
+				else
+					lerror(v, "no name provided for section")
+					return false
+				end
 			elseif word == ".struct" then
 				curStruct = tokens[2]
 
@@ -248,78 +364,68 @@ function asm.labels(block)
 				v.static = sc
 				v.staticsize = size
 
-				byteCount = byteCount + size
-				rawByteCount = rawByteCount + size
+				section.tbc = section.tbc + size
+				v.offset[2] = size
 			elseif word == ".db" then
 				if #tokens == 1 then
 					lerror(v, ".db needs 2+ arguments")
 					return false
 				end
 
-				byteCount = byteCount + (#tokens - 1)
-				rawByteCount = rawByteCount + (#tokens - 1)
+				v.offsets = {}
+
+				for i = 2, #tokens do
+					v.offsets[#v.offsets + 1] = {section.tbc, 1}
+					section.tbc = section.tbc + 1
+				end
 			elseif word == ".di" then
 				if #tokens == 1 then
 					lerror(v, ".di needs 2+ arguments")
 					return false
 				end
 
-				byteCount = byteCount + ((#tokens - 1) * 2)
-				rawByteCount = rawByteCount + ((#tokens - 1) * 2)
+				v.offsets = {}
+
+				for i = 2, #tokens do
+					v.offsets[#v.offsets + 1] = {section.tbc, 2}
+					section.tbc = section.tbc + 2
+				end
 			elseif word == ".dl" then
 				if #tokens == 1 then
 					lerror(v, ".dl needs 2+ arguments")
 					return false
 				end
 
-				byteCount = byteCount + ((#tokens - 1) * 4)
-				rawByteCount = rawByteCount + ((#tokens - 1) * 4)
+				v.offsets = {}
+
+				for i = 2, #tokens do
+					v.offsets[#v.offsets + 1] = {section.tbc, 4}
+					section.tbc = section.tbc + 4
+				end
 			elseif word == ".ds" then
-				byteCount = byteCount + #v.text:sub(5)
-				rawByteCount = rawByteCount + #v.text:sub(5)
+				section.tbc = section.tbc + #v.text:sub(5)
+				v.offset[2] = #v.text:sub(5)
 			elseif word == ".ds$" then
 				if #tokens == 1 then
 					lerror(v, ".ds$ needs a symbol")
 					return false
 				end
 
-				if not block.labels[tokens[2]] then
+				if not block.constants[tokens[2]] then
 					lerror(v, "'"..tokens[2].."' is not a symbol")
 					return false
 				end
 
-				byteCount = byteCount + #tostring(block.labels[tokens[2]])
-				rawByteCount = rawByteCount + #tostring(block.labels[tokens[2]])
+				section.tbc = section.tbc + #tostring(block.constants[tokens[2]])
+				v.offset[2] = #tostring(block.constants[tokens[2]])
 			elseif word == ".bytes" then
 				if tonumber(tokens[2]) then
-					byteCount = byteCount + tonumber(tokens[2])
-					rawByteCount = rawByteCount + tonumber(tokens[2])
+					section.tbc = section.tbc + tonumber(tokens[2])
+					v.offset[2] = tonumber(tokens[2])
 				else
 					lerror(v, ".bytes: invalid number")
 					return false
 				end
-			elseif word == ".fill" then
-				if tonumber(tokens[2]) then
-					byteCount = tonumber(tokens[2])
-					rawByteCount = rawByteCount + tonumber(tokens[2])
-				else
-					lerror(v, ".fill: invalid number")
-					return false
-				end
-			elseif word == ".org" then
-				if tokens[2] then
-					if tonumber(tokens[2]) then
-						byteCount = tonumber(tokens[2])
-					else
-						lerror(v, ".org: invalid number")
-						return false
-					end
-				else
-					lerror(v, ".org: unfinished org")
-					return false
-				end
-
-				v:destroy()
 			elseif word == ".bc" then
 				if not tokens[2] then
 					lerror(v, ".bc: needs symbol")
@@ -329,18 +435,30 @@ function asm.labels(block)
 				if tokens[2] == "@" then
 					v:replace(".bc "..tostring(byteCount))
 				end
+			elseif word == ".align" then
+				if tokens[2] then
+					if tonumber(tokens[2]) then
+						section.tbc = math.ceil(section.tbc / tonumber(tokens[2])) * tonumber(tokens[2])
+					else
+						lerror(v, ".align: invalid number")
+						return false
+					end
+				else
+					lerror(v, ".align: unfinished align")
+					return false
+				end
 			elseif word == ".global" then
 				if not tokens[2] then
 					lerror(v, ".global: needs symbol")
 					return false
 				end
 
-				if not block.labels[tokens[2]] then
+				if not symtab:getSymbol(tokens[2]) then
 					lerror(v, ".global: '"..tokens[2].."' is not a symbol")
 					return false
 				end
 
-				block.globals[tokens[2]] = block.labels[tokens[2]]
+				section:setGlobal(tokens[2])
 
 				v:destroy()
 			elseif word == ".extern" then
@@ -349,11 +467,21 @@ function asm.labels(block)
 					return false
 				end
 
-				if block.labels[tokens[2]] then
+				if symtab:getSymbol(tokens[2]) then
 					lerror(v, ".extern: '"..tokens[2].."' is already a symbol")
+					return false
 				end
 
-				block.extern[tokens[2]] = true
+				symtab:addExtern(tokens[2])
+
+				v:destroy()
+			elseif word == ".entry" then
+				if not symtab:getSymbol(tokens[2]) then
+					lerror(v, ".entry: '"..tokens[2].."' is not a symbol")
+					return false
+				end
+
+				symtab:setEntry(tokens[2])
 
 				v:destroy()
 			else
@@ -366,18 +494,17 @@ function asm.labels(block)
 
 				v.offsets = {}
 
-				v.offsets[1] = rawByteCount
-
-				local off = rawByteCount + 1
+				local off = section.tbc + 1
 
 				for i = 1, #e[3] do
-					v.offsets[i+1] = off
+					v.offsets[#v.offsets + 1] = {off, e[3][i]}
 
 					off = off + e[3][i]
 				end
 
-				byteCount = byteCount + e[1]
-				rawByteCount = rawByteCount + e[1]
+				section.tbc = section.tbc + e[1]
+
+				v.offset[2] = e[1]
 			end
 
 		end
@@ -387,12 +514,12 @@ function asm.labels(block)
 end
 
 function asm.decode(block) -- decode labels, registers, strings
-	block.reloc = {}
-
 	local curLabel
 
 	local inst = block.inst
 	local regs = block.regs
+
+	local symtab = block.symtab
 
 	for k,v in ipairs(block.lines) do
 		if v.text then
@@ -406,10 +533,10 @@ function asm.decode(block) -- decode labels, registers, strings
 				curLabel = word:sub(1,-2)
 				v:destroy()
 			else
-				if (word == ".ds") or (word == ".static") then
+				if (word == ".ds") or (word == ".static") or (word == ".section") then
 					lout = v.text
 				elseif word == ".ds$" then
-					lout = ".ds " .. tostring(block.labels[tokens[2]])
+					lout = ".ds " .. tostring(block.constants[tokens[2]])
 				else
 					local e = inst[word]
 
@@ -439,40 +566,62 @@ function asm.decode(block) -- decode labels, registers, strings
 									return false
 								end
 
-								if e then
-									if v.offsets[n] then
-										block.reloc[#block.reloc + 1] = v.offsets[n]
+								if word ~= ".bc" then
+									if v.offsets then
+										if v.offsets[n-1] then
+											v.section:addFixup(nil, v.offsets[n-1][1], v.offsets[n-1][2])
+										else
+											lerror(v, "unrecoverable condition")
+											return false
+										end
+									elseif v.offset then
+										v.section:addFixup(nil, v.offset[1], v.offset[2])
+									else
+										lerror(v, "unrecoverable condition")
+										return false
 									end
-								elseif v.offset then
-									block.reloc[#block.reloc + 1] = v.offset
 								end
 							elseif regs[t] then
 								lout = lout .. " " .. tostring(regs[t])
-							elseif block.labels[t] then
-								lout = lout .. " " .. tostring(block.labels[t])
+							elseif symtab:getSymbol(t) then
+								local sym = symtab:getSymbol(t)
 
-								if not block.constants[t] then
-									if e then
-										if v.offsets[n] then
-											block.reloc[#block.reloc + 1] = v.offsets[n]
+								if sym.symtype == "constant" then
+									lout = lout .. " " .. tostring(sym.value)
+								else
+									local psym = sym
+
+									if (sym.symtype == "local") or (sym.symtype == "global") then
+										if sym.section == v.section then
+											psym = nil
+											lout = lout .. " " .. tostring(sym.value)
+										else
+											lout = lout .. " 0"
 										end
-									elseif v.offset then
-										block.reloc[#block.reloc + 1] = v.offset
+									elseif (sym.symtype == "extern") or (sym.symtype == "special") then
+										sym.count = sym.count + 1
+										lout = lout .. " 0"
+									else
+										error("huh")
+									end
+
+									if word ~= ".bc" then
+										if v.offsets then
+											if v.offsets[n-1] then
+												v.section:addFixup(psym, v.offsets[n-1][1], v.offsets[n-1][2])
+											else
+												error("huh")
+											end
+										elseif v.offset then
+											v.section:addFixup(psym, v.offset[1], v.offset[2])
+										else
+											error("huh")
+										end
 									end
 								end
-							elseif block.extern[t] then
-								lout = lout .. " " .. t
 							else
 								lerror(v, t .. " is not a symbol")
 								return false
-							end
-
-							if e and off then
-								if e[3][n-1] then
-									off = off + e[3][n-1]
-								else
-									lerror(v, "operand count mismatch")
-								end
 							end
 						end
 					end
@@ -486,44 +635,45 @@ function asm.decode(block) -- decode labels, registers, strings
 	return true
 end
 
+local loffheader_s = struct({
+	{4, "magic"},
+	{4, "symbolTableOffset"},
+	{4, "symbolCount"},
+	{4, "stringTableOffset"},
+	{4, "stringTableSize"},
+	{4, "targetArchitecture"},
+	{4, "entrySymbol"},
+	{4, "stripped"},
+	{28, "reserved"},
+	{4, "textHeaderOffset"},
+	{4, "dataHeaderOffset"},
+	{4, "bssHeaderOffset"},
+})
+
+local sectionheader_s = struct({
+	{4, "fixupTableOffset"},
+	{4, "fixupCount"},
+	{4, "sectionOffset"},
+	{4, "sectionSize"},
+	{4, "linkedAddress"},
+})
+
+local symbol_s = struct({
+	{4, "nameOffset"},
+	{4, "section"},
+	{4, "type"},
+	{4, "value"},
+})
+
+local fixup_s = struct({
+	{4, "symbolIndex"},
+	{4, "offset"},
+	{4, "size"}
+})
+
 function asm.binary(block, lex)
 	local inst = block.inst
 	local regs = block.regs
-
-	local header = "0XEL"
-
-	local code = ""
-	local codesize = 0
-
-	local function addByte(byte)
-		code = code .. string.char(byte)
-
-		codesize = codesize + 1
-	end
-
-	local function addInt(int)
-		local u1, u2 = splitInt16(int)
-
-		code = code .. string.char(u2) .. string.char(u1)
-
-		codesize = codesize + 2
-	end
-
-	local function addThree(three)
-		local u1, u2, u3 = splitInt24(three)
-
-		code = code .. string.char(u3) .. string.char(u2) .. string.char(u1)
-
-		codesize = codesize + 3
-	end
-
-	local function addLong(long)
-		local u1, u2, u3, u4 = splitInt32(long)
-
-		code = code .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-
-		codesize = codesize + 4
-	end
 
 	local strtab = ""
 	local strtabsize = 0
@@ -539,65 +689,77 @@ function asm.binary(block, lex)
 	end
 
 	local symtab = ""
-	local symtabsize = 0
+	local symtabindex = 0
 
-	local function addSymbol(name, value)
-		local off = symtabsize
+	local function addSymbol(name, section, symtype, value)
+		local off = symtabindex
 
 		local nameoff = addString(name)
 
 		local u1, u2, u3, u4 = splitInt32(nameoff)
+		symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		u1, u2, u3, u4 = splitInt32(section)
+		symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		u1, u2, u3, u4 = splitInt32(symtype)
 		symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 		u1, u2, u3, u4 = splitInt32(value)
 		symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-		symtabsize = symtabsize + 8
+		symtabindex = symtabindex + 1
 
 		return off
 	end
 
-	local reloctab = ""
-	local reloctabsize = 0
-	
-	local function addRelocation(addr)
-		local off = reloctabsize
+	local symindex = {}
 
-		local u1, u2, u3, u4 = splitInt32(addr)
-		reloctab = reloctab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+	local symtypid = {
+		["global"] = 1,
+		["local"] = 2,
+		["extern"] = 3,
+		["special"] = 4,
+		["weak"] = 5,
+	}
 
-		reloctabsize = reloctabsize + 4
+	for k,v in pairs(block.symtab.symtab) do
+		if (v.symtype ~= "constant") and (v.count > 0) then
+			local ix = addSymbol(k, v.section.id, symtypid[v.symtype] or 0xFFFFFFFF, v.value)
 
-		return off
+			v.index = ix
+
+			symindex[ix] = v
+		end
 	end
 
-	local fixuptab = ""
-	local fixuptabsize = 0
+	local section = block.sections["data"]
 
-	local function addFixup(name)
-		local off = fixuptabsize
+	for k,v in ipairs(section.fixups) do
+		local symx = 0xFFFFFFFF
 
-		local nameoff = addString(name)
-
-		local u1, u2, u3, u4 = splitInt32(nameoff)
-		fixuptab = fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-
-		u1, u2, u3, u4 = splitInt32(codesize)
-		fixuptab = fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-
-		fixuptabsize = fixuptabsize + 8
-
-		return off
-	end
-
-	if lex then
-		for k,v in ipairs(block.reloc) do
-			addRelocation(v)
+		if v.sym then
+			symx = v.sym.index
 		end
 
-		for k,v in pairs(block.globals) do
-			addSymbol(k, v)
+		section:addBinaryFixup(symx, v.value, v.size)
+	end
+
+	section = block.sections["text"]
+
+	for k,v in ipairs(section.fixups) do
+		local symx = 0xFFFFFFFF
+
+		if v.sym then
+			symx = v.sym.index
 		end
+
+		section:addBinaryFixup(symx, v.value, v.size)
+	end
+
+	while strtabsize % 4 ~= 0 do
+		strtab = strtab..string.char(0)
+		strtabsize = strtabsize + 1
 	end
 
 	for k,v in ipairs(block.lines) do
@@ -607,13 +769,15 @@ function asm.binary(block, lex)
 			local word = tokens[1]
 
 			if word == ".static" then
-				code = code .. v.static
-				codesize = codesize + v.staticsize
+				section.contents = section.contents .. v.static
+				section.size = section.size + v.staticsize
+			elseif word == ".section" then
+				section = block.sections[tokens[2]]
 			elseif word == ".db" then
 				for i = 2, #tokens do
 					local e = tokens[i]
 					if tonumber(e) then
-						addByte(tc(e))
+						section:addByte(tc(e))
 					else
 						lerror(v, "invalid bytelist")
 						return false
@@ -623,7 +787,7 @@ function asm.binary(block, lex)
 				for i = 2, #tokens do
 					local e = tokens[i]
 					if tonumber(e) then
-						addInt(tc(e))
+						section:addInt(tc(e))
 					else
 						lerror(v, "invalid intlist")
 						return false
@@ -633,15 +797,7 @@ function asm.binary(block, lex)
 				for i = 2, #tokens do
 					local e = tokens[i]
 					if tonumber(e) then
-						addLong(tc(e))
-					elseif block.extern[e] then
-						if not lex then
-							lerror(v, "can't leave hanging symbols in a flat binary")
-							return false
-						end
-
-						addFixup(e)
-						addLong(0)
+						section:addLong(tc(e))
 					else
 						lerror(v, "invalid longlist")
 						return false
@@ -649,8 +805,8 @@ function asm.binary(block, lex)
 				end
 			elseif word == ".ds" then
 				local contents = v.text:sub(5)
-				code = code..contents
-				codesize = codesize + #contents
+				section.contents = section.contents..contents
+				section.size = section.size + #contents
 			elseif word == ".bytes" then
 				if (not tonumber(tokens[2])) or (not tonumber(tokens[3])) then
 					lerror(v, "bad numbers on .bytes")
@@ -658,23 +814,7 @@ function asm.binary(block, lex)
 				end
 
 				for i = 1, tonumber(tokens[2]) do
-					addByte(tonumber(tokens[3]))
-				end
-			elseif word == ".fill" then
-				if (not tonumber(tokens[2])) or (not tonumber(tokens[3])) then
-					lerror(v, "bad numbers on .fill")
-					return false
-				end
-
-				if codesize > tonumber(tokens[2]) then
-					lerror(v, ".fill tried to go to "..tokens[2]..", bytecount already at "..string.format("%x",codesize))
-					return false
-				elseif codesize == tonumber(tokens[2]) then
-
-				else
-					repeat
-						addByte(tonumber(tokens[3]))
-					until codesize == tonumber(tokens[2])
+					section:addByte(tonumber(tokens[3]))
 				end
 			elseif word == ".bc" then
 				if #tokens == 1 then
@@ -687,127 +827,240 @@ function asm.binary(block, lex)
 
 					print("bytecount: "..string.format("%x",tokens[2]))
 				end
+			elseif word == ".align" then
+				if not tonumber(tokens[2]) then
+					lerror(v, "bad number on .align")
+					return false
+				end
+
+				while section.size % tonumber(tokens[2]) ~= 0 do
+					section:addByte(0)
+				end
 			else
+				if section.size % block.ialign ~= 0 then
+					lerror(v, "instruction not aligned to "..tostring(block.ialign).." bytes "..tostring(codesize))
+					return false
+				end
+
+				local cs = section.size
+
 				local e = inst[word]
 
-				addByte(e[2])
+				section:addByte(e[2])
 
 				local rands = e[3] -- the names 'rand, operand
 
-				local tx = 0
-
-				for k,v in ipairs(rands) do
-					if v > 0 then
-						tx = tx + 1
-					end
-				end
-
-				if #tokens-1 ~= tx then
+				if #tokens-1 ~= #rands then
 					lerror(v, "operand count mismatch: "..word.." wants "..tostring(#rands).." operands, "..tostring(#tokens-1).." given.")
 					return false
 				end
 
-				local tn = 1
-
 				for n,s in ipairs(rands) do
-					if s < 0 then
-						if s == -1 then
-							addByte(0)
-						elseif s == -2 then
-							addInt(0)
-						elseif s == -3 then
-							addThree(0)
-						elseif s == -4 then
-							addLong(0)
-						end
-					else
-						local operand = tokens[tn+1]
-						if not tonumber(operand) then
-							if not ((s == 4) and block.extern[operand]) then
-								lerror(v, "malformed number "..operand)
-								return false
-							end
-						end
+					s = math.abs(s)
 
-						if s == 1 then
-							addByte(tc(operand))
-						elseif s == 2 then
-							addInt(tc(operand))
-						elseif s == 3 then
-							addThree(tc(operand))
-						elseif s == 4 then
-							if not tonumber(operand) then -- already checked to make sure its an extern
-								if not lex then
-									lerror(v, "can't leave hanging symbols in a flat binary")
-									return false
-								end
+					local operand = tokens[n+1]
+					if not tonumber(operand) then
+						lerror(v, "malformed number "..operand)
+						return false
+					end
 
-								addFixup(operand)
-								addLong(0)
-							else
-								addLong(tc(operand))
-							end
-						end
-
-						tn = tn + 1
+					if s == 1 then
+						section:addByte(tc(operand))
+					elseif s == 2 then
+						section:addInt(tc(operand))
+					elseif s == 3 then
+						section:addThree(tc(operand))
+					elseif s == 4 then
+						section:addLong(tc(operand))
 					end
 				end
+
+				while (section.size-cs) < e[1] do
+					section:addByte(0)
+				end
+			end
+		end
+	end
+
+	for k,v in pairs(block.sections) do
+		if not v.bss then
+			while v.size % 4 ~= 0 do
+				v.contents = v.contents..string.char(0)
+				v.size = v.size + 1
 			end
 		end
 	end
 
 	if lex then
 		-- make header
-		local size = 53
-		-- symtaboff
+		local size = 72
+
+		local header = "FFOL"
+
+		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		size = size + symtabsize
-		-- symcount
-		u1, u2, u3, u4 = splitInt32(symtabsize / 8)
+		size = size + (symtabindex * symbol_s.size())
+
+		-- symbolCount
+		u1, u2, u3, u4 = splitInt32(symtabindex)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		-- strtaboff
+
+		-- stringTableOffset
 		u1, u2, u3, u4 = splitInt32(size)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		size = size + strtabsize
-		-- strtabsize
+
+		-- stringTableSize
 		u1, u2, u3, u4 = splitInt32(strtabsize)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		-- reloctaboff
-		u1, u2, u3, u4 = splitInt32(size)
-		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		size = size + reloctabsize
-		-- reloccount
-		u1, u2, u3, u4 = splitInt32(reloctabsize / 4)
-		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		-- fixuptaboff
-		u1, u2, u3, u4 = splitInt32(size)
-		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		size = size + fixuptabsize
-		-- fixupcount
-		u1, u2, u3, u4 = splitInt32(fixuptabsize / 8)
-		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		-- codeoff
-		u1, u2, u3, u4 = splitInt32(size)
-		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		-- codesize
-		u1, u2, u3, u4 = splitInt32(codesize)
-		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		-- machine type
-		header = header .. string.char(targets[block.target])
-		-- stack size
-		u1, u2, u3, u4 = splitInt32(1024)
-		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		-- heap size
-		u1, u2, u3, u4 = splitInt32(65536)
+
+		-- targetArchitecture
+		u1, u2, u3, u4 = splitInt32(targets[block.target])
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-		block.binary = header .. symtab .. strtab .. reloctab .. fixuptab .. code
+		-- entrySymbol
+		local entryidx = 0xFFFFFFFF
+		if block.symtab.entry then
+			entryidx = block.symtab.entry.index
+		end
+		u1, u2, u3, u4 = splitInt32(entryidx)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		-- reserved
+		for i = 0, 31 do
+			header = header .. string.char(0)
+		end
+
+		local ts = block.sections["text"]
+		local ds = block.sections["data"]
+		local bs = block.sections["bss"]
+
+		-- textHeaderOffset
+		u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + sectionheader_s.size()
+
+		-- dataHeaderOffset
+		u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + sectionheader_s.size()
+
+		-- bssHeaderOffset
+		u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + sectionheader_s.size()
+
+		local textHeader = ""
+
+		-- fixupTableOffset
+		u1, u2, u3, u4 = splitInt32(size)
+		textHeader = textHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + (ts.fixupcount * fixup_s.size())
+
+		-- fixupCount
+		u1, u2, u3, u4 = splitInt32(ts.fixupcount)
+		textHeader = textHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		-- sectionOffset
+		u1, u2, u3, u4 = splitInt32(size)
+		textHeader = textHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + ts.size
+
+		-- sectionSize
+		u1, u2, u3, u4 = splitInt32(ts.size)
+		textHeader = textHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		-- linkedAddress
+		textHeader = textHeader .. string.char(0) .. string.char(0) .. string.char(0) .. string.char(0)
+
+		local dataHeader = ""
+
+		-- fixupTableOffset
+		u1, u2, u3, u4 = splitInt32(size)
+		dataHeader = dataHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + (ds.fixupcount * fixup_s.size())
+
+		-- fixupCount
+		u1, u2, u3, u4 = splitInt32(ds.fixupcount)
+		dataHeader = dataHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		-- sectionOffset
+		u1, u2, u3, u4 = splitInt32(size)
+		dataHeader = dataHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + ds.size
+
+		-- sectionSize
+		u1, u2, u3, u4 = splitInt32(ds.size)
+		dataHeader = dataHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		-- linkedAddress
+		dataHeader = dataHeader .. string.char(0) .. string.char(0) .. string.char(0) .. string.char(0)
+
+		local bssHeader = ""
+
+		-- fixupTableOffset
+		bssHeader = bssHeader .. string.char(0) .. string.char(0) .. string.char(0) .. string.char(0)
+
+		-- fixupCount
+		bssHeader = bssHeader .. string.char(0) .. string.char(0) .. string.char(0) .. string.char(0)
+
+		-- sectionOffset
+		bssHeader = bssHeader .. string.char(0) .. string.char(0) .. string.char(0) .. string.char(0)
+
+		-- sectionSize
+		u1, u2, u3, u4 = splitInt32(bs.size)
+		bssHeader = bssHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		-- linkedAddress
+		bssHeader = bssHeader .. string.char(0) .. string.char(0) .. string.char(0) .. string.char(0)
+
+		block.binary = header .. symtab .. strtab .. textHeader .. dataHeader .. bssHeader .. ts.fixuptab .. ts.contents .. ds.fixuptab .. ds.contents
 	else
-		block.binary = code
+		block.binary = block.sections["text"].contents
 	end
 
 	return true
+end
+
+local function symtab(block)
+	local sym = {}
+
+	sym.symtab = {}
+
+	local sytab = sym.symtab
+
+	sym.entry = nil
+
+
+
+	function sym:addSymbol(name, section, symtype, value, count)
+		sytab[name] = {}
+		sytab[name].section = section
+		sytab[name].symtype = symtype
+		sytab[name].value = value
+		sytab[name].count = count or 1
+	end
+
+	function sym:addConstant(name, value)
+		block.constants[name] = value
+
+		sym:addSymbol(name, nil, "constant", value)
+	end
+
+	function sym:addExtern(name)
+		self:addSymbol(name, {["id"]=0}, "extern", 0, 0)
+	end
+
+	function sym:getSymbol(name)
+		return sytab[name]
+	end
+
+	function sym:setEntry(name)
+		self.entry = self:getSymbol(name)
+	end
+
+	return sym
 end
 
 function asm.assembleBlock(target, source, filename, flat)
@@ -821,22 +1074,23 @@ function asm.assembleBlock(target, source, filename, flat)
 	end
 
 	local tinst = dofile(sd.."inst-"..target..".lua")
-	block.inst, block.regs = tinst[1], tinst[2]
+	block.inst, block.regs, block.ialign = tinst[1], tinst[2], tinst[4]
 
 	block.constants = {}
 
-	block.labels = {}
-	
-	block.labels["__DATE"] = os.date()
+	block.symtab = symtab(block)
+
+	block.symtab:addConstant("__DATE", os.date())
 
 	for k,v in pairs(tinst[3]) do
-		block.constants[k] = true
-		block.labels[k] = v
+		block.symtab:addConstant(k, v)
 	end
 
 	block.lines = {}
 
 	block.statics = {}
+
+	block.symtab = symtab(block)
 
 	block.basedir = getdirectory(filename)
 

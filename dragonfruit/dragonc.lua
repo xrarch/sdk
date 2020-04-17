@@ -9,6 +9,8 @@ local function getdirectory(p)
 end
 local sd = getdirectory(arg[0])
 
+dofile(sd.."misc.lua")
+
 local lexer = dofile(sd.."lexer.lua")
 
 local parser = dofile(sd.."parser.lua")
@@ -45,6 +47,7 @@ local incdir = {}
 local targets = {
 	["limn1k"] = "cg-limn1k.lua",
 	["auc"] = "cg-auc.lua",
+	["r216"] = "cg-r216.lua",
 }
 
 local target = "limn1k"

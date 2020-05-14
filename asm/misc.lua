@@ -1,3 +1,13 @@
+lshift, rshift, tohex, arshift, band, bxor, bor, bnot, bror, brol = bit.lshift, bit.rshift, bit.tohex, bit.arshift, bit.band, bit.bxor, bit.bor, bit.bnot, bit.ror, bit.rol
+
+function bnor(a,b)
+    return bnot(bor(a,b))
+end
+
+function bnand(a,b)
+    return bnot(band(a,b))
+end
+
 function reverse(l)
   local m = {}
   for i = #l, 1, -1 do table.insert(m, l[i]) end

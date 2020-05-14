@@ -236,6 +236,7 @@ function parser.word(t)
 	elseif cproc.autos[wc] then
 		return asthelp(wc, t, "pauto")
 	else
+		cproc.calls[wc] = true
 		return asthelp(wc, t, "call")
 	end
 end
@@ -384,6 +385,8 @@ function parser.procedure()
 	local ast = asthelp(name, t, "procedure")
 
 	cproc = ast
+
+	ast.calls = {}
 
 	ast.public = public
 	ast.inputs = {}

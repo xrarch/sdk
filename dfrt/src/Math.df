@@ -3,7 +3,7 @@
 procedure abs { v -- absv }
 	v@ absv!
 
-	if (v@ 0 s<)
+	if (v@ 0 <)
 		0 v@ - absv!
 	end
 end

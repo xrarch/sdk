@@ -16,11 +16,11 @@ local asm = dofile(sd.."assembler.lua")
 
 local function printhelp()
 	print("== asm.lua ==")
-	print("assembler for aisav2 lemon")
+	print("assembler for aisav3 lemon")
 	print("usage: asm.lua [source] [dest]")
 end
 
-local target = "limn1k"
+local target = "limn2k"
 
 for k,v in pairs(arg) do
 	if v:sub(1,7) == "target=" then

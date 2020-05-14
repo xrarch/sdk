@@ -30,7 +30,7 @@ procedure Putn { n -- }
 end
 
 procedure Puti { n -- }
-	if (n@ 0 s<)
+	if (n@ 0 <)
 		'-' Putc
 	end
 

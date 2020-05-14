@@ -5,7 +5,7 @@ local cg = {}
 local cproc
 
 local function cerror(t, err)
-	print(string.format("dragonc: cg-limn1k: %s:%d: %s", (t.file or "not specified"), (t.line or "not specified"), err))
+	print(string.format("dragonc: cg-limn2k: %s:%d: %s", (t.file or "not specified"), (t.line or "not specified"), err))
 end
 
 local e_extern
@@ -18,7 +18,7 @@ local cpushdown = {}
 
 local framepushdown = {}
 
-local regcount = 30
+local regcount = 25
 
 local topframe = {}
 topframe.regs = {}
@@ -33,7 +33,38 @@ local function rs(r)
 	return "r"..tostring(r)
 end
 
-local DIRECT,REGISTER,LABEL = 1,2,3
+local function putimm(dest, imm)
+	if (type(imm) == "number") and (imm >= 0) then
+		if imm < 0x10000 then
+			cg:code("li "..rs(dest)..", "..imm)
+		elseif band(imm, 0xFFFF) == 0 then
+			cg:code("lui "..rs(dest)..", "..imm)
+		else
+			cg:code("la "..rs(dest)..", "..imm)
+		end
+	else
+		cg:code("la "..rs(dest)..", "..imm)
+	end
+end
+
+local function imm(im, max)
+	if (type(im) == "number") then
+		if (im < max) and (im >= 0) then
+			return true
+		elseif band(im, 0xFFFF) == 0 then
+			cg:code("lui at, "..tostring(im))
+			return false
+		else
+			cg:code("la at, "..tostring(im))
+			return false
+		end
+	else
+		cg:code("la at, "..im)
+		return false
+	end
+end
+
+local DIRECT,REGISTER,LAZYADDITION = 1,2,3
 
 function codegen.frame(parent, clone)
 	local f = {}
@@ -46,7 +77,7 @@ function codegen.frame(parent, clone)
 
 	f.scratch = {}
 
-	for i = 0, regcount do
+	for i = 1, regcount do
 		f.regs[i] = parent.regs[i]
 	end
 
@@ -61,6 +92,8 @@ function codegen.frame(parent, clone)
 			e.rvalue = v.rvalue
 			e.auto = v.auto
 			e.mutable = v.mutable
+			e.op1 = v.op1
+			e.op2 = v.op2
 
 			f.stack[k] = e
 		end
@@ -100,7 +133,7 @@ function codegen.frame(parent, clone)
 			end
 		end
 
-		if not r then error("code generator flaw") end
+		if not r then error("code generator flaw") end -- ran out of registers to allocate, this means somebody isn't freeing something
 
 		return r
 	end
@@ -116,6 +149,22 @@ function codegen.frame(parent, clone)
 			o.rvalue = o.value
 
 			o.auto = false
+		end
+	end
+
+	function f.invalidreg(r)
+		for k,v in ipairs(f.stack) do
+			if (v.method == REGISTER) and (v.rvalue == r) then
+				if v.mutable then
+					cg:code("mov "..rs(v.value)..", "..rs(r))
+					f.mutate(v)
+				else
+					v.value = f.allocscratch()
+					v.rvalue = v.value
+
+					cg:code("mov "..rs(v.value)..", "..rs(r))
+				end
+			end
 		end
 	end
 
@@ -147,44 +196,24 @@ function codegen.frame(parent, clone)
 		return e
 	end
 
-	local function pull()
-		if #f.stack > 0 then
-			return table.remove(f.stack, #f.stack)
-		end
-
-		local r = f.allocscratch()
-
+	function f.makelazy(op1, op2)
 		local e = {}
 
-		if r then
-			e = f.makereg(r)
+		e.method = LAZYADDITION
 
-			cg:code("popv r5, "..rs(r))
-		end
+		e.op1 = op1
+
+		e.op2 = op2
 
 		return e
 	end
 
-	function f.pop(reglabels, mutable)
+	local function pull()
 		if #f.stack > 0 then
 			local top = table.remove(f.stack, #f.stack)
 
-			if (not reglabels) and (top.method == DIRECT) and (type(top.value) ~= "number") then
-				top.method = REGISTER
-
-				local c = top.value
-
-				top.value = f.allocscratch()
-
-				top.rvalue = top.value
-
-				cg:code("li "..rs(top.value)..", "..c)
-			elseif (top.method == REGISTER) and (top.auto) and (mutable) then
-				top.rvalue = top.value
-
-				top.value = f.allocscratch()
-
-				top.mutable = true
+			if top.method == LAZYADDITION then
+				top = f.lazyeval(top)
 			end
 
 			return top
@@ -197,7 +226,58 @@ function codegen.frame(parent, clone)
 		if r then
 			e = f.makereg(r)
 
-			cg:code("popv r5, "..rs(r))
+			cg:code("lwi.l "..rs(r)..", vs, zero")
+		else
+			error("aa")
+		end
+
+		return e
+	end
+
+	function f.pop(reglabels, mutable, invallow, lazyallow)
+		if #f.stack > 0 then
+			local top = table.remove(f.stack, #f.stack)
+
+			if (not reglabels) and (top.method == DIRECT) and (type(top.value) ~= "number") then
+				top.method = REGISTER
+
+				local c = top.value
+
+				top.value = f.allocscratch()
+
+				top.rvalue = top.value
+
+				cg:code("la "..rs(top.value)..", "..c)
+			end
+			
+			if (top.method == REGISTER) and (top.auto) and (mutable) then
+				top.rvalue = top.value
+
+				top.value = f.allocscratch()
+
+				top.mutable = true
+			end
+			
+			if (top.inverse) and not (invallow) then
+				cg:code("not "..rs(top.value)..", "..rs(top.value))
+				top.inverse = false
+			end
+
+			if (top.method == LAZYADDITION) and not (lazyallow) then
+				top = f.lazyeval(top)
+			end
+
+			return top
+		end
+
+		local r = f.allocscratch()
+
+		local e = {}
+
+		if r then
+			e = f.makereg(r)
+
+			cg:code("lwi.l "..rs(r)..", vs, zero")
 		end
 
 		return e
@@ -205,10 +285,27 @@ function codegen.frame(parent, clone)
 
 	function f.flush(drr)
 		for k,v in ipairs(f.stack) do
+			if v.method == LAZYADDITION then
+				v = f.lazyeval(v)
+			end
+
 			if v.method == DIRECT then
-				cg:code("pushvi r5, "..tostring(v.value))
+				if type(v.value) == "number" then
+					if v.value < 0x10000 then
+						cg:code("swdi.l vs, "..tostring(v.value))
+					elseif band(v.value, 0xFFFF) == 0 then
+						cg:code("lui at, "..tostring(v.value))
+						cg:code("swd.l vs, zero, at")
+					else
+						cg:code("la at, "..tostring(v.value))
+						cg:code("swd.l vs, zero, at")
+					end
+				else
+					cg:code("la at, "..v.value)
+					cg:code("swd.l vs, zero, at")
+				end
 			elseif v.method == REGISTER then
-				cg:code("pushv r5, r"..tostring(v.value))
+				cg:code("swd.l vs, zero, r"..tostring(v.value))
 				f.release(v.value)
 			end
 		end
@@ -272,9 +369,11 @@ function codegen.frame(parent, clone)
 	end
 
 	function f.swap()
-		local w = f.stack[#f.stack - 1]
-		f.stack[#f.stack - 1] = f.stack[#f.stack]
-		f.stack[#f.stack] = w
+		local o1 = f.pop(true)
+		local o2 = f.pop(true)
+
+		f.push(o1)
+		f.push(o2)
 	end
 
 	function f.drop()
@@ -283,6 +382,140 @@ function codegen.frame(parent, clone)
 		if top.method == REGISTER then
 			f.release(top.value)
 		end
+	end
+
+	local offmax = {
+		["b"] = 128,
+		["i"] = 256,
+		["l"] = 512,
+	}
+
+	function f.store(s, dest, src)
+		local r1 = dest.value
+
+		if dest.method == DIRECT then
+			r1 = f.allocscratch()
+			putimm(r1, dest.value)
+		end
+
+		if src.method == DIRECT then
+			if type(src.value) == "number" then
+				if imm(src.value, 65536) then
+					if (src.value > 255) and (s ~= "b") then
+						cg:code("si16."..s.." "..rs(r1)..", zero, "..src.value)
+					else
+						cg:code("si."..s.." "..rs(r1)..", zero, "..src.value)
+					end
+				else
+					cg:code("s."..s.." "..rs(r1)..", zero, at")
+				end
+			else
+				cg:code("la at, "..src.value)
+				cg:code("s."..s.." "..rs(r1)..", zero, at")
+			end
+		else
+			cg:code("s."..s.." "..rs(r1)..", zero, "..rs(src.value))
+			f.release(src.value)
+		end
+
+		f.release(r1)
+	end
+
+	function f.loadmut(s, src)
+		local r1, r2, im = src.rvalue
+		local tr1 = src.value
+
+		local o = src
+
+		if src.method == LAZYADDITION then
+			local op1, op2 = src.op1, src.op2
+
+			local rv1, rv2, imv = op1, op2
+
+			if op1.method == DIRECT then
+				rv1 = rv2
+				imv = op1
+			elseif op2.method == DIRECT then
+				rv2 = nil
+				imv = op2
+			end
+
+			if imv then
+				if imm(imv.value, offmax[s]) then
+					cg:code("lio."..s.." "..rs(rv1.value)..", "..rs(rv1.rvalue)..", "..imv.value)
+				else
+					cg:code("l."..s.." "..rs(rv1.value)..", "..rs(rv1.rvalue)..", at")
+				end
+			else
+				cg:code("l."..s.." "..rs(rv1.value)..", "..rs(rv1.rvalue)..", "..rs(rv2.rvalue))
+
+				f.mutate(rv2)
+				f.release(rv2.value)
+			end
+
+			f.mutate(rv1)
+
+			o = rv1
+		else
+			if src.method == DIRECT then
+				r1 = f.allocscratch()
+				tr1 = r1
+				putimm(r1, src.value)
+				o = f.makereg(r1)
+			end
+
+			cg:code("l."..s.." "..rs(tr1)..", zero, "..rs(r1))
+
+			f.mutate(src)
+		end
+
+		return o
+	end
+
+	function f.load(s, src)
+		local o = f.makereg(f.allocscratch())
+
+		if src.method == DIRECT then
+			putimm(o.value, src.value)
+		elseif src.method == REGISTER then
+			cg:code("mov "..rs(o.value)..", "..rs(src.rvalue))
+			f.release(src.value)
+		elseif src.method == LAZYADDITION then
+			error("cg bug")
+		end
+
+		return f.loadmut(s, o)
+	end
+
+	function f.lazyeval(lazy)
+		local op1, op2 = lazy.op1, lazy.op2
+
+		local rv1, rv2, imv = op1, op2
+
+		if op1.method == DIRECT then
+			rv1 = rv2
+			imv = op1
+		elseif op2.method == DIRECT then
+			rv2 = nil
+			imv = op2
+		end
+
+		if imv then
+			if imm(imv.value, 256) then
+				cg:code("addi "..rs(rv1.value)..", "..rs(rv1.rvalue)..", "..imv.value)
+			else
+				cg:code("add "..rs(rv1.value)..", "..rs(rv1.rvalue)..", at")
+			end
+		else
+			cg:code("add "..rs(rv1.value)..", "..rs(rv1.rvalue)..", "..rs(rv2.rvalue))
+
+			f.release(rv2.value)
+			f.mutate(rv2)
+		end
+
+		f.mutate(rv1)
+
+		return rv1
 	end
 
 	return f
@@ -296,6 +529,9 @@ function codegen.buffer(buffer)
 end
 
 function codegen.var(var)
+	cg:bss(".align 4")
+	cg:data(".align 4")
+
 	for name,value in pairs(var) do
 		if value == 0 then
 			cg:bss(name..":")
@@ -311,6 +547,9 @@ local tsn = 0
 
 function codegen.table(deftable)
 	local strs = {}
+
+	cg:bss(".align 4")
+	cg:data(".align 4")
 
 	for name,detail in pairs(deftable) do
 		if detail.count then
@@ -367,106 +606,6 @@ function codegen.asm(t)
 	return true
 end
 
-local cmptable = {
-	[REGISTER] = {
-		[REGISTER] = function (op1, op2, c)
-			cg:code("cmp "..rs(op1.value)..", "..rs(op2.value))
-
-			thisframe.release(op1.value)
-			thisframe.release(op2.value)
-		end,
-		[DIRECT] = function (op1, op2, c)
-			cg:code("cmpi "..rs(op1.value)..", "..tostring(op2.value))
-
-			thisframe.release(op1.value)
-		end,
-	},
-	[DIRECT] = {
-		[REGISTER] = function (op1, op2, c)
-			if not c then
-				local r = thisframe.allocscratch()
-
-				cg:code("li "..rs(r)..", "..tostring(op1.value))
-				cg:code("cmp "..rs(r)..", "..rs(op2.value))
-
-				thisframe.release(r)
-				thisframe.release(op2.value)
-			else
-				cg:code("cmpi "..rs(op2.value)..", "..tostring(op1.value))
-				thisframe.release(op2.value)
-			end
-		end,
-		[DIRECT] = function (op1, op2, c)
-			error("should be case-by-case, code generator bug")
-		end,
-	}
-}
-
-local cmpstable = {
-	[REGISTER] = {
-		[REGISTER] = function (op1, op2, c)
-			cg:code("cmps "..rs(op1.value)..", "..rs(op2.value))
-
-			thisframe.release(op1.value)
-			thisframe.release(op2.value)
-		end,
-		[DIRECT] = function (op1, op2, c)
-			cg:code("cmpsi "..rs(op1.value)..", "..tostring(op2.value))
-
-			thisframe.release(op1.value)
-		end,
-	},
-	[DIRECT] = {
-		[REGISTER] = function (op1, op2, c)
-			if not c then
-				local r = thisframe.allocscratch()
-
-				cg:code("li "..rs(r)..", "..tostring(op1.value))
-				cg:code("cmps "..rs(r)..", "..rs(op2.value))
-
-				thisframe.release(r)
-				thisframe.release(op2.value)
-			else
-				cg:code("cmpsi "..rs(op2.value)..", "..tostring(op1.value))
-				thisframe.release(op2.value)
-			end
-		end,
-		[DIRECT] = function (op1, op2, c)
-			error("should be case-by-case, code generator bug")
-		end,
-	}
-}
-
-local opstable = {
-	[REGISTER] = {
-		[REGISTER] = function (rr, rd, d, op1, op2, c)
-			cg:code(rr.." "..rs(d)..", "..rs(op1.value)..", "..rs(op2.value))
-
-			thisframe.release(op1.value)
-			thisframe.release(op2.value)
-		end,
-		[DIRECT] = function (rr, rd, d, op1, op2, c)
-			cg:code(rd.." "..rs(d)..", "..rs(op1.value)..", "..tostring(op2.value))
-
-			thisframe.release(op1.value)
-		end,
-	},
-	[DIRECT] = {
-		[REGISTER] = function (rr, rd, d, op1, op2, c)
-			if not c then
-				cg:code("li "..rs(d)..", "..tostring(op1.value))
-				cg:code(rr.." "..rs(d)..", "..rs(d)..", "..rs(op2.value))
-			else
-				cg:code(rd.." "..rs(d)..", "..rs(op2.value)..", "..tostring(op1.value))
-				thisframe.release(op2.value)
-			end
-		end,
-		[DIRECT] = function (rr, rd, d, op1, op2, c)
-			error("should be case-by-case, code generator bug")
-		end,
-	}
-}
-
 local cdummy = 0
 
 local prim_ops = {
@@ -501,169 +640,110 @@ local prim_ops = {
 		thisframe.flush(true)
 
 		if c.method == DIRECT then
-			cg:code("call "..tostring(c.value))
+			cg:code("jal "..tostring(c.value))
 		elseif c.method == REGISTER then
-			cg:code("pushi ._df_cleave_"..tostring(cdummy))
-
-			cg:code("br "..rs(c.value))
-
-			-- thisframe.release(c.value)
-			-- got released when we flush()ed
-
-			cg:code("._df_cleave_"..tostring(cdummy)..":")
-
-			cdummy = cdummy + 1
+			cg:code("jalr "..rs(c.value))
 		end
 	end,
 	["+="] = function (rn)
-		local dest = thisframe.pop(true)
+		local dest = thisframe.pop()
 		local src = thisframe.pop(true)
 
-		local dc = thisframe.allocscratch()
-
-		if dest.method == DIRECT then
-			cg:code("lri.l "..rs(dc)..", "..tostring(dest.value))
-		elseif dest.method == REGISTER then
-			cg:code("lrr.l "..rs(dc)..", "..rs(dest.value))
-		end
+		local dc = thisframe.load("l", dest)
 
 		if src.method == DIRECT then
-			cg:code("addi "..rs(dc)..", "..rs(dc)..", "..tostring(src.value))
+			if imm(src.value, 0x10000) then
+				cg:code("addi.i "..rs(dc.value)..", "..src.value)
+			else
+				cg:code("add "..rs(dc.value)..", "..rs(dc.value)..", at")
+			end
 		elseif src.method == REGISTER then
-			cg:code("add "..rs(dc)..", "..rs(dc)..", "..rs(src.value))
+			cg:code("add "..rs(dc.value)..", "..rs(dc.value)..", "..rs(src.value))
 
 			thisframe.release(src.value)
 		end
 
-		if dest.method == DIRECT then
-			cg:code("sir.l "..tostring(dest.value)..", "..rs(dc))
-		elseif dest.method == REGISTER then
-			cg:code("srr.l "..rs(dest.value)..", "..rs(dc))
-
-			thisframe.release(dest.value)
-		end
-
-		thisframe.release(dc)
+		thisframe.store("l", dest, dc)
 	end,
 	["-="] = function (rn)
-		local dest = thisframe.pop(true)
+		local dest = thisframe.pop()
 		local src = thisframe.pop(true)
 
-		local dc = thisframe.allocscratch()
-
-		if dest.method == DIRECT then
-			cg:code("lri.l "..rs(dc)..", "..tostring(dest.value))
-		elseif dest.method == REGISTER then
-			cg:code("lrr.l "..rs(dc)..", "..rs(dest.value))
-		end
+		local dc = thisframe.load("l", dest)
 
 		if src.method == DIRECT then
-			cg:code("subi "..rs(dc)..", "..rs(dc)..", "..tostring(src.value))
+			if imm(src.value, 0x10000) then
+				cg:code("subi.i "..rs(dc.value)..", "..src.value)
+			else
+				cg:code("sub "..rs(dc.value)..", "..rs(dc.value)..", at")
+			end
 		elseif src.method == REGISTER then
-			cg:code("sub "..rs(dc)..", "..rs(dc)..", "..rs(src.value))
+			cg:code("sub "..rs(dc.value)..", "..rs(dc.value)..", "..rs(src.value))
 
 			thisframe.release(src.value)
 		end
 
-		if dest.method == DIRECT then
-			cg:code("sir.l "..tostring(dest.value)..", "..rs(dc))
-		elseif dest.method == REGISTER then
-			cg:code("srr.l "..rs(dest.value)..", "..rs(dc))
-
-			thisframe.release(dest.value)
-		end
-
-		thisframe.release(dc)
+		thisframe.store("l", dest, dc)
 	end,
 	["*="] = function (rn)
-		local dest = thisframe.pop(true)
+		local dest = thisframe.pop()
 		local src = thisframe.pop(true)
 
-		local dc = thisframe.allocscratch()
-
-		if dest.method == DIRECT then
-			cg:code("lri.l "..rs(dc)..", "..tostring(dest.value))
-		elseif dest.method == REGISTER then
-			cg:code("lrr.l "..rs(dc)..", "..rs(dest.value))
-		end
+		local dc = thisframe.load("l", dest)
 
 		if src.method == DIRECT then
-			cg:code("muli "..rs(dc)..", "..rs(dc)..", "..tostring(src.value))
+			if imm(src.value, 0x10000) then
+				cg:code("muli.i "..rs(dc.value)..", "..src.value)
+			else
+				cg:code("mul "..rs(dc.value)..", "..rs(dc.value)..", at")
+			end
 		elseif src.method == REGISTER then
-			cg:code("mul "..rs(dc)..", "..rs(dc)..", "..rs(src.value))
+			cg:code("mul "..rs(dc.value)..", "..rs(dc.value)..", "..rs(src.value))
 
 			thisframe.release(src.value)
 		end
 
-		if dest.method == DIRECT then
-			cg:code("sir.l "..tostring(dest.value)..", "..rs(dc))
-		elseif dest.method == REGISTER then
-			cg:code("srr.l "..rs(dest.value)..", "..rs(dc))
-
-			thisframe.release(dest.value)
-		end
-
-		thisframe.release(dc)
+		thisframe.store("l", dest, dc)
 	end,
 	["/="] = function (rn)
-		local dest = thisframe.pop(true)
+		local dest = thisframe.pop()
 		local src = thisframe.pop(true)
 
-		local dc = thisframe.allocscratch()
-
-		if dest.method == DIRECT then
-			cg:code("lri.l "..rs(dc)..", "..tostring(dest.value))
-		elseif dest.method == REGISTER then
-			cg:code("lrr.l "..rs(dc)..", "..rs(dest.value))
-		end
+		local dc = thisframe.load("l", dest)
 
 		if src.method == DIRECT then
-			cg:code("divi "..rs(dc)..", "..rs(dc)..", "..tostring(src.value))
+			if imm(src.value, 0x10000) then
+				cg:code("divi.i "..rs(dc.value)..", "..src.value)
+			else
+				cg:code("div "..rs(dc.value)..", "..rs(dc.value)..", at")
+			end
 		elseif src.method == REGISTER then
-			cg:code("div "..rs(dc)..", "..rs(dc)..", "..rs(src.value))
+			cg:code("div "..rs(dc.value)..", "..rs(dc.value)..", "..rs(src.value))
 
 			thisframe.release(src.value)
 		end
 
-		if dest.method == DIRECT then
-			cg:code("sir.l "..tostring(dest.value)..", "..rs(dc))
-		elseif dest.method == REGISTER then
-			cg:code("srr.l "..rs(dest.value)..", "..rs(dc))
-
-			thisframe.release(dest.value)
-		end
-
-		thisframe.release(dc)
+		thisframe.store("l", dest, dc)
 	end,
 	["%="] = function (rn)
-		local dest = thisframe.pop(true)
+		local dest = thisframe.pop()
 		local src = thisframe.pop(true)
 
-		local dc = thisframe.allocscratch()
-
-		if dest.method == DIRECT then
-			cg:code("lri.l "..rs(dc)..", "..tostring(dest.value))
-		elseif dest.method == REGISTER then
-			cg:code("lrr.l "..rs(dc)..", "..rs(dest.value))
-		end
+		local dc = thisframe.load("l", dest)
 
 		if src.method == DIRECT then
-			cg:code("modi "..rs(dc)..", "..rs(dc)..", "..tostring(src.value))
+			if imm(src.value, 0x10000) then
+				cg:code("modi.i "..rs(dc.value)..", "..src.value)
+			else
+				cg:code("mod "..rs(dc.value)..", "..rs(dc.value)..", at")
+			end
 		elseif src.method == REGISTER then
-			cg:code("mod "..rs(dc)..", "..rs(dc)..", "..rs(src.value))
+			cg:code("mod "..rs(dc.value)..", "..rs(dc.value)..", "..rs(src.value))
 
 			thisframe.release(src.value)
 		end
 
-		if dest.method == DIRECT then
-			cg:code("sir.l "..tostring(dest.value)..", "..rs(dc))
-		elseif dest.method == REGISTER then
-			cg:code("srr.l "..rs(dest.value)..", "..rs(dc))
-
-			thisframe.release(dest.value)
-		end
-
-		thisframe.release(dc)
+		thisframe.store("l", dest, dc)
 	end,
 	["bswap"] = function (rn)
 		local n = thisframe.pop(false, true)
@@ -695,9 +775,20 @@ local prim_ops = {
 				r.value = 0
 			end
 		elseif r.method == REGISTER then
-			cmptable[src1.method][src2.method](src1, src2, true)
+			local r1,r2 = src1.value, src2.value
 
-			cg:code("andi "..rs(r.value)..", rf, 0x1")
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
+			end
+
+			cg:code("seq "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+			thisframe.release(r1)
+			thisframe.release(r2)
 		end
 
 		thisframe.push(r)
@@ -715,10 +806,20 @@ local prim_ops = {
 				r.value = 0
 			end
 		elseif r.method == REGISTER then
-			cmptable[src1.method][src2.method](src1, src2, true)
+			local r1,r2 = src1.value, src2.value
 
-			cg:code("not "..rs(r.value)..", rf")
-			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
+			end
+
+			cg:code("sne "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+			thisframe.release(r1)
+			thisframe.release(r2)
 		end
 
 		thisframe.push(r)
@@ -736,18 +837,20 @@ local prim_ops = {
 				r.value = 0
 			end
 		elseif r.method == REGISTER then
-			cmptable[src1.method][src2.method](src1, src2)
+			local r1,r2 = src1.value, src2.value
 
-			cg:code("rshi "..rs(r.value)..", rf, 0x1")
-			cg:code("not "..rs(r.value)..", "..rs(r.value))
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
+			end
 
-			local sr = thisframe.allocscratch()
+			cg:code("sgt "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
 
-			cg:code("not "..rs(sr)..", rf")
-			cg:code("and "..rs(r.value)..", "..rs(r.value)..", "..rs(sr))
-			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
-
-			thisframe.release(sr)
+			thisframe.release(r1)
+			thisframe.release(r2)
 		end
 
 		thisframe.push(r)
@@ -765,10 +868,20 @@ local prim_ops = {
 				r.value = 0
 			end
 		elseif r.method == REGISTER then
-			cmptable[src1.method][src2.method](src1, src2)
+			local r1,r2 = src1.value, src2.value
 
-			cg:code("rshi "..rs(r.value)..", rf, 0x1")
-			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
+			end
+
+			cg:code("slt "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+			thisframe.release(r1)
+			thisframe.release(r2)
 		end
 
 		thisframe.push(r)
@@ -786,11 +899,22 @@ local prim_ops = {
 				r.value = 0
 			end
 		elseif r.method == REGISTER then
-			cmptable[src1.method][src2.method](src1, src2)
+			local r1,r2 = src1.value, src2.value
 
-			cg:code("rshi "..rs(r.value)..", rf, 0x1")
-			cg:code("not "..rs(r.value)..", "..rs(r.value))
-			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
+			end
+
+			cg:code("slt "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+			thisframe.release(r1)
+			thisframe.release(r2)
+
+			r.inverse = true
 		end
 
 		thisframe.push(r)
@@ -808,105 +932,22 @@ local prim_ops = {
 				r.value = 0
 			end
 		elseif r.method == REGISTER then
-			cmptable[src1.method][src2.method](src1, src2)
+			local r1,r2 = src1.value, src2.value
 
-			cg:code("rshi "..rs(r.value)..", rf, 0x1")
-			cg:code("ior "..rs(r.value)..", rf, "..rs(r.value))
-			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
-		end
-
-		thisframe.push(r)
-	end,
-	["s>"] = function (rn)
-		local src2 = thisframe.pop()
-		local src1 = thisframe.pop()
-
-		local r = thisframe.result(src1, src2)
-
-		if r.method == DIRECT then
-			if src1.value > src2.value then
-				r.value = 1
-			else
-				r.value = 0
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
 			end
-		elseif r.method == REGISTER then
-			cmpstable[src1.method][src2.method](src1, src2)
 
-			cg:code("rshi "..rs(r.value)..", rf, 0x1")
-			cg:code("not "..rs(r.value)..", "..rs(r.value))
+			cg:code("sgt "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
 
-			local sr = thisframe.allocscratch()
+			thisframe.release(r1)
+			thisframe.release(r2)
 
-			cg:code("not "..rs(sr)..", rf")
-			cg:code("and "..rs(r.value)..", "..rs(r.value)..", "..rs(sr))
-			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
-
-			thisframe.release(sr)
-		end
-
-		thisframe.push(r)
-	end,
-	["s<"] = function (rn)
-		local src2 = thisframe.pop(true)
-		local src1 = thisframe.pop(true)
-
-		local r = thisframe.result(src1, src2)
-
-		if r.method == DIRECT then
-			if src1.value < src2.value then
-				r.value = 1
-			else
-				r.value = 0
-			end
-		elseif r.method == REGISTER then
-			cmpstable[src1.method][src2.method](src1, src2)
-
-			cg:code("rshi "..rs(r.value)..", rf, 0x1")
-			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
-		end
-
-		thisframe.push(r)
-	end,
-	["s>="] = function (rn) -- not carry
-		local src2 = thisframe.pop(true)
-		local src1 = thisframe.pop(true)
-
-		local r = thisframe.result(src1, src2)
-
-		if r.method == DIRECT then
-			if src1.value >= src2.value then
-				r.value = 1
-			else
-				r.value = 0
-			end
-		elseif r.method == REGISTER then
-			cmpstable[src1.method][src2.method](src1, src2)
-
-			cg:code("rshi "..rs(r.value)..", rf, 0x1")
-			cg:code("not "..rs(r.value)..", "..rs(r.value))
-			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
-		end
-
-		thisframe.push(r)
-	end,
-	["s<="] = function (rn) -- carry or zero
-		local src2 = thisframe.pop(true)
-		local src1 = thisframe.pop(true)
-
-		local r = thisframe.result(src1, src2)
-
-		if r.method == DIRECT then
-			if src1.value <= src2.value then
-				r.value = 1
-			else
-				r.value = 0
-			end
-		elseif r.method == REGISTER then
-			cmpstable[src1.method][src2.method](src1, src2)
-
-			cg:code("rshi "..rs(r.value)..", rf, 0x1")
-			cg:code("ior "..rs(r.value)..", rf, "..rs(r.value))
-			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
+			r.inverse = true
 		end
 
 		thisframe.push(r)
@@ -947,7 +988,28 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = bor(src1.value, src2.value)
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("ior", "iori", r.value, src1, src2, true)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				im = src1.value
+				r1 = r2
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("ori "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("or "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("or "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -961,7 +1023,28 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = band(bor(src1.value, src2.value), 1)
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("ior", "iori", r.value, src1, src2, true)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				im = src1.value
+				r1 = r2
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("ori "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("or "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("or "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 
 			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
 		end
@@ -977,7 +1060,28 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = band(src1.value, src2.value)
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("and", "andi", r.value, src1, src2, true)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				im = src1.value
+				r1 = r2
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("andi "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("and "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("and "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -991,7 +1095,28 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = band(band(src1.value, src2.value), 1)
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("and", "andi", r.value, src1, src2, true)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				im = src1.value
+				r1 = r2
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("andi "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("and "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("and "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 
 			cg:code("andi "..rs(r.value)..", "..rs(r.value)..", 0x1")
 		end
@@ -1007,7 +1132,28 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = rshift(src1.value, src2.value)
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("rsh", "rshi", r.value, src1, src2)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("rshi "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("rsh "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("rsh "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -1021,7 +1167,28 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = lshift(src1.value, src2.value)
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("lsh", "lshi", r.value, src1, src2)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("lshi "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("lsh "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("lsh "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -1036,18 +1203,14 @@ local prim_ops = {
 		thisframe.drop()
 	end,
 	["+"] = function (rn)
-		local src1 = thisframe.pop()
-		local src2 = thisframe.pop()
+		local src1 = thisframe.pop(false, true)
+		local src2 = thisframe.pop(false, true)
 
-		local r = thisframe.result(src1, src2)
-
-		if r.method == DIRECT then
-			r.value = src1.value + src2.value
-		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("add", "addi", r.value, src1, src2, true)
+		if (src1.method == DIRECT) and (src2.method == DIRECT) then
+			thisframe.push(thisframe.makeconst(src1.value + src2.value))
+		else
+			thisframe.push(thisframe.makelazy(src1, src2))
 		end
-
-		thisframe.push(r)
 	end,
 	["-"] = function (rn)
 		local src2 = thisframe.pop()
@@ -1058,7 +1221,28 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = src1.value - src2.value
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("sub", "subi", r.value, src1, src2)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("subi "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("sub "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("sub "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -1072,7 +1256,28 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = src1.value * src2.value
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("mul", "muli", r.value, src1, src2, true)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				im = src1.value
+				r1 = r2
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("muli "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("mul "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("mul "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -1086,7 +1291,28 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = math.floor(src1.value / src2.value)
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("div", "divi", r.value, src1, src2)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("divi "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("div "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("div "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -1100,137 +1326,64 @@ local prim_ops = {
 		if r.method == DIRECT then
 			r.value = src1.value % src2.value
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("mod", "modi", r.value, src1, src2)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("modi "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("mod "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("mod "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
 	end,
 	["gb"] = function (rn)
-		local o = thisframe.pop(true, true)
+		local o = thisframe.pop(true, true, false, true)
 
-		if o.method == DIRECT then
-			local r0 = thisframe.allocscratch()
-
-			cg:code("lri.b "..rs(r0)..", "..tostring(o.value))
-
-			o = thisframe.makereg(r0)
-		elseif o.method == REGISTER then
-			cg:code("lrr.b "..rs(o.value)..", "..rs(o.rvalue))
-
-			thisframe.mutate(o)
-		end
-
-		thisframe.push(o)
+		thisframe.push(thisframe.loadmut("b", o))
 	end,
 	["gi"] = function (rn)
-		local o = thisframe.pop(true, true)
+		local o = thisframe.pop(true, true, false, true)
 
-		if o.method == DIRECT then
-			local r0 = thisframe.allocscratch()
-
-			local rs0 = rs(r0)
-
-			cg:code("lri.i "..rs0..", "..tostring(o.value))
-
-			o = thisframe.makereg(r0)
-		elseif o.method == REGISTER then
-			cg:code("lrr.i "..rs(o.value)..", "..rs(o.rvalue))
-
-			thisframe.mutate(o)
-		end
-
-		thisframe.push(o)
+		thisframe.push(thisframe.loadmut("i", o))
 	end,
 	["@"] = function (rn)
-		local o = thisframe.pop(true, true)
+		local o = thisframe.pop(true, true, false, true)
 
-		if o.method == DIRECT then
-			local r0 = thisframe.allocscratch()
-
-			local rs0 = rs(r0)
-
-			cg:code("lri.l "..rs0..", "..tostring(o.value))
-
-			o = thisframe.makereg(r0)
-		elseif o.method == REGISTER then
-			cg:code("lrr.l "..rs(o.value)..", "..rs(o.rvalue))
-
-			thisframe.mutate(o)
-		end
-
-		thisframe.push(o)
+		thisframe.push(thisframe.loadmut("l", o))
 	end,
 	["sb"] = function (rn)
 		local op1 = thisframe.pop(true)
 		local op2 = thisframe.pop(true)
 
-		if op1.method == DIRECT then
-			if op2.method == DIRECT then
-				cg:code("sii.b "..tostring(op1.value)..", "..tostring(op2.value))
-			elseif op2.method == REGISTER then
-				cg:code("sir.b "..tostring(op1.value)..", "..rs(op2.value))
-
-				thisframe.release(op2.value)
-			end
-		elseif op1.method == REGISTER then
-			if op2.method == DIRECT then
-				cg:code("sri.b "..rs(op1.value)..", "..tostring(op2.value))
-			elseif op2.method == REGISTER then
-				cg:code("srr.b "..rs(op1.value)..", "..rs(op2.value))
-
-				thisframe.release(op2.value)
-			end
-
-			thisframe.release(op1.value)
-		end
+		thisframe.store("b", op1, op2)
 	end,
 	["si"] = function (rn)
 		local op1 = thisframe.pop(true)
 		local op2 = thisframe.pop(true)
 
-		if op1.method == DIRECT then
-			if op2.method == DIRECT then
-				cg:code("sii.i "..tostring(op1.value)..", "..tostring(op2.value))
-			elseif op2.method == REGISTER then
-				cg:code("sir.i "..tostring(op1.value)..", "..rs(op2.value))
-
-				thisframe.release(op2.value)
-			end
-		elseif op1.method == REGISTER then
-			if op2.method == DIRECT then
-				cg:code("sri.i "..rs(op1.value)..", "..tostring(op2.value))
-			elseif op2.method == REGISTER then
-				cg:code("srr.i "..rs(op1.value)..", "..rs(op2.value))
-
-				thisframe.release(op2.value)
-			end
-
-			thisframe.release(op1.value)
-		end
+		thisframe.store("i", op1, op2)
 	end,
 	["!"] = function (rn)
 		local op1 = thisframe.pop(true)
 		local op2 = thisframe.pop(true)
 
-		if op1.method == DIRECT then
-			if op2.method == DIRECT then
-				cg:code("sii.l "..tostring(op1.value)..", "..tostring(op2.value))
-			elseif op2.method == REGISTER then
-				cg:code("sir.l "..tostring(op1.value)..", "..rs(op2.value))
-
-				thisframe.release(op2.value)
-			end
-		elseif op1.method == REGISTER then
-			if op2.method == DIRECT then
-				cg:code("sri.l "..rs(op1.value)..", "..tostring(op2.value))
-			elseif op2.method == REGISTER then
-				cg:code("srr.l "..rs(op1.value)..", "..rs(op2.value))
-
-				thisframe.release(op2.value)
-			end
-
-			thisframe.release(op1.value)
-		end
+		thisframe.store("l", op1, op2)
 	end,
 	["bitget"] = function (rn) -- (v bit -- bit)
 		local src2 = thisframe.pop()
@@ -1239,11 +1392,30 @@ local prim_ops = {
 		local r = thisframe.result(src1, src2)
 
 		if r.method == DIRECT then
-			r.value = band(band(src1.value, src2.value), 1)
+			r.value = band(rshift(src1.value, src2.value), 1)
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("rsh", "rshi", r.value, src1, src2)
+			local r1,r2,im = src1.value, src2.value
 
-			cg:code("andi "..rs(r.value)..", rf, 0x1")
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("bgeti "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("bget "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("bget "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -1255,9 +1427,30 @@ local prim_ops = {
 		local r = thisframe.result(src1, src2)
 
 		if r.method == DIRECT then
-			r.value = band(band(src1.value, src2.value), 1)
+			r.value = bor(src2.value, lshift(1, src1.value))
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("bset", "bseti", r.value, src1, src2)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("bseti "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("bset "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("bset "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -1269,9 +1462,30 @@ local prim_ops = {
 		local r = thisframe.result(src1, src2)
 
 		if r.method == DIRECT then
-			r.value = band(band(src1.value, src2.value), 1)
+			r.value = band(src2.value, bnot(lshift(1, src1.value)))
 		elseif r.method == REGISTER then
-			opstable[src1.method][src2.method]("bclr", "bclri", r.value, src1, src2)
+			local r1,r2,im = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				im = src2.value
+			end
+
+			thisframe.release(r1)
+
+			if im then
+				if imm(im, 256) then
+					cg:code("bclri "..rs(r.value)..", "..rs(r1)..", "..im)
+				else
+					cg:code("bclr "..rs(r.value)..", "..rs(r1)..", at")
+				end
+			else
+				cg:code("bclr "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+				thisframe.release(r2)
+			end
 		end
 
 		thisframe.push(r)
@@ -1290,6 +1504,8 @@ local auto_ops = {
 		thisframe.push(thisframe.makereg(rn, true), true)
 	end,
 	["!"] = function (rn)
+		thisframe.invalidreg(rn)
+
 		local c = thisframe.pop(true)
 
 		if c.method == REGISTER then
@@ -1297,10 +1513,12 @@ local auto_ops = {
 
 			thisframe.release(c.value)
 		elseif c.method == DIRECT then
-			cg:code("li "..rs(rn)..", "..tostring(c.value))
+			putimm(rn, c.value)
 		end
 	end,
 	["+="] = function (rn)
+		thisframe.invalidreg(rn)
+
 		local c = thisframe.pop(true)
 
 		if c.method == REGISTER then
@@ -1308,10 +1526,16 @@ local auto_ops = {
 
 			thisframe.release(c.value)
 		elseif c.method == DIRECT then
-			cg:code("addi "..rs(rn)..", "..rs(rn)..", "..tostring(c.value))
+			if imm(c.value, 0x10000) then
+				cg:code("addi.i "..rs(rn)..", "..tostring(c.value))
+			else
+				cg:code("add "..rs(rn)..", "..rs(rn)..", at")
+			end
 		end
 	end,
 	["-="] = function (rn)
+		thisframe.invalidreg(rn)
+
 		local c = thisframe.pop(true)
 
 		if c.method == REGISTER then
@@ -1319,10 +1543,16 @@ local auto_ops = {
 
 			thisframe.release(c.value)
 		elseif c.method == DIRECT then
-			cg:code("subi "..rs(rn)..", "..rs(rn)..", "..tostring(c.value))
+			if imm(c.value, 0x10000) then
+				cg:code("subi.i "..rs(rn)..", "..tostring(c.value))
+			else
+				cg:code("sub "..rs(rn)..", "..rs(rn)..", at")
+			end
 		end
 	end,
 	["*="] = function (rn)
+		thisframe.invalidreg(rn)
+
 		local c = thisframe.pop(true)
 
 		if c.method == REGISTER then
@@ -1330,10 +1560,16 @@ local auto_ops = {
 
 			thisframe.release(c.value)
 		elseif c.method == DIRECT then
-			cg:code("muli "..rs(rn)..", "..rs(rn)..", "..tostring(c.value))
+			if imm(c.value, 0x10000) then
+				cg:code("muli.i "..rs(rn)..", "..tostring(c.value))
+			else
+				cg:code("mul "..rs(rn)..", "..rs(rn)..", at")
+			end
 		end
 	end,
 	["/="] = function (rn)
+		thisframe.invalidreg(rn)
+
 		local c = thisframe.pop(true)
 
 		if c.method == REGISTER then
@@ -1341,10 +1577,16 @@ local auto_ops = {
 
 			thisframe.release(c.value)
 		elseif c.method == DIRECT then
-			cg:code("divi "..rs(rn)..", "..rs(rn)..", "..tostring(c.value))
+			if imm(c.value, 0x10000) then
+				cg:code("divi.i "..rs(rn)..", "..tostring(c.value))
+			else
+				cg:code("div "..rs(rn)..", "..rs(rn)..", at")
+			end
 		end
 	end,
 	["%="] = function (rn)
+		thisframe.invalidreg(rn)
+
 		local c = thisframe.pop(true)
 
 		if c.method == REGISTER then
@@ -1352,7 +1594,11 @@ local auto_ops = {
 
 			thisframe.release(c.value)
 		elseif c.method == DIRECT then
-			cg:code("modi "..rs(rn)..", "..rs(rn)..", "..tostring(c.value))
+			if imm(c.value, 0x10000) then
+				cg:code("modi.i "..rs(rn)..", "..tostring(c.value))
+			else
+				cg:code("mod "..rs(rn)..", "..rs(rn)..", at")
+			end
 		end
 	end
 }
@@ -1371,13 +1617,17 @@ function codegen.genif(ifn)
 
 		inn = inn + 1
 
+		local ins = "._df_ifin_"..tostring(inn)
+
+		inn = inn + 1
+
 		local cframe = codegen.frame(thisframe)
 
 		codegen.setframe(cframe)
 
 		codegen.block(v.conditional)
 
-		local c = thisframe.pop()
+		local c = thisframe.pop(false, false, true)
 
 		if c.method == DIRECT then
 			if c.value ~= 0 then
@@ -1389,19 +1639,21 @@ function codegen.genif(ifn)
 				break
 			end
 		elseif c.method == REGISTER then
-			cg:code("cmpi "..rs(c.value)..", 0")
+			cg:code("mov tf, "..rs(c.value))
+
+			if not c.inverse then
+				cg:code("bf "..nex)
+			else
+				cg:code("bt "..nex)
+			end
 
 			local nf = codegen.frame(thisframe, true)
-
-			cg:code("be "..nex)
 
 			codegen.block(v.body)
 
 			codegen.restoreframe()
 
-			if (k < #ifn.ifs) or (ifn.default) then
-				cg:code("b "..out)
-			end
+			cg:code("b "..out)
 
 			cg:code(nex..":")
 
@@ -1441,6 +1693,10 @@ function codegen.genwhile(wn)
 
 	wnn = wnn + 1
 
+	local ins = "._df_wins_"..tostring(wnn)
+
+	wnn = wnn + 1
+
 	cg:code(loop..":")
 
 	local cframe = codegen.frame(thisframe)
@@ -1449,7 +1705,7 @@ function codegen.genwhile(wn)
 
 	codegen.block(wn.w.conditional)
 
-	local r = cframe.pop()
+	local r = cframe.pop(false, false, true)
 
 	if r.method == DIRECT then
 		if r.value ~= 0 then
@@ -1462,9 +1718,13 @@ function codegen.genwhile(wn)
 			codegen.restoreframe()
 		end
 	elseif r.method == REGISTER then
-		cg:code("cmpi "..rs(r.value)..", 0")
+		cg:code("mov tf, "..rs(r.value))
 
-		cg:code("be "..out)
+		if not r.inverse then
+			cg:code("bf "..out)
+		else
+			cg:code("bt "..out)
+		end
 
 		codegen.block(wn.w.body)
 
@@ -1545,7 +1805,7 @@ function codegen.block(t)
 					if prim_ops[v.name](v) then return false end
 				elseif (e_extern[v.name] or e_defproc[v.name]) then
 					thisframe.flush(true)
-					cg:code("call "..v.name)
+					cg:code("jal "..v.name)
 				else
 					cerror(v, "attempt to call undeclared procedure "..(v.name or "NULL"))
 					return false
@@ -1560,13 +1820,19 @@ function codegen.block(t)
 
 					local rs0 = rs(r0)
 
-					cg:code("li "..rs0..", "..v.tab.name)
-					cg:code("addi "..rs0..", "..rs0..", "..tostring(r.value * 4))
+					putimm(r0, v.tab.name)
+
+					if imm(r.value*4, 0x10000) then
+						cg:code("addi.i "..rs0..", "..tostring(r.value * 4))
+					else
+						cg:code("add "..rs0..", "..rs0..", at")
+					end
 
 					r = thisframe.makereg(r0)
 				elseif r.method == REGISTER then
-					cg:code("muli "..rs(r.value)..", "..rs(r.rvalue)..", 4")
-					cg:code("addi "..rs(r.value)..", "..rs(r.value)..", "..v.tab.name)
+					cg:code("lshi "..rs(r.value)..", "..rs(r.rvalue)..", 2")
+					imm(v.tab.name,-1)
+					cg:code("add "..rs(r.value)..", "..rs(r.value)..", at")
 
 					thisframe.mutate(r)
 				end
@@ -1604,8 +1870,8 @@ function codegen.setframe(frame)
 	thisframe = frame
 end
 
-function codegen.restoreframe()
-	thisframe.flush()
+function codegen.restoreframe(drr)
+	thisframe.flush(drr)
 
 	thisframe = framepushdown[#framepushdown]
 
@@ -1613,6 +1879,10 @@ function codegen.restoreframe()
 end
 
 function codegen.save()
+	if not cproc.leaf then
+		cg:code("push lr")
+	end
+
 	for i = 1, #cproc.allocr do
 		cg:code("push "..cproc.allocr[i])
 	end
@@ -1626,12 +1896,16 @@ end
 
 function codegen.fret()
 	for i = 1, #cproc.outo do
-		cg:code("pushv r5, "..cproc.outo[i])
+		cg:code("swd.l vs, zero, "..cproc.outo[i])
 	end
 
 	codegen.restoreframe()
 
 	codegen.restore()
+
+	if not cproc.leaf then
+		cg:code("pop lr")
+	end
 
 	cg:code("ret")
 end
@@ -1656,6 +1930,15 @@ function codegen.procedure(t)
 	cproc.ralloc = {}
 
 	cproc.outo = {}
+
+	cproc.leaf = true
+
+	for k,v in pairs(t.calls) do
+		if (k == "Call") or (not prim_ops[k]) then
+			cproc.leaf = false
+			break
+		end
+	end
 
 	local inv = {}
 
@@ -1725,7 +2008,7 @@ function codegen.procedure(t)
 	codegen.save()
 
 	for i = 1, #inv do
-		cg:code("popv r5, "..inv[i])
+		cg:code("lwi.l "..inv[i]..", vs, zero")
 	end
 
 	if not codegen.block(t.block) then return false end
@@ -1763,7 +2046,7 @@ function codegen.gen(ast, extern, externconst, var, deftable, export, defproc, b
 		topframe.regs[i] = true
 	end
 
-	topframe.regs[5] = false -- dragonfruit stack pointer
+	topframe.regs[27] = false -- dragonfruit stack pointer
 
 	e_extern = extern
 

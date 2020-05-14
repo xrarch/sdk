@@ -1,6 +1,6 @@
 # sdk
 
-Small, somewhat crappy toolchain targeting the limn1k architecture.
+Small cross-toolchain for the LIMNstation architecture.
 
 ## Usage
 

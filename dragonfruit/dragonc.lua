@@ -38,19 +38,17 @@ end
 
 local function printhelp()
 	print("== dragonc.lua ==")
-	print("compiler for dragonfruit, targeting limn1k asm")
+	print("compiler for dragonfruit, targeting limn2k asm")
 	print("usage: dragonc.lua [source1 source2 ...] [dest1 dest2 ...]")
 end
 
 local incdir = {}
 
 local targets = {
-	["limn1k"] = "cg-limn1k.lua",
-	["auc"] = "cg-auc.lua",
-	["r216"] = "cg-r216.lua",
+	["limn2k"] = "cg-limn2k.lua",
 }
 
-local target = "limn1k"
+local target = "limn2k"
 
 local narg = {}
 

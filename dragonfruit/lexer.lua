@@ -116,6 +116,9 @@ function lex.extractAll(src, filename, stream, spot)
 								t = t..c
 							end
 						end
+					elseif c == "\n" then
+						line = line + 1
+						t = t..c
 					else
 						t = t..c
 					end

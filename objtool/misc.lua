@@ -1,3 +1,13 @@
+lshift, rshift, tohex, arshift, band, bxor, bor, bnot, bror, brol = bit.lshift, bit.rshift, bit.tohex, bit.arshift, bit.band, bit.bxor, bit.bor, bit.bnot, bit.ror, bit.rol
+
+function bnor(a,b)
+    return bnot(bor(a,b))
+end
+
+function bnand(a,b)
+    return bnot(band(a,b))
+end
+
 function toInt32(byte4, byte3, byte2, byte1)
     return (byte1*0x1000000) + (byte2*0x10000) + (byte3*0x100) + byte4
 end
@@ -12,6 +22,10 @@ end
 
 function splitInt16(n)
     return (math.modf(n/256))%256, n%256
+end
+
+function splitInt24(n) 
+    return (math.modf(n/65536))%256, (math.modf(n/256))%256, n%256
 end
 
 function explode(d,p)
@@ -77,17 +91,32 @@ function cast(struct, tab, offset)
     end
 
     function s.sv(n, val)
-        if s.s.sz[n] == 4 then
+        local sz = s.s.sz[n]
+
+        local t = s.t
+        local o = s.s.o
+        local off = s.o
+
+        if sz == 4 then
             local b1,b2,b3,b4 = splitInt32(val)
-            s.t[s.s.o[n] + s.o] = b4
-            s.t[s.s.o[n] + s.o + 1] = b3
-            s.t[s.s.o[n] + s.o + 2] = b2
-            s.t[s.s.o[n] + s.o + 3] = b1
-        elseif s.s.sz[n] == 1 then
+            t[o[n] + off] = b4
+            t[o[n] + off + 1] = b3
+            t[o[n] + off + 2] = b2
+            t[o[n] + off + 3] = b1
+        elseif sz == 3 then
+            local b1,b2,b3 = splitInt24(val)
+            t[o[n] + off] = b3
+            t[o[n] + off + 1] = b2
+            t[o[n] + off + 2] = b1
+        elseif sz == 2 then
+            local b1,b2 = splitInt16(val)
+            t[o[n] + off] = b2
+            t[o[n] + off + 1] = b1
+        elseif sz == 1 then
             val = val % 255
-            s.t[s.s.o[n] + s.o] = val
+            t[o[n] + off] = val
         else
-            error("no support for vals size "..tostring(s.s.sz[n]))
+            error("no support for vals size "..tostring(sz))
         end
     end
 

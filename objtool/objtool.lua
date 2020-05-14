@@ -42,7 +42,7 @@ local function usage()
 	externs [loff]: dump unresolved external symbols
 	move [loff] [move expression]: move a loff file in memory
 	strip [loff]: strip linking information from loff file
-	binary [loff] [base address] (bss address): flatten a loff file, will expand BSS section in file unless address is provided
+	binary (-nobss) [loff] [base address] (bss address): flatten a loff file, will expand BSS section in file unless address is provided
 	link (-f) [output] [loff1 loff2 ... ]: link 2 or more loff files
 ]])
 end
@@ -74,6 +74,9 @@ if arg[1] == "info" then
 	end
 
 	print(string.format("architecture: %s", archn[image.codeType] or "UNKNOWN"))
+	if image.entrySymbol then
+		print(string.format("entry point: %s @ $%X", image.entrySymbol.name, image.entrySymbol.value))
+	end
 elseif arg[1] == "symbols" then
 	if not arg[2] then
 		usage()
@@ -125,9 +128,9 @@ elseif arg[1] == "fixups" then
 			local sym = v.symbol
 
 			if sym then
-				print(string.format("%s: %x ref %s: %s (@%x) (target type: %x)", s.name, v.offset, (image.sections[sym.section] or {["name"]="extern"}).name, sym.name, sym.value, v.size))
+				print(string.format("%s: %x ref %s: %s (@%x) (target type: %x/%x)", s.name, v.offset, (image.sections[sym.section] or {["name"]="extern"}).name, sym.name, sym.value, v.size, v.divisor))
 			else
-				print(string.format("%s: %x relocation (target type: %x)", s.name, v.offset, v.size))
+				print(string.format("%s: %x relocation (target type: %x/%x)", s.name, v.offset, v.size, v.divisor))
 			end
 		end
 	end
@@ -244,6 +247,10 @@ elseif arg[1] == "move" then
 				r = r + image.sections[2].offset
 			elseif v == "bss_offset" then
 				r = r + image.sections[3].offset
+			elseif v == "align" then
+				while r % 4096 ~= 0 do
+					r = r + 1
+				end
 			elseif tonumber(v) then
 				r = r + tonumber(v)
 			else
@@ -268,7 +275,12 @@ elseif arg[1] == "binary" then
 		os.exit(1)
 	end
 
-	local image = loff.new(arg[2])
+	local nobss = arg[2] == "-nobss"
+
+	local b = 2
+	if nobss then b = 3 end
+
+	local image = loff.new(arg[b])
 	if not image then
 		os.exit(1)
 	end
@@ -277,7 +289,7 @@ elseif arg[1] == "binary" then
 		os.exit(1)
 	end
 
-	if not image:binary(tonumber(arg[3]), tonumber(arg[4])) then
+	if not image:binary(nobss, tonumber(arg[b+1]), tonumber(arg[b+2])) then
 		os.exit(1)
 	end
 elseif arg[1] == "link" then

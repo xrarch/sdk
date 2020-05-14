@@ -289,13 +289,10 @@ procedure private HexDigitToNum { digit -- num }
 
 	if (digit@ '0' >= digit@ '9' <= &&)
 		digit@ '0' - num!
-		return
 	end elseif (digit@ 'a' >= digit@ 'f' <= &&)
 		digit@ 'a' - 10 + num!
-		return
 	end elseif (digit@ 'A' >= digit@ 'F' <= &&)
 		digit@ 'A' - 10 + num!
-		return
 	end
 end
 

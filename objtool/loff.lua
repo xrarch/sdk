@@ -13,6 +13,17 @@ dofile(sd.."misc.lua")
 
 local loff = {}
 
+loff.archinfo = {}
+local archinfo = loff.archinfo
+
+archinfo[1] = {}
+archinfo[1].name = "limn1k"
+archinfo[1].align = 1
+
+archinfo[2] = {}
+archinfo[2].name = "limn2k"
+archinfo[2].align = 4
+
 local loffheader_s = struct({
 	{4, "magic"},
 	{4, "symbolTableOffset"},
@@ -46,7 +57,8 @@ local symbol_s = struct({
 local fixup_s = struct({
 	{4, "symbolIndex"},
 	{4, "offset"},
-	{4, "size"}
+	{4, "size"},
+	{4, "divisor"},
 })
 
 local uint32_s = struct {
@@ -126,6 +138,8 @@ function loff.new(filename)
 
 		self.codeType = self.header.gv("targetArchitecture")
 
+		self.archinfo = archinfo[self.codeType]
+
 		local stripped = self.header.gv("stripped")
 
 		if stripped == 1 then
@@ -153,6 +167,8 @@ function loff.new(filename)
 		local symcount = hdr.gv("symbolCount")
 		ptr = hdr.gv("symbolTableOffset")
 
+		self.isym = {}
+
 		for i = 1, symcount do
 			local sym = cast(symbol_s, self.bin, ptr)
 
@@ -175,7 +191,11 @@ function loff.new(filename)
 
 			symt.file = self.path
 
+			symt.sectiont = self.sections[symt.section]
+
 			self.symbols[i-1] = symt
+
+			self.isym[#self.isym + 1] = symt
 
 			if symt.symtype == 1 then
 				self.globals[name] = symt
@@ -244,6 +264,8 @@ function loff.new(filename)
 
 						f.size = fent.gv("size")
 
+						f.divisor = fent.gv("divisor")
+
 						f.file = self.path
 					end
 				end
@@ -256,6 +278,11 @@ function loff.new(filename)
 				return false
 			end
 
+			if self.archinfo and (address % self.archinfo.align ~= 0) then
+				print(string.format("objtool: %s requires section addresses to be aligned to a boundary of %d bytes", self.archinfo.name, self.archinfo.align))
+				return false
+			end
+
 			local s = self.sections[section]
 
 			for k,v in ipairs(s.fixups) do
@@ -263,7 +290,7 @@ function loff.new(filename)
 					if v.size <= 8 then
 						local type_s = struct({{v.size, "value"}})
 						local addrs = cast(type_s, s.contents, v.offset)
-						addrs.sv("value", addrs.gv("value") - s.linkedAddress + address)
+						addrs.sv("value", ((addrs.gv("value") * v.divisor) - s.linkedAddress + address) / v.divisor)
 					end
 				end
 			end
@@ -284,14 +311,14 @@ function loff.new(filename)
 
 								if sym.symtype == 4 then
 									if sym.value == 1 then
-										addrs.sv("value", s.linkedAddress)
+										addrs.sv("value", math.floor(s.linkedAddress / v.divisor))
 									elseif sym.value == 2 then
-										addrs.sv("value", s.size)
+										addrs.sv("value", math.floor(s.size / v.divisor))
 									elseif sym.value == 3 then
-										addrs.sv("value", s.linkedAddress + s.size)
+										addrs.sv("value", math.floor((s.linkedAddress + s.size) / v.divisor))
 									end
 								else
-									addrs.sv("value", sym.value + s.linkedAddress)
+									addrs.sv("value", (sym.value + s.linkedAddress) / v.divisor)
 								end
 							end
 						end
@@ -326,7 +353,7 @@ function loff.new(filename)
 			end
 		end
 
-		function self:binary(base, bss)
+		function self:binary(nobss, base, bss)
 			if base then
 				if self.linkable then
 					self:relocTo(1, base)
@@ -357,7 +384,7 @@ function loff.new(filename)
 				local s = self.sections[i]
 
 				if i == 3 then
-					if not bss then
+					if (not bss) and (not nobss) then
 						for b = 0, s.size - 1 do
 							file:write(string.char(0))
 						end
@@ -372,6 +399,42 @@ function loff.new(filename)
 			file:close()
 
 			return true
+		end
+
+		local sortedsym
+
+		local function sortsyms(s1,s2)
+			return (s1.value + s1.sectiont.linkedAddress) < (s2.value + s2.sectiont.linkedAddress)
+		end
+
+		function self:getSym(address)
+			if not sortedsym then
+				table.sort(self.isym, sortsyms)
+
+				sortedsym = true
+			end
+
+			for i = 1, 3 do
+				local s = self.sections[i]
+
+				if (address >= s.linkedAddress) and (address < (s.linkedAddress + s.size)) then
+					local thesym
+
+					for k,sym in ipairs(self.isym) do
+						if (sym.section == i) and (sym.symtype ~= 4) then
+							if address >= (sym.value + s.linkedAddress) then
+								thesym = sym
+							elseif address < (sym.value + s.linkedAddress) then
+								return thesym, address - (thesym.value + s.linkedAddress)
+							end
+						end
+					end
+
+					if thesym then
+						return thesym, address - (thesym.value + s.linkedAddress)
+					end
+				end
+			end
 		end
 
 		return true
@@ -441,7 +504,7 @@ function loff.new(filename)
 			es.index = addSymbol(es.name, es.section, es.symtype, es.value)
 		end
 
-		local function addFixup(section, symindex, offset, size)
+		local function addFixup(section, symindex, offset, size, divisor)
 			local u1, u2, u3, u4 = splitInt32(symindex)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
@@ -449,6 +512,9 @@ function loff.new(filename)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 			u1, u2, u3, u4 = splitInt32(size)
+			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			u1, u2, u3, u4 = splitInt32(divisor)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		end
 
@@ -466,11 +532,16 @@ function loff.new(filename)
 						sindex = v.symbol.index
 					end
 
-					addFixup(s, sindex, v.offset, v.size)
+					addFixup(s, sindex, v.offset, v.size, v.divisor)
 
 					s.fixupcount = s.fixupcount + 1
 				end
 			end
+		end
+
+		while strtabsize % 4 ~= 0 do
+			strtab = strtab .. string.char(0)
+			strtabsize = strtabsize + 1
 		end
 
 		-- make header
@@ -664,7 +735,7 @@ function loff.new(filename)
 					if v.size <= 8 then
 						local type_s = struct({{v.size, "value"}})
 						local addrs = cast(type_s, mysection.contents, v.offset)
-						addrs.sv("value", sym.resolved.value)
+						addrs.sv("value", (sym.resolved.value / v.divisor))
 					else
 						--print("didnt resolve")
 					end
@@ -690,7 +761,7 @@ function loff.new(filename)
 		end
 
 		if with.codeType ~= self.codeType then
-			print(string.format("objtool: warning: linking 2 object files of differing code types, %d and %d", with.codeType, self.codeType))
+			print(string.format("objtool: warning: linking 2 object files of differing code types, %d and %d\n  %s\n  %s", self.codeType, with.codeType, self.path, with.path))
 		end
 
 		if self.entrySymbol and with.entrySymbol then

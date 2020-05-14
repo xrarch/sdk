@@ -15,9 +15,7 @@ local sd = getdirectory(arg[0])
 dofile(sd.."misc.lua")
 
 local targets = {
-	["limn1k"] = 0x1,
 	["limn2k"] = 0x2,
-	["auc"] = 0x3,
 }
 
 local function lerror(line, err)
@@ -36,6 +34,54 @@ local function dumpAllLines(block)
 	end
 end
 
+local function ttokenize(str)
+	local tokens = {}
+
+	if #str == 0 then return tokens end
+
+	local ctok = ""
+
+	local raw = false
+
+	for i = 1, #str do
+		local c = str:sub(i,i)
+
+		if not raw then
+			if c == "\\" then
+				ctok = ctok .. (str:sub(i+1,i+1) or "")
+
+				i = i + 1
+			elseif c == ";" then
+				break
+			elseif (c == " ") or (c == "\t") then
+				if #ctok > 0 then
+					if ctok:sub(-1,-1) == "," then
+						ctok = ctok:sub(1,-2)
+					elseif (ctok == ".ds") and (#tokens == 0) then
+						raw = true
+						i = i + 1
+					end
+
+					tokens[#tokens + 1] = ctok
+					ctok = ""
+				end
+			else
+				ctok = ctok .. c
+			end
+		else
+			ctok = ctok .. c
+		end
+
+		i = i + 1
+	end
+
+	if (#ctok > 0) or raw then
+		tokens[#tokens + 1] = ctok
+	end
+
+	return tokens
+end
+
 local asm = {}
 
 function asm.lines(block, source, filename)
@@ -45,49 +91,14 @@ function asm.lines(block, source, filename)
 
 	local lnum = 0
 
+	local pseudo = block.pseudo
+
 	for n,line in ipairs(llit) do
 		lnum = lnum + 1
 
-		while (line:sub(1,1) == " ") or (line:sub(1,1) == "\t") do
-			line = line:sub(2)
-		end
+		local tt = ttokenize(line)
 
-		local tt = tokenize(line)
-
-		if tt[1] ~= ".ds" then
-			for i = 1, #line do
-				if line:sub(i,i) == ";" then
-					if (line:sub(i-1,i-1) ~= '"') or (line:sub(i+1,i+1) ~= '"') then
-						line = line:sub(1, i-1)
-						break
-					end
-				end
-			end
-
-			while (line:sub(-1,-1) == " ") do
-				line = line:sub(1,-2)
-			end
-
-			tt = tokenize(line)
-		end
-
-		if line ~= "" then
-			if tt[1] ~= ".ds" then -- ds is immune
-				line = ""
-
-				for k,v in ipairs(tt) do
-					if v:sub(-1,-1) == "," then
-						v = v:sub(1,-2)
-					end
-
-					if k > 1 then
-						line = line .. " " .. v
-					else
-						line = v
-					end
-				end
-			end
-
+		if #tt > 0 then
 			if tt[1] == ".include" then
 				local srcf = io.open(block.basedir .. "/" .. tt[2], "r")
 				if not srcf then
@@ -98,6 +109,15 @@ function asm.lines(block, source, filename)
 				if not asm.lines(block, srcf:read("*a"), tt[2]) then return false end
 
 				srcf:close()
+			elseif pseudo[tt[1]] then
+				local pi = pseudo[tt[1]]
+
+				if (#tt - 1) < pi[1] then
+					print(string.format("asm: %s:%d: not enough arguments", filename, lnum))
+					return false
+				end
+
+				if not asm.lines(block, pi[2](tt), filename) then return false end
 			else
 				lines[#lines + 1] = {}
 
@@ -106,6 +126,7 @@ function asm.lines(block, source, filename)
 				lines[key].text = line
 				lines[key].file = filename
 				lines[key].number = lnum
+				lines[key].tokens = tt
 
 				lines[key].destroy = function (self)
 					self.text = nil
@@ -113,6 +134,7 @@ function asm.lines(block, source, filename)
 
 				lines[key].replace = function (self, text)
 					self.text = text
+					self.tokens = ttokenize(text)
 				end
 			end
 		end
@@ -140,7 +162,7 @@ local function section(block, id, bss)
 
 	function me:addByte(byte)
 		if not self.bss then
-			self.contents = self.contents .. string.char(byte)
+			self.contents = self.contents .. string.char(band(byte, 0xFF))
 		end
 
 		self.size = self.size + 1
@@ -184,17 +206,20 @@ local function section(block, id, bss)
 		symtab:addSymbol(name, self, "local", off)
 	end
 
-	function me:addFixup(sym, off, size)
+	function me:addFixup(sym, off, size, divisor)
+		if size < 0 then return end
+
 		self.fixups[#self.fixups + 1] = {}
 		self.fixups[#self.fixups].sym = sym
 		self.fixups[#self.fixups].value = off
 		self.fixups[#self.fixups].size = size
+		self.fixups[#self.fixups].divisor = (divisor or 1)
 	end
 
 	me.fixuptab = ""
 	me.fixupcount = 0
 
-	function me:addBinaryFixup(symindex, offset, size)
+	function me:addBinaryFixup(symindex, offset, size, divisor)
 		local u1, u2, u3, u4 = splitInt32(symindex)
 		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
@@ -202,6 +227,9 @@ local function section(block, id, bss)
 		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 		u1, u2, u3, u4 = splitInt32(size)
+		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		u1, u2, u3, u4 = splitInt32(divisor)
 		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 		self.fixupcount = self.fixupcount + 1
@@ -242,19 +270,19 @@ function asm.labels(block)
 	symtab:addSymbol("_bss_end", block.sections["bss"], "special", 3)
 
 	for k,v in ipairs(block.lines) do
-		local tokens = tokenize(v.text)
+		local tokens = v.tokens
 
 		local word = tokens[1]
 
 		if curStruct then
-			if word == "end-struct" then
+			if word == ".end-struct" then
 				symtab:addConstant(curStruct.."_sizeof", strCount)
 				curStruct = false
 				strCount = 0
 			elseif #tokens == 2 then
-				symtab:addConstant(curStruct.."_"..word, strCount)
+				symtab:addConstant(curStruct.."_"..tokens[2], strCount)
 
-				local sz = tonumber(tokens[2])
+				local sz = tonumber(word)
 
 				if not sz then
 					lerror(v, "malformed struct entry")
@@ -403,8 +431,8 @@ function asm.labels(block)
 					section.tbc = section.tbc + 4
 				end
 			elseif word == ".ds" then
-				section.tbc = section.tbc + #v.text:sub(5)
-				v.offset[2] = #v.text:sub(5)
+				section.tbc = section.tbc + #tokens[2]
+				v.offset[2] = #tokens[2]
 			elseif word == ".ds$" then
 				if #tokens == 1 then
 					lerror(v, ".ds$ needs a symbol")
@@ -497,7 +525,7 @@ function asm.labels(block)
 				local off = section.tbc + 1
 
 				for i = 1, #e[3] do
-					v.offsets[#v.offsets + 1] = {off, e[3][i]}
+					v.offsets[#v.offsets + 1] = {off, e[3][i], e[5]}
 
 					off = off + e[3][i]
 				end
@@ -505,6 +533,7 @@ function asm.labels(block)
 				section.tbc = section.tbc + e[1]
 
 				v.offset[2] = e[1]
+				v.offset[3] = e[5]
 			end
 
 		end
@@ -523,7 +552,7 @@ function asm.decode(block) -- decode labels, registers, strings
 
 	for k,v in ipairs(block.lines) do
 		if v.text then
-			local tokens = tokenize(v.text)
+			local tokens = v.tokens
 
 			local word = tokens[1]
 
@@ -559,23 +588,33 @@ function asm.decode(block) -- decode labels, registers, strings
 							elseif tonumber(t) then
 								lout = lout .. " " .. t
 							elseif t:sub(1,1) == "." then -- local label
-								if block.localLabels[curLabel][t:sub(2)] then
-									lout = lout .. " " .. tostring(block.localLabels[curLabel][t:sub(2)])
+								local ll = block.localLabels[curLabel][t:sub(2)]
+
+								local nofix = false
+
+								if ll then
+									if e and e[3][n-1] < 0 then
+										nofix = true
+
+										lout = lout .. " " .. tostring(ll - v.offset[1])
+									else
+										lout = lout .. " " .. tostring(ll)
+									end
 								else
 									lerror(v, "not a local label: '"..t:sub(2).."'")
 									return false
 								end
 
-								if word ~= ".bc" then
+								if (word ~= ".bc") and (not nofix) then
 									if v.offsets then
 										if v.offsets[n-1] then
-											v.section:addFixup(nil, v.offsets[n-1][1], v.offsets[n-1][2])
+											v.section:addFixup(nil, v.offsets[n-1][1], v.offsets[n-1][2], v.offsets[n-1][3])
 										else
 											lerror(v, "unrecoverable condition")
 											return false
 										end
 									elseif v.offset then
-										v.section:addFixup(nil, v.offset[1], v.offset[2])
+										v.section:addFixup(nil, v.offset[1], v.offset[2], v.offset[3])
 									else
 										lerror(v, "unrecoverable condition")
 										return false
@@ -594,7 +633,14 @@ function asm.decode(block) -- decode labels, registers, strings
 									if (sym.symtype == "local") or (sym.symtype == "global") then
 										if sym.section == v.section then
 											psym = nil
-											lout = lout .. " " .. tostring(sym.value)
+
+											if e and e[3][n-1] < 0 then
+												psym = -1
+
+												lout = lout .. " " .. tostring(sym.value - v.offset[1])
+											else
+												lout = lout .. " " .. tostring(sym.value)
+											end
 										else
 											lout = lout .. " 0"
 										end
@@ -605,15 +651,15 @@ function asm.decode(block) -- decode labels, registers, strings
 										error("huh")
 									end
 
-									if word ~= ".bc" then
+									if (word ~= ".bc") and (psym ~= -1) then
 										if v.offsets then
 											if v.offsets[n-1] then
-												v.section:addFixup(psym, v.offsets[n-1][1], v.offsets[n-1][2])
+												v.section:addFixup(psym, v.offsets[n-1][1], v.offsets[n-1][2], v.offsets[n-1][3])
 											else
 												error("huh")
 											end
 										elseif v.offset then
-											v.section:addFixup(psym, v.offset[1], v.offset[2])
+											v.section:addFixup(psym, v.offset[1], v.offset[2], v.offset[3])
 										else
 											error("huh")
 										end
@@ -668,7 +714,8 @@ local symbol_s = struct({
 local fixup_s = struct({
 	{4, "symbolIndex"},
 	{4, "offset"},
-	{4, "size"}
+	{4, "size"},
+	{4, "divisor"},
 })
 
 function asm.binary(block, lex)
@@ -742,7 +789,7 @@ function asm.binary(block, lex)
 			symx = v.sym.index
 		end
 
-		section:addBinaryFixup(symx, v.value, v.size)
+		section:addBinaryFixup(symx, v.value, v.size, v.divisor)
 	end
 
 	section = block.sections["text"]
@@ -754,7 +801,7 @@ function asm.binary(block, lex)
 			symx = v.sym.index
 		end
 
-		section:addBinaryFixup(symx, v.value, v.size)
+		section:addBinaryFixup(symx, v.value, v.size, v.divisor)
 	end
 
 	while strtabsize % 4 ~= 0 do
@@ -764,7 +811,7 @@ function asm.binary(block, lex)
 
 	for k,v in ipairs(block.lines) do
 		if v.text then
-			local tokens = tokenize(v.text)
+			local tokens = v.tokens
 
 			local word = tokens[1]
 
@@ -804,7 +851,7 @@ function asm.binary(block, lex)
 					end
 				end
 			elseif word == ".ds" then
-				local contents = v.text:sub(5)
+				local contents = tokens[2]
 				section.contents = section.contents..contents
 				section.size = section.size + #contents
 			elseif word == ".bytes" then
@@ -838,7 +885,7 @@ function asm.binary(block, lex)
 				end
 			else
 				if section.size % block.ialign ~= 0 then
-					lerror(v, "instruction not aligned to "..tostring(block.ialign).." bytes "..tostring(codesize))
+					lerror(v, "instruction not aligned to "..tostring(block.ialign).." bytes")
 					return false
 				end
 
@@ -858,9 +905,18 @@ function asm.binary(block, lex)
 				for n,s in ipairs(rands) do
 					s = math.abs(s)
 
-					local operand = tokens[n+1]
-					if not tonumber(operand) then
-						lerror(v, "malformed number "..operand)
+					local operand = tonumber(tokens[n+1])
+					if not operand then
+						lerror(v, "malformed number "..tokens[n+1])
+						return false
+					end
+
+					if e[4] then
+						operand = e[4](n, operand)
+					end
+
+					if math.floor(operand) ~= operand then
+						lerror(v, "unaligned operand")
 						return false
 					end
 
@@ -869,7 +925,7 @@ function asm.binary(block, lex)
 					elseif s == 2 then
 						section:addInt(tc(operand))
 					elseif s == 3 then
-						section:addThree(tc(operand))
+						section:addTriplet(tc(operand))
 					elseif s == 4 then
 						section:addLong(tc(operand))
 					end
@@ -1074,7 +1130,7 @@ function asm.assembleBlock(target, source, filename, flat)
 	end
 
 	local tinst = dofile(sd.."inst-"..target..".lua")
-	block.inst, block.regs, block.ialign = tinst[1], tinst[2], tinst[4]
+	block.inst, block.regs, block.ialign, block.pseudo = tinst[1], tinst[2], tinst[4], tinst[6]
 
 	block.constants = {}
 

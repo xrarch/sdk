@@ -14,11 +14,11 @@ dofile(sd.."misc.lua")
 local block = dofile(sd.."block.lua")
 
 local superblock_s = struct {
-	{1, "version"},
+	{4, "version"},
 	{4, "magic"},
 	{4, "size"},
 	{4, "numfiles"},
-	{1, "dirty"},
+	{4, "dirty"},
 	{4, "blocksused"},
 	{4, "numdirs"},
 	{4, "reservedblocks"},
@@ -29,16 +29,15 @@ local superblock_s = struct {
 }
 
 local dirent_s = struct {
-	{1, "type"},
-	{1, "permissions"},
+	{4, "type"},
+	{4, "permissions"},
 	{4, "uid"},
 	{4, "reserved"},
 	{4, "timestamp"},
 	{4, "startblock"},
 	{4, "size"},
 	{4, "bytesize"},
-	{37, "name"},
-	{1, "nullterm"}
+	{32, "name"},
 }
 
 local fat_s = struct {
@@ -220,7 +219,7 @@ function fat.mount(image)
 				return false
 			end
 
-			name = name:sub(1, 36)
+			name = name:sub(1, 31)
 
 			st = st or 1
 
@@ -393,11 +392,10 @@ function fat.mount(image)
 	end
 
 	function fs:dumpinfo()
-		print(string.format([[general info:
+		print(string.format([[info:
 	partition size: %d blocks
 	blocks used: %d blocks
 	number of reserved blocks: %d blocks
-specific info:
 	%d files
 	%d directories]],
 			superblock.gv("size"),

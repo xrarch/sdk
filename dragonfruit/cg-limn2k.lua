@@ -291,7 +291,7 @@ function codegen.frame(parent, clone)
 
 			if v.method == DIRECT then
 				if type(v.value) == "number" then
-					if v.value < 0x10000 then
+					if (v.value < 0x10000) and (v.value >= 0) then
 						cg:code("swdi.l vs, "..tostring(v.value))
 					elseif band(v.value, 0xFFFF) == 0 then
 						cg:code("lui at, "..tostring(v.value))
@@ -847,7 +847,7 @@ local prim_ops = {
 				putimm(r2, src2.value)
 			end
 
-			cg:code("sgt "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+			cg:code("slt "..rs(r.value)..", "..rs(r2)..", "..rs(r1))
 
 			thisframe.release(r1)
 			thisframe.release(r2)
@@ -942,7 +942,135 @@ local prim_ops = {
 				putimm(r2, src2.value)
 			end
 
-			cg:code("sgt "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+			cg:code("slt "..rs(r.value)..", "..rs(r2)..", "..rs(r1))
+
+			thisframe.release(r1)
+			thisframe.release(r2)
+
+			r.inverse = true
+		end
+
+		thisframe.push(r)
+	end,
+	["s>"] = function (rn)
+		local src2 = thisframe.pop()
+		local src1 = thisframe.pop()
+
+		local r = thisframe.result(src1, src2)
+
+		if r.method == DIRECT then
+			if src1.value > src2.value then
+				r.value = 1
+			else
+				r.value = 0
+			end
+		elseif r.method == REGISTER then
+			local r1,r2 = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
+			end
+
+			cg:code("slt.s "..rs(r.value)..", "..rs(r2)..", "..rs(r1))
+
+			thisframe.release(r1)
+			thisframe.release(r2)
+		end
+
+		thisframe.push(r)
+	end,
+	["s<"] = function (rn)
+		local src2 = thisframe.pop(true)
+		local src1 = thisframe.pop(true)
+
+		local r = thisframe.result(src1, src2)
+
+		if r.method == DIRECT then
+			if src1.value < src2.value then
+				r.value = 1
+			else
+				r.value = 0
+			end
+		elseif r.method == REGISTER then
+			local r1,r2 = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
+			end
+
+			cg:code("slt.s "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+			thisframe.release(r1)
+			thisframe.release(r2)
+		end
+
+		thisframe.push(r)
+	end,
+	["s>="] = function (rn) -- not carry
+		local src2 = thisframe.pop(true)
+		local src1 = thisframe.pop(true)
+
+		local r = thisframe.result(src1, src2)
+
+		if r.method == DIRECT then
+			if src1.value >= src2.value then
+				r.value = 1
+			else
+				r.value = 0
+			end
+		elseif r.method == REGISTER then
+			local r1,r2 = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
+			end
+
+			cg:code("slt.s "..rs(r.value)..", "..rs(r1)..", "..rs(r2))
+
+			thisframe.release(r1)
+			thisframe.release(r2)
+
+			r.inverse = true
+		end
+
+		thisframe.push(r)
+	end,
+	["s<="] = function (rn) -- carry or zero
+		local src2 = thisframe.pop(true)
+		local src1 = thisframe.pop(true)
+
+		local r = thisframe.result(src1, src2)
+
+		if r.method == DIRECT then
+			if src1.value <= src2.value then
+				r.value = 1
+			else
+				r.value = 0
+			end
+		elseif r.method == REGISTER then
+			local r1,r2 = src1.value, src2.value
+
+			if src1.method == DIRECT then
+				r1 = thisframe.allocscratch()
+				putimm(r1, src1.value)
+			elseif src2.method == DIRECT then
+				r2 = thisframe.allocscratch()
+				putimm(r2, src2.value)
+			end
+
+			cg:code("slt.s "..rs(r.value)..", "..rs(r2)..", "..rs(r1))
 
 			thisframe.release(r1)
 			thisframe.release(r2)

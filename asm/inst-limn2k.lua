@@ -95,7 +95,7 @@ local inst = {
 		if n == 3 then o = o / 4 end
 		return o
 	end},
-	["bgt"]    = {4, 0x29, {1, 1, -1}, function (n,o)
+	["blt.s"]  = {4, 0x29, {1, 1, -1}, function (n,o)
 		if n == 3 then o = o / 4 end
 		return o
 	end},
@@ -103,8 +103,11 @@ local inst = {
 	["slt"]    = {4, 0x2A, {1, 1, 1}},
 	["slti"]   = {4, 0x2B, {1, 2}},
 
-	["sgt"]    = {4, 0x2E, {1, 1, 1}},
+	["slt.s"]  = {4, 0x2C, {1, 1, 1}},
+	["slti.s"] = {4, 0x2D, {1, 2}},
+
 	["sgti"]   = {4, 0x2F, {1, 2}},
+	["sgti.s"] = {4, 0x30, {1, 2}},
 
 	["seq"]    = {4, 0x32, {1, 1, 1}},
 	["sne"]   = {4, 0x33, {1, 1, 1}},

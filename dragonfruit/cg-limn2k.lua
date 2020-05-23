@@ -54,6 +54,9 @@ local function imm(im, max)
 		elseif band(im, 0xFFFF) == 0 then
 			cg:code("lui at, "..tostring(im))
 			return false
+		elseif (im < 0x10000) and (im >= 0) then
+			cg:code("li at, "..tostring(im))
+			return false
 		else
 			cg:code("la at, "..tostring(im))
 			return false
@@ -402,7 +405,7 @@ function codegen.frame(parent, clone)
 			if type(src.value) == "number" then
 				if imm(src.value, 65536) then
 					if (src.value > 255) and (s ~= "b") then
-						cg:code("si16."..s.." "..rs(r1)..", zero, "..src.value)
+						cg:code("si16."..s.." "..rs(r1)..", "..src.value)
 					else
 						cg:code("si."..s.." "..rs(r1)..", zero, "..src.value)
 					end

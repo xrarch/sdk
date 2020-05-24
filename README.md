@@ -1,6 +1,6 @@
 # sdk
 
-Small cross-toolchain for the LIMNstation architecture.
+Cross-toolchain for the LIMNstation architecture, written in Lua because why not!
 
 ## Usage
 

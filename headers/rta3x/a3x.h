@@ -42,6 +42,8 @@ extern a3xDevIterate
 
 extern a3xDGetName
 
+extern a3xConsoleUserOut
+
 externconst a3xCIPtr (* var *)
 
 externconst a3xFwctx (* var *)

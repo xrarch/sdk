@@ -27,6 +27,20 @@ local function usage()
 ]])
 end
 
+local offset = 0
+
+local narg = {}
+
+for k,v in ipairs(arg) do
+	if v:sub(1,7) == "offset=" then
+		offset = tonumber(v:sub(8))
+	else
+		narg[#narg + 1] = v
+	end
+end
+
+arg = narg
+
 if #arg < 2 then
 	usage()
 	os.exit(1)
@@ -35,9 +49,9 @@ end
 local cmd = arg[2]
 
 if cmd == "f" then -- format
-	fat.format(dimg)
+	fat.format(dimg, offset)
 else
-	local fs = fat.mount(dimg)
+	local fs = fat.mount(dimg, offset)
 	if not fs then
 		print("fsutil: error: couldn't mount image")
 		os.exit(1)

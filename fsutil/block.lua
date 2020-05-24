@@ -5,8 +5,10 @@
 
 local block = {}
 
-function block.new(image, blocksize)
+function block.new(image, blocksize, offset)
 	local bd = {}
+
+	offset = offset or 0
 
 	bd.bs = blocksize
 
@@ -14,12 +16,12 @@ function block.new(image, blocksize)
 
 	if not bd.file then return false end
 
-	bd.size = bd.file:seek("end")
+	bd.size = bd.file:seek("end") - (offset * blocksize)
 
 	bd.blocks = math.floor(bd.size / blocksize)
 
 	function bd:seek(block)
-		self.file:seek("set", block * self.bs)
+		self.file:seek("set", (block * self.bs) + (offset * self.bs))
 	end
 
 	function bd:read()
@@ -33,7 +35,7 @@ function block.new(image, blocksize)
 	function bd:readBlock(block)
 		local b = {}
 
-		self.file:seek("set", block * self.bs)
+		self.file:seek("set", (block * self.bs) + (offset * self.bs))
 
 		for i = 0, self.bs - 1 do
 			b[i] = string.byte(self.file:read(1) or "\0")
@@ -43,7 +45,7 @@ function block.new(image, blocksize)
 	end
 
 	function bd:writeBlock(block, b)
-		self.file:seek("set", block * self.bs)
+		self.file:seek("set", (block * self.bs) + (offset * self.bs))
 
 		for i = 0, self.bs - 1 do
 			self.file:write(string.char(b[i] or 0))

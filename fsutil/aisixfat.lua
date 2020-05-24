@@ -46,10 +46,10 @@ local fat_s = struct {
 
 local fat = {}
 
-function fat.mount(image)
+function fat.mount(image, offset)
 	local fs = {}
 
-	fs.image = block.new(image, 4096)
+	fs.image = block.new(image, 4096, offset)
 	local img = fs.image
 
 	fs.rSuperblock = img:readBlock(0)
@@ -161,9 +161,7 @@ function fat.mount(image)
 
 	function fs:writeData(data)
 		local datas = #data
-		print("length: "..tostring(datas).." bytes")
 		local blocks = math.ceil(datas / 4096)
-		print("blocks: "..tostring(blocks))
 		if blocks == 0 then blocks = 1 end
 
 		local bc = fs:allocateBlocks(blocks)
@@ -417,10 +415,10 @@ function fat.mount(image)
 	return fs
 end
 
-function fat.format(image)
+function fat.format(image, offset)
 	print("formatting...")
 
-	local img = block.new(image, 4096)
+	local img = block.new(image, 4096, offset)
 
 	local rSuperblock = {}
 	for i = 0, 4095 do
@@ -454,7 +452,7 @@ function fat.format(image)
 	img:writeBlock(fsize+16, {[0]=0})
 
 	print("mounting")
-	local fs = fat.mount(image)
+	local fs = fat.mount(image, offset)
 
 	print("reserving blocks")
 	for i = 0, reservedblocks do

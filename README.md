@@ -4,7 +4,7 @@ Cross-toolchain for the LIMNstation architecture, written in Lua because why not
 
 ## Usage
 
-Modify the `./lua.sh` shell script to use your LuaJIT executable. LuaJIT was optional at one point, but is now required.
+Modify the `./lua.sh` shell script to use your LuaJIT executable.
 
 Then the following scripts can be used as follows:
 

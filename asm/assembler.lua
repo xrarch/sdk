@@ -916,7 +916,7 @@ function asm.binary(block, lex)
 					end
 
 					if math.floor(operand) ~= operand then
-						lerror(v, "unaligned operand")
+						lerror(v, "unaligned operand on "..word)
 						return false
 					end
 

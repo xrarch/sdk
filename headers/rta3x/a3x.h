@@ -2,6 +2,8 @@ extern a3xGets
 
 extern a3xPutc
 
+extern a3xPuts
+
 extern a3xGetc
 
 extern a3xAPIDevTree
@@ -43,6 +45,8 @@ extern a3xDevIterate
 extern a3xDGetName
 
 extern a3xConsoleUserOut
+
+extern a3xDGetCurrent
 
 externconst a3xCIPtr (* var *)
 

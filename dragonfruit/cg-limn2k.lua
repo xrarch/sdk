@@ -1552,8 +1552,8 @@ local prim_ops = {
 		thisframe.push(r)
 	end,
 	["bitset"] = function (rn) -- (v bit -- v)
-		local src1 = thisframe.pop()
 		local src2 = thisframe.pop()
+		local src1 = thisframe.pop()
 
 		local r = thisframe.result(src1, src2)
 
@@ -1587,8 +1587,8 @@ local prim_ops = {
 		thisframe.push(r)
 	end,
 	["bitclear"] = function (rn) -- (v bit -- v)
-		local src1 = thisframe.pop()
 		local src2 = thisframe.pop()
+		local src1 = thisframe.pop()
 
 		local r = thisframe.result(src1, src2)
 
@@ -1756,13 +1756,13 @@ function codegen.genif(ifn)
 
 		codegen.setframe(cframe)
 
-		codegen.block(v.conditional)
+		if not codegen.block(v.conditional) then return false end
 
 		local c = thisframe.pop(false, false, true)
 
 		if c.method == DIRECT then
 			if c.value ~= 0 then
-				codegen.block(v.body)
+				if not codegen.block(v.body) then return false end
 
 				codegen.restoreframe()
 
@@ -1780,7 +1780,7 @@ function codegen.genif(ifn)
 
 			local nf = codegen.frame(thisframe, true)
 
-			codegen.block(v.body)
+			if not codegen.block(v.body) then return false end
 
 			codegen.restoreframe()
 
@@ -1797,7 +1797,7 @@ function codegen.genif(ifn)
 
 		codegen.setframe(bframe)
 
-		codegen.block(ifn.default)
+		if not codegen.block(ifn.default) then return false end
 
 		codegen.restoreframe()
 	end
@@ -1834,13 +1834,13 @@ function codegen.genwhile(wn)
 
 	codegen.setframe(cframe)
 
-	codegen.block(wn.w.conditional)
+	if not codegen.block(wn.w.conditional) then return false end
 
 	local r = cframe.pop(false, false, true)
 
 	if r.method == DIRECT then
 		if r.value ~= 0 then
-			codegen.block(wn.w.body)
+			if not codegen.block(wn.w.body) then return false end
 
 			cg:code("b "..loop)
 
@@ -1857,7 +1857,7 @@ function codegen.genwhile(wn)
 			cg:code("bt "..out)
 		end
 
-		codegen.block(wn.w.body)
+		if not codegen.block(wn.w.body) then return false end
 
 		cg:code("b "..loop)
 

@@ -60,10 +60,15 @@ if flat then
 	asm = asm .. "-flat "
 end
 
+local dx = 0
+
 for k,v in ipairs(sourcef) do
 	local ed = getdirectory(v)
 
-	local eout = ed..".__out.s "
+	-- this is unlikely to appear twice during multi-core building, I hope.
+	local i = math.floor(os.clock()*10000000 + math.random()*100000)
+
+	local eout = ed..".__out"..tostring(i)..".s "
 
 	local err
 

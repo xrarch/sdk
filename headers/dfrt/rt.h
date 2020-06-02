@@ -49,3 +49,5 @@ extern Gets (* s max -- *)
 extern Putc (* c -- *)
 
 extern Getc (* -- c *)
+
+extern iserr (* v -- err *)

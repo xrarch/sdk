@@ -15,3 +15,7 @@ end
 procedure min { n1 n2 } (* -- min *)
 	if (n2@ n1@ <) n2@ end else n1@ end
 end
+
+procedure iserr { n -- err }
+	n@ 0 s< err!
+end

@@ -1,55 +1,53 @@
-extern a3xGets
+extern a3xGets { buf max -- }
 
-extern a3xPutc
+extern a3xPutc { c -- }
 
-extern a3xPuts
+extern a3xPuts { s -- }
 
-extern a3xGetc
+extern a3xGetc { -- c }
 
-extern a3xAPIDevTree
+extern a3xAPIDevTree { -- root dcp }
 
-extern a3xMalloc
+extern a3xMalloc { sz -- ptr }
 
-extern a3xCalloc
+extern a3xCalloc { sz -- ptr }
 
-extern a3xFree
+extern a3xFree { ptr -- }
 
-extern a3xDevTreeWalk
+extern a3xDevTreeWalk { path -- node }
 
-extern a3xDeviceParent
+extern a3xDeviceParent { -- }
 
-extern a3xDeviceSelectNode
+extern a3xDeviceSelectNode { node -- }
 
-extern a3xDeviceSelect
+extern a3xDeviceSelect { path -- }
 
-extern a3xDGetProperty
+extern a3xDGetProperty { name -- value }
 
-extern a3xDGetMethod
+extern a3xDGetMethod { name -- ptr }
 
-extern a3xDCallMethod
+extern a3xDCallMethod { ... name -- out1 out2 out3 ok }
 
-extern a3xDSetProperty
+extern a3xDSetProperty { prop name -- }
 
-extern a3xDeviceExit
+extern a3xDeviceExit { -- }
 
-extern a3xInit
+extern a3xReturn { code -- }
 
-extern a3xReturn
+extern a3xDCallMethodPtr { ptr -- }
 
-extern a3xDCallMethodPtr
+extern a3xDevIteratorInit { -- iter }
 
-extern a3xDevIteratorInit
+extern a3xDevIterate { iterin -- iterout }
 
-extern a3xDevIterate
+extern a3xDGetName { -- name }
 
-extern a3xDGetName
+extern a3xConsoleUserOut { -- }
 
-extern a3xConsoleUserOut
+extern a3xDGetCurrent { -- current }
 
-extern a3xDGetCurrent
+externptr a3xCIPtr (* var *)
 
-externconst a3xCIPtr (* var *)
+externptr a3xFwctx (* var *)
 
-externconst a3xFwctx (* var *)
-
-externconst a3xMyDevice (* var *)
+externptr a3xMyDevice (* var *)

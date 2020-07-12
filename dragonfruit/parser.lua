@@ -1,5 +1,3 @@
--- recursive descent parser for dragonfruit
-
 local function getdirectory(p)
 	for i = #p, 1, -1 do
 		if p:sub(i,i) == "/" then
@@ -15,54 +13,89 @@ local function lerror(token, err)
 	print(string.format("dragonc: parser: %s:%d: %s", token[4], token[3], err))
 end
 
-local function asthelp(name, errtok, tag)
-	local ast = {}
-	ast.tag = tag
-	ast.name = name
-	ast.line = errtok[3]
-	ast.file = errtok[4]
-	return ast
+local function node_t(kind, errtok, ident)
+	local node = {}
+	node.ident = ident
+	node.kind = kind
+	node.errtok = errtok
+	return node
 end
 
 local parser = {}
 
-local ast
+local def = {}
 
-local const
+local public = {}
 
-local extern
-
-local externconst
-
-local defproc
-
-local var
-
-local deftable
-
-local export
-
-local cproc
-
-local defined
-
-local structs
-
-local bd
+local extern = {}
 
 local lex
 
+local basedir
+
+local stack
+
+local currentfn
+
 local incdir
 
-function parser.asm()
-	local t, ok = lex:expect("string")
+local res
 
-	if not ok then
-		lerror(t, "expected string, got "..t[2])
+local function defined(ident, kind)
+	local id = currentfn.def[ident] or def[ident]
+
+	if id then
+		if kind then
+			if id.kind == kind then
+				return id
+			else
+				return false
+			end
+		else
+			return id
+		end
+	end
+
+	return false
+end
+
+local function define(ident, kind, errtok, scoped, value)
+	if ((ident == "argv") and (not scoped)) or (res[ident]) then
+		lerror(errtok, ident.." is a reserved name")
 		return false
 	end
 
-	return asthelp(t[1], t, "asm")
+	local id = defined(ident)
+
+	if id then
+		-- if anyone asks i did not tell you it is okay to code like this
+		if (not id.scoped) and scoped then
+
+		elseif (kind == "fn") and (id.kind == "extern") then
+
+		elseif (id.kind == "externconst") and ((kind == "table") or (kind == "buffer") or (kind == "var")) then
+
+		else
+			lerror(errtok, "can't define "..tostring(ident).." twice")
+			return false
+		end
+	end
+
+	local d = {}
+	d.ident = ident
+	d.kind = kind
+	d.errtok = errtok
+	d.value = value
+	d.scoped = scoped
+
+	if scoped then
+		currentfn.def[ident] = d
+		currentfn.idef[#currentfn.idef + 1] = d
+	else
+		def[ident] = d
+	end
+
+	return id or true
 end
 
 function parser.directive()
@@ -85,7 +118,7 @@ function parser.directive()
 
 		local incpath = t[1]
 
-		local qd = bd
+		local qd = basedir
 
 		local f
 
@@ -102,7 +135,7 @@ function parser.directive()
 				if f then break end
 			end
 		else
-			f = io.open(bd.."/"..incpath)
+			f = io.open(basedir.."/"..incpath)
 		end
 
 		if not f then
@@ -121,11 +154,218 @@ function parser.directive()
 	return true
 end
 
+-- parses the form { in1 in2 in3 ... -- out1 out2 out3 ... }
+-- { in1 ... -- } is not allowed, { ... in1 -- } is
+-- { -- ... out1 } is allowed, { -- out1 ... } is not
+function parser.signature(extern, fnptr)
+	local sig = {}
+
+	sig.varin = false
+	sig.varout = false
+
+	sig.fin = {}
+	sig.out = {}
+
+	sig.public = true
+
+	local t, ok = lex:expect("tag")
+
+	if not ok then
+		lerror(t, "expected tag, got "..t[2])
+		return false
+	end
+
+	sig.errtok = t
+
+	if t[1] == "private" then
+		if extern or fnptr then
+			lerror(t, "extern or fnptr can't be declared as private (they are inherently private)")
+			return false
+		end
+
+		sig.public = false
+
+		t, ok = lex:expect("tag")
+
+		if not ok then
+			lerror(t, "expected tag, got "..t[2])
+			return false
+		end
+	end
+
+	sig.name = t[1]
+
+	sig.ident = t[1]
+
+	t, ok = lex:expect("tag")
+
+	if not ok then
+		lerror(t, "expected tag, got "..t[2])
+		return false
+	end
+
+	if t[1] ~= "{" then
+		lerror(t, "malformed function signature")
+		return false
+	end
+
+	t, ok = lex:expect("tag")
+
+	if not ok then
+		lerror(t, "malformed function signature")
+		return false
+	end
+
+	while t[1] ~= "--" do
+		if t[1] == "..." then
+			if (not sig.varin) and (#sig.fin == 0) then
+				sig.varin = true
+			else
+				lerror(t, "malformed function signature: '...' can only be the first argument")
+				return false
+			end
+		else
+			if (not extern) and (not fnptr) then
+				if not define(t[1], "auto", t, true) then
+					return false
+				end
+
+				currentfn.autos[#currentfn.autos + 1] = t[1]
+			end
+
+			sig.fin[#sig.fin + 1] = t[1]
+		end
+
+		t, ok = lex:expect("tag")
+
+		if not ok then
+			lerror(t, "malformed function signature")
+			return false
+		end
+	end
+
+	t, ok = lex:expect("tag")
+
+	if not ok then
+		lerror(t, "malformed function signature")
+		return false
+	end
+
+	while t[1] ~= "}" do
+		if t[1] == "..." then
+			lerror(t, "varout not allowed")
+			return false
+		else
+			if (not extern) and (not fnptr) then
+				if not define(t[1], "auto", t, true) then
+					return false
+				end
+
+				currentfn.autos[#currentfn.autos + 1] = t[1]
+			end
+
+			sig.out[#sig.out + 1] = t[1]
+		end
+
+		t, ok = lex:expect("tag")
+
+		if not ok then
+			lerror(t, "malformed function signature")
+			return false
+		end
+	end
+
+	function sig.compare(sig2)
+		if sig.name ~= sig2.name then
+			return false
+		end
+
+		if sig.public ~= sig2.public then
+			return false
+		end
+
+		if sig.varin ~= sig2.varin then
+			return false
+		end
+
+		for k,v in ipairs(sig.fin) do
+			if sig2.fin[k] ~= v then
+				return false
+			end
+		end
+
+		for k,v in ipairs(sig.out) do
+			if sig2.out[k] ~= v then
+				return false
+			end
+		end
+
+		return true
+	end
+
+	return sig
+end
+
+function parser.extern()
+	local sig = parser.signature(true)
+
+	if not sig then
+		return false
+	end
+
+	if not define(sig.name, "extern", sig.errtok, false, sig) then
+		return false
+	end
+
+	extern[sig.name] = true
+
+	return true
+end
+
+function parser.fnptr()
+	local sig = parser.signature(false, true)
+
+	if not sig then
+		return false
+	end
+
+	if not define(sig.name, "fnptr", sig.errtok, false, sig) then
+		return false
+	end
+
+	return true
+end
+
+local function defauto(name, tok)
+	if not define(name, "auto", tok, true) then
+		return false
+	end
+
+	currentfn.autos[#currentfn.autos + 1] = name
+
+	return true
+end
+
+function parser.auto()
+	local t, ok = lex:expect("tag")
+
+	if not ok then
+		lerror(t, "expected tag, got "..t[2])
+		return false
+	end
+
+	if not defauto(t[1], t) then
+		return false
+	end
+
+	return true
+end
+
 local function pconbody(name)
 	local t, ok = lex:expect("keyc")
 
 	if not ok then
-		lerror(t, "malformed "..name)
+		lerror(t, "malformed "..name.." statement")
 		return false
 	end
 
@@ -134,13 +374,21 @@ local function pconbody(name)
 		return false
 	end
 
-	local ast = {}
+	local ast = node_t(name.."_cb", lex:peek())
 
 	ast.conditional = parser.block(")")
 
 	if not ast.conditional then return false end
 
+	if name == "while" then
+		currentfn.wdepth = currentfn.wdepth + 1
+	end
+
 	ast.body = parser.block("end")
+
+	if name == "while" then
+		currentfn.wdepth = currentfn.wdepth - 1
+	end
 
 	if not ast.body then return false end
 
@@ -148,7 +396,7 @@ local function pconbody(name)
 end
 
 function parser.pif()
-	local ast = asthelp(nil, lex:peek(), "if")
+	local ast = node_t("if", lex:peek())
 
 	ast.ifs = {}
 
@@ -176,21 +424,19 @@ function parser.pif()
 
 	peek = lex:peek()
 
-	if peek then
-		if peek[1] == "else" then
-			lex:extract()
+	if peek and (peek[1] == "else") then
+		lex:extract()
 
-			ast.default = parser.block("end")
+		ast.default = parser.block("end")
 
-			if not ast.default then return ast end
-		end
+		if not ast.default then return ast end
 	end
 
 	return ast
 end
 
 function parser.pwhile()
-	local ast = asthelp(nil, lex:peek(), "while")
+	local ast = node_t("while", lex:peek())
 
 	ast.w = pconbody("while")
 
@@ -199,49 +445,9 @@ function parser.pwhile()
 	return ast
 end
 
-function parser.string(t)
-	return asthelp(t[1], t, "putstring")
-end
+function parser.pointerof()
+	local ast = node_t("pointerof", lex:peek())
 
-function parser.number(t)
-	return asthelp(t[1], t, "putnumber")
-end
-
-function parser.word(t)
-	local wc = t[1]
-
-	if wc == "pointerof" then
-		local e, ok = lex:expect("tag")
-
-		if not ok then
-			lerror(t, "expected tag, got "..e[2])
-			return false
-		end
-
-		return asthelp(e[1], e, "putptr")
-	elseif wc == "asm" then
-		return parser.asm()
-	end
-
-	if const[wc] then
-		return asthelp(const[wc], t, "putnumber")
-	elseif externconst[wc] then
-		return asthelp(wc, t, "putextptr")
-	elseif (deftable[wc] or var[wc] or buffer[wc]) then
-		return asthelp(wc, t, "putptr")
-	elseif cproc.inputs[wc] then
-		return asthelp(wc, t, "pinput")
-	elseif cproc.outputs[wc] then
-		return asthelp(wc, t, "poutput")
-	elseif cproc.autos[wc] then
-		return asthelp(wc, t, "pauto")
-	else
-		cproc.calls[wc] = true
-		return asthelp(wc, t, "call")
-	end
-end
-
-function parser.auto()
 	local t, ok = lex:expect("tag")
 
 	if not ok then
@@ -249,22 +455,13 @@ function parser.auto()
 		return false
 	end
 
-	if not cproc then
-		error("internal parser error, should never happen and may god save you")
-	end
+	ast.value = t[1]
 
-	if cproc.autos[t[1]] then
-		lerror(t, "can't declare auto "..t[1].." twice")
-		return false
-	end
-
-	cproc.autos[t[1]] = true
-
-	return true
+	return ast
 end
 
 function parser.index()
-	local ast = asthelp(nil, lex:peek(), "index")
+	local ast = node_t("index", lex:peek())
 
 	ast.block = parser.block("]")
 
@@ -277,18 +474,20 @@ function parser.index()
 		return false
 	end
 
-	if deftable[t[1]] then
-		ast.tab = deftable[t[1]]
-	else
-		ast.tab = {}
-		ast.tab.name = t[1]
-	end
+	ast.name = t[1]
 
 	return ast
 end
 
-function parser.block(endtok)
-	local ast = {}
+
+function parser.block(endtok, defines)
+	local ast = node_t("block", lex:peek())
+
+	ast.defines = defines
+
+	ast.block = {}
+
+	local b = ast.block
 
 	local t = lex:extract()
 
@@ -305,42 +504,36 @@ function parser.block(endtok)
 
 			if not pq then return false end
 
-			ast[#ast + 1] = pq
+			b[#b + 1] = pq
 		elseif ident == "while" then
 			local pq = parser.pwhile()
 
 			if not pq then return false end
 
-			ast[#ast + 1] = pq
+			b[#b + 1] = pq
 		elseif ident == "auto" then
 			if not parser.auto() then return false end
+		elseif ident == "pointerof" then
+			local pq = parser.pointerof()
+
+			if not pq then return false end
+
+			b[#b + 1] = pq
 		elseif ident == "[" then
 			local pq = parser.index()
 
 			if not pq then return false end
 
-			ast[#ast + 1] = pq
-		elseif t[2] == "string" then
-			local pq = parser.string(t)
-
-			if not pq then return false end
-
-			ast[#ast + 1] = pq
-		elseif t[2] == "number" then
-			local pq = parser.number(t)
-
-			if not pq then return false end
-
-			ast[#ast + 1] = pq
-		elseif (t[2] == "tag") or (t[2] == "keyc") then
-			local pq = parser.word(t)
-
-			if not pq then return false end
-
-			ast[#ast + 1] = pq
+			b[#b + 1] = pq
 		else
-			lerror(t, "unexpected "..t[2])
-			return false
+			if (t[1] == "break") or (t[1] == "continue") then
+				if currentfn.wdepth == 0 then
+					lerror(t, "can't "..t[1].." outside of a loop")
+					return false
+				end
+			end
+
+			b[#b + 1] = node_t("lazy", t, t)
 		end
 
 		t = lex:extract()
@@ -354,137 +547,125 @@ function parser.block(endtok)
 	return ast
 end
 
-function parser.procedure()
-	local public = true
+function parser.fn(defonly)
+	local mydef = {}
+	local myautos = {}
+	local myidef = {}
+	currentfn = {}
+	currentfn.def = mydef
+	currentfn.autos = myautos
+	currentfn.idef = myidef
 
-	local t, ok = lex:expect("tag")
+	local sig = parser.signature(false)
 
-	if not ok then
-		lerror(t, "expected tag, got "..t[2])
+	if not sig then
 		return false
 	end
 
-	if t[1] == "private" then
-		public = false
+	local ast = node_t("fn", sig.errtok, sig.name)
 
-		t, ok = lex:expect("tag")
+	local extdef = defined(sig.name, "extern")
 
-		if not ok then
-			lerror(t, "expected tag, got "..t[2])
+	if (extdef) and (not sig.compare(extdef.value)) then
+		lerror(sig.errtok, "function signature doesn't match previous extern declaration")
+		return false
+	end
+
+	if not define(sig.name, "fn", sig.errtok, false, ast) then
+		return false
+	end
+
+	ast.fin = sig.fin
+	ast.out = sig.out
+	ast.public = sig.public
+	ast.varin = sig.varin
+
+	ast.def = mydef
+	ast.autos = myautos
+	ast.idef = myidef
+
+	ast.wdepth = 0
+
+	currentfn = ast
+
+	if ast.varin then
+		if not defauto("argc", sig.errtok) then
+			return false
+		end
+
+		if not define("argv", "table", sig.errtok, true, {}) then
 			return false
 		end
 	end
 
-	local name = t[1]
-
-	if defproc[name] then
-		lerror(t, "attempt to define procedure "..name.." twice")
-		return false
-	end
-
-	local ast = asthelp(name, t, "procedure")
-
-	cproc = ast
-
-	ast.calls = {}
-
-	ast.public = public
-	ast.inputs = {}
-	ast.outputs = {}
-	ast.autos = {}
-
-	ast.inputso = {}
-	ast.outputso = {}
-
-	local d = {}
-
-	local peek = lex:peek()
-	if peek then
-		if peek[1] == "{" then
-			lex:extract()
-
-			t = lex:extract()
-
-			local switched, vec, veco = false, ast.inputs, ast.inputso
-
-			while t do
-				if t[1] == "}" then
-					break
-				elseif t[1] == "--" then
-					if not switched then
-						switched = true
-						vec = ast.outputs
-						veco = ast.outputso
-					else
-						lerror(t, "malformed procedure IO list")
-						return false
-					end
-				else
-					if d[t[1]] then
-						lerror(t, "cannot define "..t[1].." twice")
-						return false
-					end
-
-					vec[t[1]] = true
-					veco[#veco + 1] = t[1]
-					d[t[1]] = true
-				end
-
-				t = lex:extract()
-			end
-		end
-	else
-		lerror(t, "malformed procedure")
-		return false
-	end
-
 	ast.block = parser.block("end")
 
-	if not ast.block then return false end
-
-	defproc[name] = ast
+	if not ast.block then
+		return false
+	end
 
 	return ast
 end
 
-function parser.constant(poa, str)
+function parser.constant(poa, str, noblock)
 	local t = lex:extract()
 
 	if not t then return false end
 
 	if t[2] == "number" then
-		return t[1], "num"
+		return t[1], "num", t
 	end
 
 	if (t[2] == "string") and (str) then
-		return t[1], "str"
+		return t[1], "str", t
 	end
 
-	if t[2] ~= "tag" then
-		lerror(t, "malformed constant")
-		return false
-	end
+	if t[2] == "tag" then
+		if t[1] == "pointerof" then
+			if not poa then
+				lerror(t, "pointerof not allowed here")
+				return false
+			end
 
-	local ok
+			local n, ok = lex:expect("tag")
 
-	if (t[1] == "pointerof") and poa then
-		t, ok = lex:expect("tag")
+			if not ok then
+				lerror(t, "expected tag, got "..t[2])
+				return false
+			end
 
-		if not ok then
-			lerror(t, "expected tag, got "..t[2])
+			return n[1], "ptr", t
+		end
+
+		local c = defined(t[1], "const")
+		if not c then
+			lerror(t, "not a constant")
 			return false
 		end
 
-		return t[1], "ptr"
-	elseif const[t[1]] then
-		return const[t[1]], "num"
+		return c.value, "const", t
+	end
+
+	if t[1] == "(" then
+		if noblock then
+			lerror(t, "can't use complex constants here")
+			return false
+		end
+
+		local ast = parser.block(")")
+
+		if not ast then
+			return false
+		end
+
+		return ast, "block", t
 	end
 	
 	lerror(t, "strange constant")
 	return false
 end
 
-function parser.def(tab, init)
+function parser.def(kind, hasinit)
 	local t, ok = lex:expect("tag")
 
 	if not ok then
@@ -496,21 +677,24 @@ function parser.def(tab, init)
 
 	local initv = true
 
-	if init then
-		initv = parser.constant()
+	local k
+
+	if hasinit then
+		initv, k = parser.constant()
 		if not initv then return false end
+
+		if k == "block" then
+			initv.defines = name
+		end
 	end
 
-	if defined[name] then
-		lerror(t, "cannot re-define "..name)
+	if not define(name, kind, t, false, initv) then
 		return false
 	end
 
-	if (tab ~= extern) and (tab ~= externconst) then
-		defined[name] = tab
+	if kind == "externconst" then
+		extern[name] = true
 	end
-
-	tab[name] = initv
 
 	return true
 end
@@ -525,9 +709,11 @@ function parser.table()
 
 	local name = t[1]
 
-	deftable[name] = {}
+	local dte = {}
 
-	local dte = deftable[name]
+	if not define(name, "table", t, false, dte) then
+		return false
+	end
 
 	dte.name = name
 
@@ -575,10 +761,10 @@ function parser.table()
 	end
 
 	while peek[1] ~= "endtable" do
-		local n, q = parser.constant(true, true)
+		local n, q, t = parser.constant(true, true)
 		if not n then return false end
 
-		dte.words[#dte.words + 1] = {["typ"]=q, ["name"]=n}
+		dte.words[#dte.words + 1] = {["typ"]=q, ["name"]=n, ["errtok"]=t}
 
 		peek = lex:peek()
 
@@ -603,6 +789,10 @@ function parser.struct()
 
 	local name = t[1]
 
+	if not define(name, "struct", t) then
+		return false
+	end
+
 	local t = lex:peek()
 
 	if not t then
@@ -613,7 +803,7 @@ function parser.struct()
 	local off = 0
 
 	while t[1] ~= "endstruct" do
-		local num = parser.constant()
+		local num = parser.constant(nil, nil, true)
 		if not num then return false end
 
 		local n, ok = lex:expect("tag")
@@ -623,7 +813,9 @@ function parser.struct()
 			return false
 		end
 
-		const[name.."_"..n[1]] = off
+		if not define(name.."_"..n[1], "const", n, false, off) then
+			return false
+		end
 
 		off = off + num
 
@@ -637,7 +829,9 @@ function parser.struct()
 
 	lex:extract()
 
-	const[name.."_SIZEOF"] = off
+	if not define(name.."_SIZEOF", "const", t, false, off) then
+		return false
+	end
 
 	return true
 end
@@ -652,39 +846,37 @@ function parser.public()
 
 	local name = t[1]
 
-	export[name] = true
+	public[name] = t
 
 	return true
 end
 
-function parser.parse(lexer, sourcetext, filename, idt)
-	ast = {}
+function parser.asm()
+	local t, ok = lex:expect("string")
 
-	const = {}
+	if not ok then
+		lerror(t, "expected string, got "..t[2])
+		return false
+	end
 
-	extern = {}
+	return t[1]
+end
 
-	externconst = {}
-
-	defproc = {}
-
-	var = {}
-
-	deftable = {}
-
-	export = {}
-
-	defined = {}
-
-	buffer = {}
-
-	incdir = idt
-
+function parser.parse(lexer, sourcetext, filename, incd, reserve)
 	lex = lexer.new(sourcetext, filename)
+
+	res = reserve
+
+	incdir = incd
 
 	if not lex then return false end
 
-	bd = getdirectory(filename)
+	basedir = getdirectory(filename)
+
+	currentfn = {}
+	currentfn.def = {}
+
+	local asms = {}
 
 	local token = lex:extract()
 
@@ -695,26 +887,24 @@ function parser.parse(lexer, sourcetext, filename, idt)
 			-- why doesnt lua 5.1 have a continue keyword
 		elseif ident == "#" then
 			if not parser.directive() then return false end
-		elseif ident == "procedure" then
-			local pq = parser.procedure()
-
-			if not pq then return false end
-
-			ast[#ast + 1] = pq
-		elseif ident == "const" then
-			if not parser.def(const, true) then return false end
+		elseif (ident == "fn") then
+			if not parser.fn(true) then return false end
 		elseif ident == "extern" then
-			if not parser.def(extern, false) then return false end
-		elseif ident == "externconst" then
-			if not parser.def(externconst, false) then return false end
+			if not parser.extern() then return false end
+		elseif ident == "fnptr" then
+			if not parser.fnptr() then return false end
+		elseif ident == "const" then
+			if not parser.def("const", true) then return false end
+		elseif ident == "externptr" then
+			if not parser.def("externconst", false) then return false end
 		elseif ident == "public" then
 			if not parser.public() then return false end
 		elseif ident == "var" then
-			if not parser.def(var, true) then return false end
+			if not parser.def("var", true) then return false end
 		elseif ident == "table" then
 			if not parser.table() then return false end
 		elseif ident == "buffer" then
-			if not parser.def(buffer, true) then return false end
+			if not parser.def("buffer", true) then return false end
 		elseif ident == "struct" then
 			if not parser.struct() then return false end
 		elseif ident == "asm" then
@@ -722,7 +912,7 @@ function parser.parse(lexer, sourcetext, filename, idt)
 
 			if not pq then return false end
 
-			ast[#ast + 1] = pq
+			asms[#asms + 1] = pq
 		else
 			lerror(token, "unexpected token: "..ident)
 			return false
@@ -731,7 +921,7 @@ function parser.parse(lexer, sourcetext, filename, idt)
 		token = lex:extract()
 	end
 
-	return ast, extern, externconst, var, deftable, export, defproc, buffer, const
+	return def, public, extern, asms
 end
 
 return parser

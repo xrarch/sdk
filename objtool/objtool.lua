@@ -52,7 +52,7 @@ if #arg < 1 then
 	os.exit(1)
 end
 
-local symtypen = {"global","local","extern"}
+local symtypen = {"global","local","extern","special"}
 
 local sectionn = {"text","data","bss"}
 

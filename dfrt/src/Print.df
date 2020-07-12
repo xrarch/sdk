@@ -5,7 +5,7 @@ table KConsoleDigits
 	'0' '1' '2' '3' '4' '5' '6' '7' '8' '9' 'a' 'b' 'c' 'd' 'e' 'f'
 endtable
 
-procedure Putx { nx -- }
+fn Putx { nx -- }
 	if (nx@ 15 >)
 		auto a
 		nx@ 16 / a!
@@ -17,7 +17,7 @@ procedure Putx { nx -- }
 	[nx@]KConsoleDigits@ Putc
 end
 
-procedure Putn { n -- }
+fn Putn { n -- }
 	if (n@ 9 >)
 		auto a
 		n@ 10 / a!
@@ -29,7 +29,7 @@ procedure Putn { n -- }
 	[n@]KConsoleDigits@ Putc
 end
 
-procedure Puti { n -- }
+fn Puti { n -- }
 	if (n@ 0 s<)
 		'-' Putc
 	end
@@ -37,16 +37,22 @@ procedure Puti { n -- }
 	n@ abs Putn
 end
 
-procedure Printf (* ... fmt -- *)
-	auto f
-	f!
+fn VPrintf { argvt argcn fmt -- }
 	auto i
 	0 i!
+
 	auto sl
-	f@ strlen sl!
+	fmt@ strlen sl!
+
+	auto a
+	0 a!
+
+	auto max
+	argcn@ 4 * max!
+	
 	while (i@ sl@ <)
 		auto char
-		f@ i@ + gb char!
+		fmt@ i@ + gb char!
 		if (char@ '%' ~=)
 			char@ Putc
 		end else
@@ -55,23 +61,47 @@ procedure Printf (* ... fmt -- *)
 				return
 			end
 
-			f@ i@ + gb char!
+			fmt@ i@ + gb char!
+
+			if (char@ '%' ==)
+				'%' Putc
+				1 i +=
+				continue
+			end
+
+			if (a@ max@ >=)
+				'?' Putc
+				1 i +=
+				continue
+			end
 
 			if (char@ 'd' ==)
-				Putn
+				a@ argvt@ + @ Putn
+
+				4 a +=
 			end elseif (char@ 'x' ==)
-				Putx
+				a@ argvt@ + @ Putx
+
+				4 a +=
 			end elseif (char@ 's' ==)
-				Puts
-			end elseif (char@ '%' ==)
-				'%' Putc
+				a@ argvt@ + @ Puts
+				
+				4 a +=
 			end elseif (char@ 'l' ==)
-				Putc
+				a@ argvt@ + @ Putc
+
+				4 a +=
 			end elseif (char@ 'i' ==)
-				Puti
+				a@ argvt@ + @ Puti
+
+				4 a +=
 			end
 		end
 
 		1 i +=
 	end
+end
+
+fn Printf { ... fmt -- }
+	argv argc@ fmt@ VPrintf
 end

@@ -130,6 +130,8 @@ local inst = {
 	end, 4},
 	["jalr"]   = {4, 0x37, {1}},
 
+	["jr"]     = {4, 0x38, {1}},
+
 	["brk"]    = {4, 0x39, {}},
 	["sys"]    = {4, 0x3A, {}},
 
@@ -203,7 +205,7 @@ local inst = {
 
 local pseudo = {
 	["ret"]    = {0, function (ops)
-		return "add pc, lr, zero"
+		return "jr lr"
 	end},
 	["la"]     = {2, function (ops)
 		return string.format("lui %s, %s\naddi.i %s, %s", ops[2], ops[3], ops[2], ops[3])
@@ -255,10 +257,9 @@ local regs = {
 	["r23"] = 23,
 	["r24"] = 24,
 	["r25"] = 25,
-	["tf"] = 26,
-	--["r27"] = 27,
-	["vs"]  = 27,
-	["at"] = 28,
+	["r26"] = 26,
+	["at"]  = 27,
+	["tf"]  = 28,
 	["sp"]  = 29,
 	["lr"]  = 30,
 	["pc"]  = 31,
@@ -277,6 +278,35 @@ local regs = {
 	["timer"] = 41,
 	["cpuid"] = 42,
 	["badaddr"] = 43,
+
+	-- helpful dragonfruit ABI names
+
+	["t0"] = 1,
+	["t1"] = 2,
+	["t2"] = 3,
+	["t3"] = 4,
+	["t4"] = 5,
+	["a0"] = 6,
+	["a1"] = 7,
+	["a2"] = 8,
+	["a3"] = 9,
+	["v0"] = 10,
+	["v1"] = 11,
+	["s0"] = 12,
+	["s1"] = 13,
+	["s2"] = 14,
+	["s3"] = 15,
+	["s4"] = 16,
+	["s5"] = 17,
+	["s6"] = 18,
+	["s7"] = 19,
+	["s8"] = 20,
+	["s9"] = 21,
+	["s10"] = 22,
+	["s11"] = 23,
+	["s12"] = 24,
+	["s13"] = 25,
+	["s14"] = 26,
 }
 
 return {inst, regs, {}, 4, false, pseudo}

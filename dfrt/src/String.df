@@ -1,8 +1,8 @@
 #include "<inc>/const.h"
 
-extern Malloc
+extern Malloc { sz -- ptr }
 
-procedure itoa { n str -- }
+fn itoa { n str -- }
 	auto i
 	0 i!
 
@@ -19,13 +19,13 @@ procedure itoa { n str -- }
 	str@ reverse
 end
 
-procedure strdup { str -- astr }
+fn strdup { str -- astr }
 	str@ strlen 1 + Malloc astr!
 
 	astr@ str@ strcpy
 end
 
-procedure reverse { str -- }
+fn reverse { str -- }
 	auto i
 	auto j
 	auto c
@@ -44,7 +44,7 @@ procedure reverse { str -- }
 	end
 end
 
-procedure memcpy { dest src sz -- }
+fn memcpy { dest src sz -- }
 	auto i
 	0 i!
 
@@ -73,7 +73,7 @@ procedure memcpy { dest src sz -- }
 	end
 end
 
-procedure memset { ptr size wot -- }
+fn memset { ptr size wot -- }
 	auto iol
 	size@ 4 / iol!
 
@@ -100,22 +100,24 @@ procedure memset { ptr size wot -- }
 	end
 end
 
-procedure strcmp { str1 str2 } (* -- equal? *)
+fn strcmp { str1 str2 -- eq }
 	auto i
 	0 i!
 
 	while (str1@ i@ + gb str2@ i@ + gb ==)
 		if (str1@ i@ + gb 0 ==)
-			1 return
+			1 eq!
+			return
 		end
 
 		1 i +=
 	end
 
-	0 return
+	0 eq!
+	return
 end
 
-procedure strlen { str -- size }
+fn strlen { str -- size }
 	0 size!
 
 	while (str@ gb 0 ~=)
@@ -124,7 +126,7 @@ procedure strlen { str -- size }
 	end
 end
 
-procedure strtok { str buf del -- next }
+fn strtok { str buf del -- next }
 	auto i
 	0 i!
 
@@ -157,7 +159,7 @@ procedure strtok { str buf del -- next }
 	str@ i@ + next!
 end
 
-procedure strzero { str -- }
+fn strzero { str -- }
 	auto i
 	0 i!
 	while (str@ i@ + gb 0 ~=)
@@ -167,7 +169,7 @@ procedure strzero { str -- }
 	end
 end
 
-procedure strntok { str buf del n -- next }
+fn strntok { str buf del n -- next }
 	auto i
 	0 i!
 
@@ -202,7 +204,7 @@ procedure strntok { str buf del n -- next }
 	str@ i@ + next!
 end
 
-procedure strcpy { dest src -- }
+fn strcpy { dest src -- }
 	while (src@ gb 0 ~=)
 		src@ gb dest@ sb
 
@@ -213,7 +215,7 @@ procedure strcpy { dest src -- }
 	0 dest@ sb
 end
 
-procedure strncpy { dest src max -- }
+fn strncpy { dest src max -- }
 	dest@ max@ + max!
 
 	while (src@ gb 0 ~= dest@ max@ < &&)
@@ -226,11 +228,11 @@ procedure strncpy { dest src max -- }
 	0 dest@ sb
 end
 
-procedure strcat { dest src -- }
+fn strcat { dest src -- }
 	dest@ strlen 1 + dest@ + src@ strcpy
 end
 
-procedure strncat { dest src max -- }
+fn strncat { dest src max -- }
 	auto ds
 	dest@ strlen 1 + ds!
 
@@ -240,7 +242,7 @@ procedure strncat { dest src max -- }
 	ds@ dest@ + src@ md@ strncpy
 end
 
-procedure atoi10 { str -- res }
+fn atoi10 { str -- res }
 	auto i
 	0 i!
 	0 res!
@@ -262,7 +264,7 @@ procedure atoi10 { str -- res }
 	end
 end
 
-procedure atoi8 { str -- res }
+fn atoi8 { str -- res }
 	auto i
 	0 i!
 	0 res!
@@ -284,7 +286,7 @@ procedure atoi8 { str -- res }
 	end
 end
 
-procedure private HexDigitToNum { digit -- num }
+fn private HexDigitToNum { digit -- num }
 	-1 num!
 
 	if (digit@ '0' >= digit@ '9' <= &&)
@@ -296,7 +298,7 @@ procedure private HexDigitToNum { digit -- num }
 	end
 end
 
-procedure atoi16 { str -- res }
+fn atoi16 { str -- res }
 	auto i
 	0 i!
 	0 res!
@@ -316,12 +318,12 @@ procedure atoi16 { str -- res }
 	end
 end
 
-procedure atoi { str -- res }
+fn atoi { str -- res }
 	auto base
 	10 base!
 
 	if (str@ gb 0 ==)
-		0 return
+		0 res! return
 	end
 
 	auto neg

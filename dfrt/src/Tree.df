@@ -2,49 +2,49 @@
 #include "<inc>/list.h"
 #include "<inc>/tree.h"
 
-extern Calloc
-extern Malloc
-extern Free
+extern Calloc { sz -- ptr }
+extern Malloc { sz -- ptr }
+extern Free { ptr -- }
 
 (* stolen and ported to dragonfruit from toaruos tree.c *)
 
-(* any new procedures should be updated in <df>/tree.h *)
+(* any new fns should be updated in <df>/tree.h *)
 
-procedure TreeNodes (* tree -- nodes *)
-	Tree_Nodes + @
+fn TreeNodes { tree -- nodes }
+	tree@ Tree_Nodes + @ nodes!
 end
 
-procedure TreeRoot (* tree -- root *)
-	Tree_Root + @
+fn TreeRoot { tree -- root }
+	tree@ Tree_Root + @ root!
 end
 
-procedure TreeNodeValue (* node -- value *)
-	TreeNode_Value + @
+fn TreeNodeValue { node -- value }
+	node@ TreeNode_Value + @ value!
 end
 
-procedure TreeNodeParent (* node -- parent *)
-	TreeNode_Parent + @
+fn TreeNodeParent { node -- parent }
+	node@ TreeNode_Parent + @ parent!
 end
 
-procedure TreeNodeChildren (* node -- children *)
-	TreeNode_Children + @
+fn TreeNodeChildren { node -- children }
+	node@ TreeNode_Children + @ children!
 end
 
-procedure TreeCreate { -- out }
-	Tree_SIZEOF Calloc out!
+fn TreeCreate { -- tree }
+	Tree_SIZEOF Calloc tree!
 
-	0 out@ Tree_Nodes + !
-	0 out@ Tree_Root + !
+	0 tree@ Tree_Nodes + !
+	0 tree@ Tree_Root + !
 end
 
-procedure TreeSetRoot { value tree -- root }
+fn TreeSetRoot { value tree -- root }
 	value@ TreeNodeCreate root!
 
 	root@ tree@ Tree_Root + !
 	1 tree@ Tree_Nodes + !
 end
 
-procedure TreeNodeDestroy { node -- }
+fn TreeNodeDestroy { node -- }
 	auto n
 	node@ TreeNode_Children + @ List_Head + @ n!
 	while (n@ 0 ~=)
@@ -56,13 +56,13 @@ procedure TreeNodeDestroy { node -- }
 	node@ TreeNode_Value + @ Free
 end
 
-procedure TreeDestroy { tree -- }
+fn TreeDestroy { tree -- }
 	if (tree@ Tree_Root + @ 0 ~=)
 		tree@ Tree_Root + @ TreeNodeDestroy
 	end
 end
 
-procedure TreeNodeFree { node -- }
+fn TreeNodeFree { node -- }
 	if (node@ 0 ==)
 		return
 	end
@@ -78,32 +78,29 @@ procedure TreeNodeFree { node -- }
 	node@ Free
 end
 
-procedure TreeFree { tree -- }
+fn TreeFree { tree -- }
 	tree@ Tree_Root + @ TreeNodeFree
 end
 
-procedure TreeNodeCreate { value -- }
-	auto out
-	TreeNode_SIZEOF Calloc out!
+fn TreeNodeCreate { value -- node }
+	TreeNode_SIZEOF Calloc node!
 
-	value@ out@ TreeNode_Value + !
-	ListCreate out@ TreeNode_Children + !
-	0 out@ TreeNode_Parent + !
-
-	out@
+	value@ node@ TreeNode_Value + !
+	ListCreate node@ TreeNode_Children + !
+	0 node@ TreeNode_Parent + !
 end
 
-procedure TreeInsertChildNode { node parent tree -- }
+fn TreeInsertChildNode { node parent tree -- }
 	node@ parent@ TreeNode_Children + @ ListInsert
 	parent@ node@ TreeNode_Parent + !
 	1 tree@ Tree_Nodes + +=
 end
 
-procedure TreeInsertChild { value parent tree -- node }
+fn TreeInsertChild { value parent tree -- node }
 	value@ TreeNodeCreate node!
 	node@ parent@ tree@ TreeInsertChildNode
 end
 
-procedure TreeNodeGetValue (* node -- value *)
-	TreeNode_Value + @
+fn TreeNodeGetValue { node -- value }
+	node@ TreeNode_Value + @ value!
 end

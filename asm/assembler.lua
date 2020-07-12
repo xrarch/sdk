@@ -84,12 +84,12 @@ end
 
 local asm = {}
 
-function asm.lines(block, source, filename)
+function asm.lines(block, source, filename, lnum)
 	local lines = block.lines
 
 	local llit = lineate(source)
 
-	local lnum = 0
+	local lnum = lnum or 0
 
 	local pseudo = block.pseudo
 
@@ -117,7 +117,7 @@ function asm.lines(block, source, filename)
 					return false
 				end
 
-				if not asm.lines(block, pi[2](tt), filename) then return false end
+				if not asm.lines(block, pi[2](tt), filename, lnum-1) then return false end
 			else
 				lines[#lines + 1] = {}
 

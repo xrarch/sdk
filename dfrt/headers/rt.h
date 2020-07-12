@@ -1,53 +1,55 @@
-extern abs (* v -- absv *)
+extern abs { v -- absv }
 
-extern max (* n1 n2 -- max *)
+extern max { n1 n2 -- max }
 
-extern min (* n1 n2 -- min *)
+extern min { n1 n2 -- min }
 
-extern itoa (* n buf -- *)
+extern itoa { n buf -- }
 
-extern strdup (* str -- allocstr *)
+extern strdup { str -- allocstr }
 
-extern reverse (* str -- *)
+extern reverse { str -- }
 
-extern memcpy (* dest src size -- *)
+extern memcpy { dest src size -- }
 
-extern memset (* ptr size wot -- *)
+extern memset { ptr size wot -- }
 
-extern strcmp (* str1 str2 -- equal? *)
+extern strcmp { str1 str2 -- equal? }
 
-extern strlen (* str -- size *)
+extern strlen { str -- size }
 
-extern strtok (* str buf del -- next *)
+extern strtok { str buf del -- next }
 
-extern strzero (* str -- *)
+extern strzero { str -- }
 
-extern strntok (* str buf del n -- next *)
+extern strntok { str buf del n -- next }
 
-extern strcpy (* dest src -- *)
+extern strcpy { dest src -- }
 
-extern strncpy (* dest src max -- *)
+extern strncpy { dest src max -- }
 
-extern strcat (* dest src -- *)
+extern strcat { dest src -- }
 
-extern strncat (* dest src max -- *)
+extern strncat { dest src max -- }
 
-extern atoi (* str -- n *)
+extern atoi { str -- n }
 
-extern Puts (* s -- *)
+extern Puts { s -- }
 
-extern Printf (* ... fmt -- *)
+extern Printf { ... fmt -- }
 
-extern Malloc (* size -- ptr *)
+extern VPrintf { argvt argcn fmt -- }
 
-extern Calloc (* size -- ptr *)
+extern Malloc { size -- ptr }
 
-extern Free (* ptr -- *)
+extern Calloc { size -- ptr }
 
-extern Gets (* s max -- *)
+extern Free { ptr -- }
 
-extern Putc (* c -- *)
+extern Gets { s max -- }
 
-extern Getc (* -- c *)
+extern Putc { c -- }
 
-extern iserr (* v -- err *)
+extern Getc { -- c }
+
+extern iserr { v -- err }

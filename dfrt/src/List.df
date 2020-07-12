@@ -1,43 +1,43 @@
 #include "<inc>/const.h"
 #include "<inc>/list.h"
 
-extern Free
-extern Malloc
-extern Calloc
+extern Free { ptr -- }
+extern Malloc { sz -- ptr }
+extern Calloc { sz -- ptr }
 
 (* stolen and ported to dragonfruit from toaruos list.c *)
 
-(* any new procedures should be updated in <df>/list.h *)
+(* any new fns should be updated in <df>/list.h *)
 
-procedure ListLength (* list -- length *)
-	List_Length + @
+fn ListLength { list -- length }
+	list@ List_Length + @ length!
 end
 
-procedure ListHead (* list -- head *)
-	List_Head + @
+fn ListHead { list -- head }
+	list@ List_Head + @ head!
 end
 
-procedure ListTail (* list -- tail *)
-	List_Tail + @
+fn ListTail { list -- tail }
+	list@ List_Tail + @ tail!
 end
 
-procedure ListNodeOwner (* node -- owner *)
-	ListNode_Owner + @
+fn ListNodeOwner { node -- owner }
+	node@ ListNode_Owner + @ owner!
 end
 
-procedure ListNodePrev (* node -- prev *)
-	ListNode_Prev + @
+fn ListNodePrev { node -- prev }
+	node@ ListNode_Prev + @ prev!
 end
 
-procedure ListNodeNext (* node -- next *)
-	ListNode_Next + @
+fn ListNodeNext { node -- next }
+	node@ ListNode_Next + @ next!
 end
 
-procedure ListNodeValue (* node -- value *)
-	ListNode_Value + @
+fn ListNodeValue { node -- value }
+	node@ ListNode_Value + @ value!
 end
 
-procedure ListDestroy { list -- }
+fn ListDestroy { list -- }
 	auto n
 	list@ List_Head + @ n!
 
@@ -47,7 +47,7 @@ procedure ListDestroy { list -- }
 	end
 end
 
-procedure ListFree { list -- }
+fn ListFree { list -- }
 	auto n
 	list@ List_Head + @ n!
 
@@ -59,7 +59,7 @@ procedure ListFree { list -- }
 	end
 end
 
-procedure ListAppend { node list -- }
+fn ListAppend { node list -- }
 	0 node@ ListNode_Next + !
 	list@ node@ ListNode_Owner + !
 
@@ -78,7 +78,7 @@ procedure ListAppend { node list -- }
 	1 list@ List_Length + +=
 end
 
-procedure ListInsert1 { item list -- node }
+fn ListInsert1 { item list -- node }
 	ListNode_SIZEOF Malloc node!
 	item@ node@ ListNode_Value + !
 	0 node@ ListNode_Next + !
@@ -87,23 +87,23 @@ procedure ListInsert1 { item list -- node }
 	node@ list@ ListAppend
 end
 
-procedure ListInsert (* item list -- *)
-	ListInsert1 drop
+fn ListInsert { item list -- }
+	item@ list@ ListInsert1 drop
 end
 
-procedure ListCreate { -- out }
-	List_SIZEOF Malloc out!
+fn ListCreate { -- list }
+	List_SIZEOF Malloc list!
 
-	0 out@ List_Head + !
-	0 out@ List_Tail + !
-	0 out@ List_Length + !
+	0 list@ List_Head + !
+	0 list@ List_Tail + !
+	0 list@ List_Length + !
 end
 
-procedure ListTakeHead { list } (* -- head *)
-	0 list@ ListRemoveRR
+fn ListTakeHead { list -- head }
+	0 list@ ListRemoveRR head!
 end
 
-procedure ListRemoveRR { index list -- ref }
+fn ListRemoveRR { index list -- ref }
 	if (index@ list@ List_Length + @ >) ERR ref! return end
 
 	auto n
@@ -122,11 +122,11 @@ procedure ListRemoveRR { index list -- ref }
 	n@ ref!
 end
 
-procedure ListRemove (* index list -- *)
-	ListRemoveRR Free
+fn ListRemove { index list -- }
+	index@ list@ ListRemoveRR Free
 end
 
-procedure ListDelete { node list -- }
+fn ListDelete { node list -- }
 	if (node@ list@ List_Head + @ ==)
 		node@ ListNode_Next + @ list@ List_Head + !
 	end
@@ -149,19 +149,20 @@ procedure ListDelete { node list -- }
 	list@ List_Length + dup @ 1 - swap !
 end
 
-procedure ListFind { value list } (* -- item *)
+fn ListFind { value list -- item }
 	auto n
 	list@ List_Head + @ n!
 
-	auto i
-	0 i!
+	0 item!
 
 	while (n@ 0 ~=)
 		if (n@ ListNode_Value + @ value@ ==)
-			i@ return
+			return
 		end
 
-		1 i +=
+		1 item +=
 		n@ ListNode_Next + @ n!
 	end
+
+	-1 item!
 end

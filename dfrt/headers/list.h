@@ -11,36 +11,36 @@ struct List
 	4 Length
 endstruct
 
-extern ListLength (* list -- length *)
+extern ListLength { list -- length }
 
-extern ListHead (* list -- head *)
+extern ListHead { list -- head }
 
-extern ListTail (* list -- tail *)
+extern ListTail { list -- tail }
 
-extern ListNodeOwner (* node -- owner *)
+extern ListNodeOwner { node -- owner }
 
-extern ListNodePrev (* node -- prev *)
+extern ListNodePrev { node -- prev }
 
-extern ListNodeNext (* node -- next *)
+extern ListNodeNext { node -- next }
 
-extern ListNodeValue (* node -- value *)
+extern ListNodeValue { node -- value }
 
-extern ListDestroy (* list -- *)
+extern ListDestroy { list -- }
 
-extern ListAppend (* node list -- *)
+extern ListAppend { node list -- }
 
-extern ListInsert1 (* item list -- node *)
+extern ListInsert1 { item list -- node }
 
-extern ListInsert (* item list -- *)
+extern ListInsert { item list -- }
 
-extern ListCreate (* -- list *)
+extern ListCreate { -- list }
 
-extern ListTakeHead (* list -- head *)
+extern ListTakeHead { list -- head }
 
-extern ListRemoveRR (* index list -- ref *)
+extern ListRemoveRR { index list -- ref }
 
-extern ListRemove (* index list -- *)
+extern ListRemove { index list -- }
 
-extern ListDelete (* node list -- *)
+extern ListDelete { node list -- }
 
-extern ListFind (* value list -- item *)
+extern ListFind { value list -- item }

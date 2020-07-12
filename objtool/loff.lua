@@ -487,11 +487,22 @@ function loff.new(filename)
 		end
 
 		if self.linkable then
+			local sp = {}
+
 			for i = 0, #self.symbols do
 				local sym = self.symbols[i]
 
 				if sym and (not sym.resolved) then
-					sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+					if sym.symtype == 4 then
+						if not sp[sym.name] then
+							sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+							sp[sym.name] = sym.index
+						else
+							sym.index = sp[sym.name]
+						end
+					else
+						sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+					end
 				end
 			end
 		elseif self.entrySymbol then
@@ -528,6 +539,7 @@ function loff.new(filename)
 			if self.linkable then
 				for k,v in ipairs(s.fixups) do
 					local sindex = 0xFFFFFFFF
+
 					if v.symbol and (not v.symbol.resolved) then
 						sindex = v.symbol.index
 					end

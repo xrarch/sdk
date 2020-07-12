@@ -1,6 +1,6 @@
 #include "<inc>/const.h"
 
-procedure abs { v -- absv }
+fn abs { v -- absv }
 	v@ absv!
 
 	if (v@ 0 s<)
@@ -8,14 +8,14 @@ procedure abs { v -- absv }
 	end
 end
 
-procedure max { n1 n2 } (* -- max *)
-	if (n2@ n1@ >) n2@ end else n1@ end
+fn max { n1 n2 -- maxv }
+	if (n2@ n1@ >) n2@ maxv! end else n1@ maxv! end
 end
 
-procedure min { n1 n2 } (* -- min *)
-	if (n2@ n1@ <) n2@ end else n1@ end
+fn min { n1 n2 -- minv }
+	if (n2@ n1@ <) n2@ minv! end else n1@ minv! end
 end
 
-procedure iserr { n -- err }
+fn iserr { n -- err }
 	n@ 0 s< err!
 end

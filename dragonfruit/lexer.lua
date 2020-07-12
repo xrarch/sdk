@@ -222,11 +222,15 @@ function lex.new(src, filename)
 	function s:expect(kind)
 		local t = self:extract()
 
-		if not t then return {0, "EOF"}, false end
+		if not t then return {0, "EOF", -1, filename}, false end
 
 		if t[2] ~= kind then return t, false end
 
 		return t, true
+	end
+
+	function s:reset()
+		s.token = 1
 	end
 
 	return s

@@ -9,32 +9,32 @@ struct Tree
 	4 Root
 endstruct
 
-extern TreeNodes (* tree -- nodes *)
+extern TreeNodes { tree -- nodes }
 
-extern TreeRoot (* tree -- root *)
+extern TreeRoot { tree -- root }
 
-extern TreeNodeValue (* node -- value *)
+extern TreeNodeValue { node -- value }
 
-extern TreeNodeParent (* node -- parent *)
+extern TreeNodeParent { node -- parent }
 
-extern TreeNodeChildren (* node -- children *)
+extern TreeNodeChildren { node -- children }
 
-extern TreeCreate (* -- tree *)
+extern TreeCreate { -- tree }
 
-extern TreeSetRoot (* value tree -- node *)
+extern TreeSetRoot { value tree -- root }
 
-extern TreeNodeDestroy (* node -- *)
+extern TreeNodeDestroy { node -- }
 
-extern TreeDestroy (* tree -- *)
+extern TreeDestroy { tree -- }
 
-extern TreeNodeFree (* node -- *)
+extern TreeNodeFree { node -- }
 
-extern TreeFree (* tree -- *)
+extern TreeFree { tree -- }
 
-extern TreeNodeCreate (* value -- *)
+extern TreeNodeCreate { value -- node }
 
-extern TreeInsertChildNode (* node parent tree -- *)
+extern TreeInsertChildNode { node parent tree -- }
 
-extern TreeInsertChild (* value parent tree -- node *)
+extern TreeInsertChild { value parent tree -- node }
 
-extern TreeNodeGetValue (* node -- value *)
+extern TreeNodeGetValue { node -- value }

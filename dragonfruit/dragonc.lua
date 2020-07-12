@@ -15,6 +15,8 @@ local lexer = dofile(sd.."lexer.lua")
 
 local parser = dofile(sd.."parser.lua")
 
+local eval = dofile(sd.."eval.lua")
+
 local function explode(d,p)
 	local t, ll
 	t={}
@@ -34,7 +36,7 @@ local function explode(d,p)
 end
 
 -- dragonc.lua [source1 source2 ...] [dest1 dest2 ...]
--- tested under lua 5.1
+-- tested under luaJIT 5.1
 
 local function printhelp()
 	print("== dragonc.lua ==")
@@ -90,7 +92,7 @@ for i = 1, #arg/2 do
 		os.exit(1)
 	end
 
-	local o = codegen.gen(parser.parse(lexer, srcf:read("*a"), source, incdir))
+	local o = codegen.gen(eval.eval(parser.parse(lexer, srcf:read("*a"), source, incdir, eval.immop)))
 
 	if not o then
 		print("dragonc: couldn't compile "..source.."!")

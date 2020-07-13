@@ -241,6 +241,22 @@ eval.immop = {
 
 		return
 	end,
+	["^"] = function (s, tok)
+		local op1 = s.pop(tok)
+		if not op1 then return false end
+
+		local op2 = s.pop(tok)
+		if not op2 then return false end
+
+		if (op1.kind == "num") and (op2.kind == "num") then
+			s.push(stacknode_t("num", bxor(op1.ident, op2.ident), tok))
+			return
+		end
+
+		s.push(stacknode_t("op", nil, tok, "^", op1, op2))
+
+		return
+	end,
 	["||"] = function (s, tok)
 		local op1 = s.pop(tok)
 		if not op1 then return false end

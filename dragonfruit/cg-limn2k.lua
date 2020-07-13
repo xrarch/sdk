@@ -482,6 +482,9 @@ local optable = {
 	["|"] = function (errtok, op, rootcanmut)
 		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "or", "ori")
 	end,
+	["^"] = function (errtok, op, rootcanmut)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "xor", "xori")
+	end,
 
 	["bitget"] = function (errtok, op, rootcanmut)
 		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "bget", "bgeti", true)

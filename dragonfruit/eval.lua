@@ -1157,7 +1157,11 @@ local function basicdef(symdef)
 					mb.words[i] = {}
 					mb.words[i].typ = "num"
 					mb.words[i].errtok = w[i].errtok
-					mb.words[i].name = eval.blockeval(w[i].name, w[i].errtok, true)
+					if type(w[i].name) == "number" then
+						mb.words[i].name = w[i].name
+					else
+						mb.words[i].name = eval.blockeval(w[i].name, w[i].errtok, true)
+					end
 
 					if not mb.words[i].name then return false end
 				else

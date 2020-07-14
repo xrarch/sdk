@@ -891,17 +891,16 @@ local function conditional(cond, out)
 		text("\tmov "..e.n..", "..rs.n)
 	end
 
-	local iv = rs.inverse
-
-	freeofp(e, rs)
-
 	if rs.typ ~= "imm" then
 		if rs.inverse then
+			rs.inverse = nil
 			text("\tbt "..out)
 		else
 			text("\tbf "..out)
 		end
 	end
+
+	freeofp(e, rs)
 
 	return true
 end

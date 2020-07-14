@@ -768,7 +768,7 @@ eval.immop = {
 		return op_t(tok, "break")
 	end,
 
-	["bitget"] = function (rn) -- (v bit -- bit)
+	["bitget"] = function (s, tok) -- (v bit -- bit)
 		local op1 = s.pop(tok)
 		if not op1 then return false end
 
@@ -782,7 +782,7 @@ eval.immop = {
 
 		s.push(stacknode_t("op", nil, tok, "bitget", op2, op1))
 	end,
-	["bitset"] = function (rn) -- (v bit -- v)
+	["bitset"] = function (s, tok) -- (v bit -- v)
 		local op1 = s.pop(tok)
 		if not op1 then return false end
 
@@ -796,7 +796,7 @@ eval.immop = {
 
 		s.push(stacknode_t("op", nil, tok, "bitset", op2, op1))
 	end,
-	["bitclear"] = function (rn) -- (v bit -- v)
+	["bitclear"] = function (s, tok) -- (v bit -- v)
 		local op1 = s.pop(tok)
 		if not op1 then return false end
 
@@ -1212,7 +1212,15 @@ function eval.eval(symdeftab, public, extern, asms)
 
 	for k,v in pairs(symdeftab) do
 		if v.kind == "const" then
-			-- ignore, constants are evaluated on demand
+			if not const[v.ident] then
+				if type(v.value) == "number" then
+					const[v.ident] = v.value
+				else
+					const[v.ident] = eval.blockeval(v.value, v.errtok, true)
+
+					if not const[v.ident] then return false end
+				end
+			end
 		elseif basicdefs[v.kind] then
 			if not basicdef(v) then return false end
 		elseif v.kind == "fn" then
@@ -1255,7 +1263,7 @@ function eval.eval(symdeftab, public, extern, asms)
 		end
 	end
 
-	return def, public, extern, asms
+	return def, public, extern, asms, const
 end
 
 return eval

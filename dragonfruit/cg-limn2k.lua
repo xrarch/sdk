@@ -1419,7 +1419,7 @@ function cg.func(func)
 	return true
 end
 
-function cg.gen(edefs, public, extern, asms)
+function cg.gen(edefs, public, extern, asms, const)
 	if not edefs then return false end
 
 	defs = edefs
@@ -1436,6 +1436,12 @@ function cg.gen(edefs, public, extern, asms)
 
 	for k,v in pairs(extern) do
 		text(".extern "..k)
+	end
+
+	for k,v in pairs(const) do
+		if not extern[k] then
+			text(k.." === "..tostring(v))
+		end
 	end
 
 	for k,v in pairs(defs) do

@@ -181,7 +181,7 @@ function loff.new(filename)
 			symt.section = sym.gv("section")
 
 			if symt.section > 3 then
-				print(string.format("objtool: '%s' section # > 3", self.path))
+				print(string.format("objtool: '%s': section # > 3", self.path))
 				return false
 			end
 

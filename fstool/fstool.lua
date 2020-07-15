@@ -61,16 +61,16 @@ else
 		if arg[3] then
 			local node, errmsg = fs:path(arg[3])
 			if not node then
-				print("fsutil: "..errmsg)
+				print("fstool: "..errmsg)
 				os.exit(1)
 			elseif node.kind ~= "dir" then
-				print("fsutil: "..node.name.." isn't a directory")
+				print("fstool: "..node.name.." isn't a directory")
 				os.exit(1)
 			end
 
 			local l = node.dirlist()
 
-			print("fsutil: listing for "..arg[3]..":")
+			print("fstool: listing for "..arg[3]..":")
 			for k,v in ipairs(l) do
 				io.write("\t"..v[2])
 				if v[1] == 2 then
@@ -87,16 +87,16 @@ else
 		if arg[3] and arg[4] then
 			local node, errmsg = fs:path(arg[3], true)
 			if not node then
-				print("fsutil: "..errmsg)
+				print("fstool: "..errmsg)
 				os.exit(1)
 			elseif node.kind == "dir" then
-				print("fsutil: "..arg[3].." is a directory")
+				print("fstool: "..arg[3].." is a directory")
 				os.exit(1)
 			end
 
 			local inf = io.open(arg[4], "rb")
 			if not inf then
-				print("fsutil: couldn't open "..arg[4])
+				print("fstool: couldn't open "..arg[4])
 				os.exit(1)
 			else
 				node.trunc()
@@ -110,7 +110,7 @@ else
 				end
 
 				if node.write(#s, tab, 0) < 0 then
-					print("fsutil: couldn't write "..node.name)
+					print("fstool: couldn't write "..node.name)
 				end
 			end
 		else
@@ -121,7 +121,7 @@ else
 		if arg[3] then
 			local node, errmsg = fs:path(arg[3])
 			if not node then
-				print("fsutil: "..errmsg)
+				print("fstool: "..errmsg)
 				os.exit(1)
 			end
 
@@ -140,14 +140,14 @@ else
 		if arg[3] then
 			local node, errmsg = fs:path(arg[3])
 			if not node then
-				print("fsutil: "..errmsg)
+				print("fstool: "..errmsg)
 				os.exit(1)
 			end
 
 			local ok, errmsg = node.delete()
 
 			if not ok then
-				print("fsutil: "..errmsg)
+				print("fstool: "..errmsg)
 				os.exit(1)
 			end
 		else

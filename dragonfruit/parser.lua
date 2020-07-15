@@ -155,8 +155,8 @@ function parser.directive()
 end
 
 -- parses the form { in1 in2 in3 ... -- out1 out2 out3 ... }
--- { in1 ... -- } is not allowed, { ... in1 -- } is
--- { -- ... out1 } is allowed, { -- out1 ... } is not
+-- { in1 ... -- } is not allowed, { ... in1 -- } is.
+-- { -- ... out1 } is allowed, { -- out1 ... } is not.
 function parser.signature(extern, fnptr)
 	local sig = {}
 
@@ -205,14 +205,14 @@ function parser.signature(extern, fnptr)
 	end
 
 	if t[1] ~= "{" then
-		lerror(t, "malformed function signature")
+		lerror(t, "malformed function declaration")
 		return false
 	end
 
 	t, ok = lex:expect("tag")
 
 	if not ok then
-		lerror(t, "malformed function signature")
+		lerror(t, "malformed function declaration")
 		return false
 	end
 
@@ -221,7 +221,7 @@ function parser.signature(extern, fnptr)
 			if (not sig.varin) and (#sig.fin == 0) then
 				sig.varin = true
 			else
-				lerror(t, "malformed function signature: '...' can only be the first argument")
+				lerror(t, "malformed function declaration: '...' can only be the first argument")
 				return false
 			end
 		else
@@ -239,7 +239,7 @@ function parser.signature(extern, fnptr)
 		t, ok = lex:expect("tag")
 
 		if not ok then
-			lerror(t, "malformed function signature")
+			lerror(t, "malformed function declaration")
 			return false
 		end
 	end
@@ -247,7 +247,7 @@ function parser.signature(extern, fnptr)
 	t, ok = lex:expect("tag")
 
 	if not ok then
-		lerror(t, "malformed function signature")
+		lerror(t, "malformed function declaration")
 		return false
 	end
 
@@ -270,17 +270,17 @@ function parser.signature(extern, fnptr)
 		t, ok = lex:expect("tag")
 
 		if not ok then
-			lerror(t, "malformed function signature")
+			lerror(t, "malformed function declaration")
 			return false
 		end
 	end
 
-	function sig.compare(sig2)
-		if sig.name ~= sig2.name then
+	function sig.compare(sig2, allowpubdiff)
+		if (not allowpubdiff) and (sig.name ~= sig2.name) then
 			return false
 		end
 
-		if sig.public ~= sig2.public then
+		if (not allowpubdiff) and (sig.public ~= sig2.public) then
 			return false
 		end
 
@@ -556,6 +556,37 @@ function parser.fn(defonly)
 	currentfn.autos = myautos
 	currentfn.idef = myidef
 
+	local fnptr
+
+	local t = lex:peek()
+
+	if t then -- dont deal with the reverse case t=nil, let parser.signature() print its error message
+		if t[1] == "(" then
+			lex:extract()
+
+			local t, ok = lex:expect("tag")
+
+			if not ok then
+				lerror(t, "expected fnptr name, got "..t[2])
+				return false
+			end
+
+			fnptr = defined(t[1], "fnptr")
+
+			if not fnptr then
+				lerror(t, t[1].." isn't a declared fnptr")
+				return false
+			end
+
+			t, ok = lex:expect("keyc")
+
+			if (not ok) or (t[1] ~= ")") then
+				lerror(t, "expected )")
+				return false
+			end
+		end
+	end
+
 	local sig = parser.signature(false)
 
 	if not sig then
@@ -567,7 +598,12 @@ function parser.fn(defonly)
 	local extdef = defined(sig.name, "extern")
 
 	if (extdef) and (not sig.compare(extdef.value)) then
-		lerror(sig.errtok, "function signature doesn't match previous extern declaration")
+		lerror(sig.errtok, "function declaration doesn't match previous extern declaration")
+		return false
+	end
+
+	if (fnptr) and (not sig.compare(fnptr.value, true)) then
+		lerror(sig.errtok, "function declaration doesn't match fnptr prototype")
 		return false
 	end
 

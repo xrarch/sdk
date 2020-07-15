@@ -1,5 +1,5 @@
-DFILES := $(shell find ./src -type f -name '*.df')
-SFILES := $(shell find ./src -type f -name '*.s')
+DFILES := $(shell find ./src -type f -name "*.df")
+SFILES := $(shell find ./src -type f -name "*.s")
 OBJ    := $(DFILES:.df=.o)
 SOBJ   := $(SFILES:.s=.o)
 

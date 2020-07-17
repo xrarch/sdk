@@ -701,7 +701,7 @@ function parser.constant(poa, str, noblock)
 	return false
 end
 
-function parser.def(kind, hasinit)
+function parser.def(kind, hasinit, conste)
 	local t, ok = lex:expect("tag")
 
 	if not ok then
@@ -719,7 +719,7 @@ function parser.def(kind, hasinit)
 		initv, k = parser.constant()
 		if not initv then return false end
 
-		if k == "block" then
+		if (k == "block") and (conste) then
 			initv.defines = name
 		end
 	end
@@ -930,7 +930,7 @@ function parser.parse(lexer, sourcetext, filename, incd, reserve)
 		elseif ident == "fnptr" then
 			if not parser.fnptr() then return false end
 		elseif ident == "const" then
-			if not parser.def("const", true) then return false end
+			if not parser.def("const", true, true) then return false end
 		elseif ident == "externptr" then
 			if not parser.def("externconst", false) then return false end
 		elseif ident == "public" then

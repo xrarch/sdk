@@ -45,21 +45,35 @@ fn reverse { str -- }
 end
 
 fn memcpy { dest src sz -- }
+	auto canfast
+	1 canfast!
+
+	if (dest@ 4 %)
+		0 canfast!
+	end elseif (src@ 4 %)
+		0 canfast!
+	end
+
 	auto i
 	0 i!
 
 	auto iol
-	sz@ 4 / iol!
 
 	auto rm
-	sz@ 4 % rm!
 
-	while (i@ iol@ <)
-		src@ @ dest@ !
+	if (canfast@)
+		sz@ 4 / iol!
+		sz@ 4 % rm!
 
-		4 src +=
-		4 dest +=
-		1 i +=
+		while (i@ iol@ <)
+			src@ @ dest@ !
+
+			4 src +=
+			4 dest +=
+			1 i +=
+		end
+	end else
+		sz@ rm!
 	end
 
 	0 i!
@@ -74,6 +88,12 @@ fn memcpy { dest src sz -- }
 end
 
 fn memset { ptr size wot -- }
+	while (ptr@ 4 %)
+		wot@ ptr@ sb
+
+		1 ptr +=
+	end
+
 	auto iol
 	size@ 4 / iol!
 

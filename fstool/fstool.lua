@@ -18,12 +18,12 @@ local function usage()
 	print("utility to manipulate aisixfat images")
 	print("usage: fstool.lua [image] [command] [args] ...")
 	print([[commands:
-	f: format
-	i: dump superblock info
-	w [dest] [src]: write file from src to dest
-	r [path]: read contents of file at path
-	ls [path]: list contents of directory at path
-	d [path]: delete file at path
+  f: format
+  i: dump superblock info
+  w [dest] [src]: write file from src to dest
+  r [path]: read contents of file at path
+  ls [path]: list contents of directory at path
+  d [path]: delete file at path
 ]])
 end
 

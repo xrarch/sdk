@@ -36,14 +36,14 @@ local function usage()
 	print("utility to manipulate LIMN Object File Format (LOFF) images")
 	print("usage: objtool.lua [command] [args] ...")
 	print([[commands:
-	info [loff]: show info about the file
-	symbols [loff]: dump symbols
-	fixups [loff]: dump fixup table
-	externs [loff]: dump unresolved external symbols
-	move [loff] [move expression]: move a loff file in memory
-	strip [loff]: strip linking information from loff file
-	binary (-nobss) [loff] [base address] (bss address): flatten a loff file, will expand BSS section in file unless address is provided
-	link (-f) [output] [loff1 loff2 ... ]: link 2 or more loff files
+  info [loff]: show info about the file
+  symbols [loff]: dump symbols
+  fixups [loff]: dump fixup table
+  externs [loff]: dump unresolved external symbols
+  move [loff] [move expression]: move a loff file in memory
+  strip [loff]: strip linking information from loff file
+  binary (-nobss) [loff] [base address] (bss address): flatten a loff file, will expand BSS section in file unless address is provided
+  link (-f) [output] [loff1 loff2 ... ]: link 2 or more loff files
 ]])
 end
 
@@ -199,6 +199,10 @@ elseif arg[1] == "move" then
 	local textaddress = image.sections[1].linkedAddress
 	local dataaddress = image.sections[2].linkedAddress
 	local bssaddress = image.sections[3].linkedAddress
+
+	if arg[3] == "aisix" then
+		arg[3] = "text=0x00000000,data=0x40000000,bss=data+data_size"
+	end
 
 	local expr = explode(",", arg[3])
 

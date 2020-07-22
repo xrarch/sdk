@@ -504,8 +504,15 @@ function asm.labels(block)
 
 				v:destroy()
 			elseif word == ".entry" then
-				if not symtab:getSymbol(tokens[2]) then
+				local sym = symtab:getSymbol(tokens[2])
+
+				if not sym then
 					lerror(v, ".entry: '"..tokens[2].."' is not a symbol")
+					return false
+				end
+
+				if sym.symtype ~= "global" then
+					lerror(v, ".entry: '"..tokens[2].."' must be a global to be set as the entry point")
 					return false
 				end
 

@@ -233,6 +233,22 @@ function fat.mount(image, offset)
 			end
 		end
 
+		function node.chmod(bits)
+			node.permissions = bits
+
+			node.dirty = true
+
+			return true
+		end
+
+		function node.chown(uid)
+			node.uid = uid
+
+			node.dirty = true
+
+			return true
+		end
+
 		function node.delete()
 			if node.root then
 				return false, "can't delete root"

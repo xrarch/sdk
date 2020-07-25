@@ -1,8 +1,37 @@
+extern Main { ... -- ret }
+
 extern Abort { ... fmt -- }
 
-const O_READ 1
-const O_WRITE 2
-const O_RW 3
+extern FPutc { fd c -- }
+
+extern Open { path mode -- fd }
+
+extern Close { fd -- ok }
+
+extern Write { buf len fd -- bytes }
+
+extern Read { buf len fd -- bytes }
+
+extern Spawn { path -- pid }
+
+extern Exit { ret -- }
+
+extern FDup { fd1 -- fd2 }
+
+extern SetTTYIgnore { ign -- ok }
+
+extern Readline { s max -- eof }
+
+const STDIN 0
+const STDOUT 1
+const STDERR 2
+
+const O_READ 0
+const O_WRITE 1
+const O_RW 2
+
+const NP_INHERIT 0
+const NP_SPECIFY 1
 
 const	EPERM	1
 const	ENOENT	2
@@ -68,6 +97,6 @@ const	-ESPIPE	-29
 const	-EROFS	-30
 const	-EMLINK	-31
 const	-EPIPE	-32
-const	-EFAULT	-33
+const	-EBADSYS	-33
 
 externptr ErrorNames

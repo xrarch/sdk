@@ -24,6 +24,8 @@ local function usage()
   r [path]: read contents of file at path
   ls [path]: list contents of directory at path
   d [path]: delete file at path
+  chmod [path] [bits]: change permissions bits
+  chown [path] [uid]: change owner
 ]])
 end
 
@@ -145,6 +147,42 @@ else
 			end
 
 			local ok, errmsg = node.delete()
+
+			if not ok then
+				print("fstool: "..errmsg)
+				os.exit(1)
+			end
+		else
+			usage()
+			os.exit(1)
+		end
+	elseif cmd == "chmod" then
+		if arg[3] and tonumber(arg[4]) then
+			local node, errmsg = fs:path(arg[3])
+			if not node then
+				print("fstool: "..errmsg)
+				os.exit(1)
+			end
+
+			local ok, errmsg = node.chmod(tonumber(arg[4]))
+
+			if not ok then
+				print("fstool: "..errmsg)
+				os.exit(1)
+			end
+		else
+			usage()
+			os.exit(1)
+		end
+	elseif cmd == "chown" then
+		if arg[3] and tonumber(arg[4]) then
+			local node, errmsg = fs:path(arg[3])
+			if not node then
+				print("fstool: "..errmsg)
+				os.exit(1)
+			end
+
+			local ok, errmsg = node.chown(tonumber(arg[4]))
 
 			if not ok then
 				print("fstool: "..errmsg)

@@ -404,6 +404,9 @@ function loff.new(filename)
 		local sortedsym
 
 		local function sortsyms(s1,s2)
+			if s1.section == 0 then return false end
+			if s2.section == 0 then return false end
+
 			return (s1.value + s1.sectiont.linkedAddress) < (s2.value + s2.sectiont.linkedAddress)
 		end
 

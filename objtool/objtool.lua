@@ -44,7 +44,7 @@ local function usage()
   strip [loff]: strip linking information from loff file
   binary (-nobss) [loff] [base address] (bss address): flatten a loff file, will expand BSS section in file unless address is provided
   link (-f) [output] [loff1 loff2 ... ]: link 2 or more loff files
-  symtab [output] [loff]: generate a symbol table
+  symtab [output] [loff] (text offset): generate a symbol table
 ]])
 end
 
@@ -127,6 +127,8 @@ elseif arg[1] == "symtab" then
 		os.exit(1)
 	end
 
+	local textoff = tonumber(arg[4]) or 0
+
 	local symtab = io.open(arg[2], "w")
 
 	if not symtab then
@@ -142,12 +144,14 @@ elseif arg[1] == "symtab" then
 
 	local names = ""
 
+	print(image.sections[1].linkedAddress, textoff)
+
 	for k,sym in ipairs(image.isym) do
 		local s = image.sections[1]
 
 		if (sym.symtype == 1) and (sym.section == 1) then
 			symtab:write("\t.dl __SYMNAM"..tostring(k).."\n")
-			symtab:write("\t.dl "..tostring(sym.value + s.linkedAddress).."\n")
+			symtab:write("\t.dl "..tostring(sym.value + s.linkedAddress + textoff).."\n")
 
 			names = names.."__SYMNAM"..tostring(k)..":\n\t.ds "..sym.name.."\n\t.db 0x0\n"
 

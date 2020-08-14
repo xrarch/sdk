@@ -16,18 +16,6 @@ function toInt16(byte2, byte1)
     return (byte1*0x100) + byte2
 end
 
-function splitInt32(n) 
-    return (math.modf(n/16777216))%256, (math.modf(n/65536))%256, (math.modf(n/256))%256, n%256
-end
-
-function splitInt16(n)
-    return (math.modf(n/256))%256, n%256
-end
-
-function splitInt24(n) 
-    return (math.modf(n/65536))%256, (math.modf(n/256))%256, n%256
-end
-
 function strtok(str, del, off)
     off = off or 1
 
@@ -81,6 +69,18 @@ function tods(dat)
     return out
 end
 
+function splitInt32(n) 
+    return (math.modf(n/16777216))%256, (math.modf(n/65536))%256, (math.modf(n/256))%256, n%256
+end
+
+function splitInt16(n)
+    return (math.modf(n/256))%256, n%256
+end
+
+function splitInt24(n) 
+    return (math.modf(n/65536))%256, (math.modf(n/256))%256, n%256
+end
+
 function struct(stuff)
     local s = {}
     s.o = {}
@@ -123,26 +123,9 @@ function cast(struct, tab, offset)
         local o = s.s.o
         local off = s.o
 
-        if sz == 4 then
-            local b1,b2,b3,b4 = splitInt32(val)
-            t[o[n] + off] = b4
-            t[o[n] + off + 1] = b3
-            t[o[n] + off + 2] = b2
-            t[o[n] + off + 3] = b1
-        elseif sz == 3 then
-            local b1,b2,b3 = splitInt24(val)
-            t[o[n] + off] = b3
-            t[o[n] + off + 1] = b2
-            t[o[n] + off + 2] = b1
-        elseif sz == 2 then
-            local b1,b2 = splitInt16(val)
-            t[o[n] + off] = b2
-            t[o[n] + off + 1] = b1
-        elseif sz == 1 then
-            val = val % 255
-            t[o[n] + off] = val
-        else
-            error("no support for vals size "..tostring(sz))
+        for i = 0, sz-1 do
+            t[o[n] + i + off] = val % 256
+            val = math.floor(val/256)
         end
     end
 

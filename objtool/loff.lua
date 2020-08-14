@@ -407,12 +407,16 @@ function loff.new(filename)
 			return (s1.value + s1.sectiont.linkedAddress) < (s2.value + s2.sectiont.linkedAddress)
 		end
 
-		function self:getSym(address)
+		function self:iSymSort()
 			if not sortedsym then
 				table.sort(self.isym, sortsyms)
 
 				sortedsym = true
 			end
+		end
+
+		function self:getSym(address)
+			self:iSymSort()
 
 			for i = 1, 3 do
 				local s = self.sections[i]

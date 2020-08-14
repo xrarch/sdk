@@ -44,6 +44,7 @@ local function usage()
   strip [loff]: strip linking information from loff file
   binary (-nobss) [loff] [base address] (bss address): flatten a loff file, will expand BSS section in file unless address is provided
   link (-f) [output] [loff1 loff2 ... ]: link 2 or more loff files
+  symtab [output] [loff]: generate a symbol table
 ]])
 end
 
@@ -106,6 +107,63 @@ elseif arg[1] == "symbols" then
 	if not x then
 		print("objtool: no symbols exposed!")
 	end
+elseif arg[1] == "symtab" then
+	if not arg[2] then
+		usage()
+		os.exit(1)
+	end
+
+	if not arg[3] then
+		usage()
+		os.exit(1)
+	end
+
+	local image = loff.new(arg[3])
+	if not image then
+		os.exit(1)
+	end
+
+	if not image:load() then
+		os.exit(1)
+	end
+
+	local symtab = io.open(arg[2], "w")
+
+	if not symtab then
+		print("objtool: couldn't open "..tostring(arg[2]).." for writing")
+		os.exit(1)
+	end
+
+	image:iSymSort()
+
+	symtab:write(".section data\n\nSymbolTable:\n.global SymbolTable\n")
+
+	local syms = 0
+
+	local names = ""
+
+	for k,sym in ipairs(image.isym) do
+		local s = image.sections[1]
+
+		if (sym.symtype == 1) and (sym.section == 1) then
+			symtab:write("\t.dl __SYMNAM"..tostring(k).."\n")
+			symtab:write("\t.dl "..tostring(sym.value + s.linkedAddress).."\n")
+
+			names = names.."__SYMNAM"..tostring(k)..":\n\t.ds "..sym.name.."\n\t.db 0x0\n"
+
+			syms = syms + 1
+
+			symtab:write("\n")
+		end
+	end
+
+	symtab:write("SymbolCount:\n.global SymbolCount\n\t.dl "..tostring(syms).."\n\n")
+
+	symtab:write(names)
+
+	symtab:write("\n.align 4\n")
+
+	symtab:close()
 elseif arg[1] == "fixups" then
 	if not arg[2] then
 		usage()

@@ -12,7 +12,9 @@ extern Write { buf len fd -- bytes }
 
 extern Read { buf len fd -- bytes }
 
-extern Spawn { path -- pid }
+extern Spawn { ... path -- pid }
+
+extern VSpawn { argcn argvt path -- pid }
 
 extern Exit { ret -- }
 
@@ -21,6 +23,8 @@ extern FDup { fd1 -- fd2 }
 extern SetTTYIgnore { ign -- ok }
 
 extern Readline { s max -- eof }
+
+extern NewProcess { path fd0 fd1 fd2 mode udatavec udatac -- pid }
 
 const STDIN 0
 const STDOUT 1
@@ -32,6 +36,16 @@ const O_RW 2
 
 const NP_INHERIT 0
 const NP_SPECIFY 1
+
+const TTYI_ALL 0
+const TTYI_IGN 1
+const TTYI_CHILD_ALL 0x100
+const TTYI_CHILD_IGN 0x200
+
+struct UDVec
+	4 Ptr
+	4 Size
+endstruct
 
 const	EPERM	1
 const	ENOENT	2

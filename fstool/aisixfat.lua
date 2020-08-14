@@ -16,29 +16,31 @@ local block = dofile(sd.."block.lua")
 local superblock_s = struct {
 	{4, "version"},
 	{4, "magic"},
-	{4, "size"},
-	{4, "numfiles"},
 	{4, "dirty"},
-	{4, "blocksused"},
-	{4, "numdirs"},
 	{4, "reservedblocks"},
 	{4, "fatstart"},
 	{4, "fatsize"},
-	{4, "rootstart"},
+	{4, "istart"},
+	{4, "icount"},
 	{4, "datastart"},
-	{4, "rootsize"},
+	{4, "datasize"},
+	{4, "volsize"}
 }
 
 local dirent_s = struct {
+	{4, "inum"},
+	{60, "name"},
+}
+
+local inode_s = struct {
 	{4, "type"},
 	{4, "permissions"},
 	{4, "uid"},
-	{4, "reserved"},
+	{4, "iparent"},
 	{4, "timestamp"},
 	{4, "startblock"},
-	{4, "size"},
+	{4, "RESERVED"},
 	{4, "bytesize"},
-	{32, "name"},
 }
 
 local fat_s = struct {
@@ -47,7 +49,7 @@ local fat_s = struct {
 
 local fat = {}
 
-function fat.mount(image, offset)
+function fat.mount(image, offset, noroot)
 	local fs = {}
 
 	fs.image = block.new(image, 4096, offset)
@@ -60,18 +62,21 @@ function fat.mount(image, offset)
 	if superblock.gv("magic") ~= 0xAFBBAFBB then
 		print(string.format("couldn't mount image: bad magic %x", superblock.gv("magic")))
 		return false
-	elseif superblock.gv("version") ~= 0x5 then
-		print(string.format("couldn't mount image: bad version %d, wanted 5", superblock.gv("version")))
+	elseif superblock.gv("version") ~= 0x6 then
+		print(string.format("couldn't mount image: bad version %d, wanted 6", superblock.gv("version")))
 		return false
 	end
 
 	local fatstart = superblock.gv("fatstart")
 	local fatsize = superblock.gv("fatsize")
 	local datastart = superblock.gv("datastart")
-	local rootstart = superblock.gv("rootstart")
-	local rootsize = superblock.gv("rootsize")
+	local istart = superblock.gv("istart")
+	local icount = superblock.gv("icount")
+	local isize = math.ceil((icount * inode_s.size())/4096)
 
 	local fat = {}
+
+	local iblk = {}
 
 	local cnodes = {}
 
@@ -133,46 +138,91 @@ function fat.mount(image, offset)
 		return -1 -- no blocks left
 	end
 
-	function fs.node_t(parent, direntoff)
+	function fs.iget(inum)
+		if inum == 0 then
+			error("inum = 0")
+		end
+
+		if inum >= icount then
+			error("inum >= icount")
+		end
+
+		local ino = cnodes[inum]
+
+		if not ino then
+			local ioffb = inum * inode_s.size()
+
+			local ibn = math.floor(ioffb / 4096) + istart
+
+			local ioff = ioffb % 4096
+
+			local i_b = iblk[ibn]
+
+			if not i_b then
+				iblk[ibn] = img:readBlock(ibn)
+				i_b = iblk[ibn]
+			end
+
+			local in_s = cast(inode_s, i_b, ioff)
+			ino = fs.node_t(in_s, inum)
+			cnodes[inum] = ino
+		end
+
+		return ino
+	end
+	local iget = fs.iget
+
+	function fs.isetup(parent, ino, kind)
+		local uid
+		local permissions
+		local iparent
+
+		if parent then
+			uid = parent.uid
+			permissions = parent.permissions
+			iparent = parent.inum
+		else
+			uid = 0
+			permissions = 0
+			iparent = 1 -- root inode, iparent is 1
+		end
+
+		ino.kind = kind
+		ino.entry = 0xFFFFFFFF
+		ino.uid = uid
+		ino.permissions = permissions
+		ino.size = 0
+		ino.iparent = iparent
+
+		ino.dirty = true
+	end
+	local isetup = fs.isetup
+
+	local function ialloc(parent, kind)
+		for i = 2, icount-1 do -- no inode 0, and inode 1 is root, so start looking at inode 2
+			local ino = iget(i)
+
+			if ino.kind == "empty" then
+				isetup(parent, ino, kind)
+				return ino
+			end
+		end
+
+		return nil -- no inodes left
+	end
+
+	function fs.node_t(ino_s, inum)
 		local node = {}
 
+		node.inum = inum
 		node.entry = 0xFFFFFFFF
 		node.parent = parent
-		node.direntoff = direntoff
 		node.size = 0
 		node.uid = 0
 		node.permissions = 0
 		node.dirty = false
 		node.blocks = {}
 		node.children = {}
-
-		local function getdirent()
-			if not node.parent then return end
-
-			local dirent = {}
-
-			if node.parent.read(dirent_s.size(), dirent, node.direntoff) < dirent_s.size() then
-				error("oh no my parent didn't give me my dirent")
-			end
-
-			local direns = cast(dirent_s, dirent)
-
-			return direns, dirent
-		end
-
-		local function dir_writeent(dirent, dir, off)
-			if dir.write(dirent_s.size(), dirent, off) < dirent_s.size() then
-				error("oh no my parent didn't let me write my dirent")
-			end
-
-			dir.dirty = true
-		end
-
-		local function writedirent(dirent)
-			if not node.parent then error("oh no") end
-
-			dir_writeent(dirent, node.parent, node.direntoff)
-		end
 
 		local function dir_getent(off, extend)
 			local dirent = {}
@@ -200,10 +250,10 @@ function fat.mount(image, offset)
 		local function dir_allocent()
 			local off = 0
 
-			for i = 1, 256 do -- 256 is maxsearch
+			for i = 1, 1024 do -- 1024 is maxsearch
 				local direns, dirent = dir_getent(off, true)
 
-				if direns.gv("type") == 0 then
+				if direns.gv("inum") == 0 then
 					return direns, dirent, off
 				end
 
@@ -211,26 +261,22 @@ function fat.mount(image, offset)
 			end
 		end
 
-		if parent then -- populate
-			local direns, dirent = getdirent()
+		node.permissions = ino_s.gv("permissions")
+		node.uid = ino_s.gv("uid")
+		node.entry = ino_s.gv("startblock")
+		node.size = ino_s.gv("bytesize")
+		node.iparent = ino_s.gv("iparent")
 
-			if not direns then error("oh no") end
+		local kind = ino_s.gv("type")
 
-			node.permissions = direns.gv("permissions")
-			node.uid = direns.gv("uid")
-			node.entry = direns.gv("startblock")
-			node.size = direns.gv("bytesize")
-			node.name = direns.gs("name")
-
-			local kind = direns.gv("type")
-
-			if kind == 1 then
-				node.kind = "file"
-			elseif kind == 2 then
-				node.kind = "dir"
-			else
-				error("oh no what even is "..tostring(kind))
-			end
+		if kind == 1 then
+			node.kind = "file"
+		elseif kind == 2 then
+			node.kind = "dir"
+		elseif kind == 0 then
+			node.kind = "empty"
+		else
+			error("oh no what even is "..tostring(kind))
 		end
 
 		function node.chmod(bits)
@@ -250,7 +296,7 @@ function fat.mount(image, offset)
 		end
 
 		function node.delete()
-			if node.root then
+			if inum == 1 then
 				return false, "can't delete root"
 			end
 
@@ -260,7 +306,7 @@ function fat.mount(image, offset)
 				while off < node.size do
 					local direns, dirent = dir_getent(off)
 
-					if direns.gv("type") ~= 0 then
+					if direns.gv("inum") ~= 0 then
 						return false, "can't delete a directory with entries"
 					end
 
@@ -268,62 +314,33 @@ function fat.mount(image, offset)
 				end
 			end
 
-			local direns, dirent = getdirent()
-
-			if not direns then
-				error("no dirent??")
-			end
-
 			node.trunc()
 
-			direns.sv("type", 0)
-
-			writedirent(dirent)
+			node.kind = "empty"
 
 			node.deleted = true
 
 			return true
 		end
 
-		local function rootupdate()
-			superblock.sv("rootstart", node.entry)
-			superblock.sv("rootsize", node.size)
-			fs.superblock_b.dirty = true
-		end
-
-		function node.update(final)
+		function node.update()
 			if not node.dirty then return end
 
 			if node.deleted then return end
 
-			if node.root then
-				rootupdate()
+			if node.kind == "dir" then
+				ino_s.sv("type", 2)
+			elseif node.kind == "file" then
+				ino_s.sv("type", 1)
 			else
-				local direns, dirent = getdirent()
-
-				if not direns then return end
-
-				if node.kind == "dir" then
-					direns.sv("type", 2)
-				elseif node.kind == "file" then
-					direns.sv("type", 1)
-				else
-					error("oh no what even is "..tostring(node.kind))
-				end
-
-				direns.sv("permissions", node.permissions)
-				direns.sv("uid", node.uid)
-				direns.sv("startblock", node.entry)
-				direns.sv("size", math.ceil(node.size / 4096))
-				direns.sv("bytesize", node.size)
-				direns.ss("name", node.name)
-
-				writedirent(dirent)
-
-				if node.parent then
-					node.parent.update(final)
-				end
+				error("oh no what even is "..tostring(node.kind))
 			end
+
+			ino_s.sv("permissions", node.permissions)
+			ino_s.sv("uid", node.uid)
+			ino_s.sv("startblock", node.entry)
+			ino_s.sv("bytesize", node.size)
+			ino_s.sv("iparent", node.iparent)
 
 			for k,v in pairs(node.blocks) do
 				if v.dirty then
@@ -332,13 +349,9 @@ function fat.mount(image, offset)
 				end
 			end
 
+			ino_s.t.dirty = true
+
 			node.dirty = false
-		end
-
-		local function nextent(bn)
-			if node.blocks[bn] then
-
-			end
 		end
 
 		local function ngetb(bn, reading)
@@ -480,11 +493,9 @@ function fat.mount(image, offset)
 			while off < node.size do
 				local direns, dirent = dir_getent(off)
 
-				if direns.gv("type") ~= 0 then
+				if direns.gv("inum") ~= 0 then
 					if direns.gs("name") == name then
-						local n = fs.node_t(node, off)
-
-						node.children[#node.children + 1] = n
+						local n = iget(direns.gv("inum"))
 
 						return n
 					end
@@ -494,31 +505,64 @@ function fat.mount(image, offset)
 			end
 		end
 
+		function node.deletechild(name)
+			if node.kind ~= "dir" then
+				error("oh no im not a directory u cant do that")
+			end
+
+			local off = 0
+
+			while off < node.size do
+				local direns, dirent = dir_getent(off)
+
+				if direns.gv("inum") ~= 0 then
+					if direns.gs("name") == name then
+						local n = iget(direns.gv("inum"))
+
+						local r, m = n.delete()
+
+						if not r then
+							return false, m
+						end
+
+						direns.sv("inum", 0)
+
+						node.write(dirent_s.size(), dirent, off)
+
+						return true
+					end
+				end
+
+				off = off + dirent_s.size()
+			end
+
+			return false, "no such file or directory"
+		end
+
 		function node.createchild(name, kind)
+			local ino = ialloc(node, kind)
+
+			if not ino then
+				return false
+			end
+
 			local direns, dirent, off = dir_allocent()
 
-			direns.sv("type", kind)
-			direns.sv("startblock", 0xFFFFFFFF)
-			direns.sv("uid", node.uid)
-			direns.sv("permissions", node.permissions)
-			direns.sv("size", 0)
-			direns.sv("bytesize", 0)
 			direns.ss("name", name)
+			direns.sv("inum", ino.inum)
 
 			node.write(dirent_s.size(), dirent, off)
 
-			local child = fs.node_t(node, off)
-
-			child.dirty = true
-
 			node.dirty = true
 
-			node.children[#node.children + 1] = child
-
-			return child
+			return ino
 		end
 
 		function node.dirlist()
+			if node.kind ~= "dir" then
+				return false, "not a directory"
+			end
+
 			local list = {}
 
 			local off = 0
@@ -526,8 +570,12 @@ function fat.mount(image, offset)
 			while off < node.size do
 				local direns, dirent = dir_getent(off)
 
-				if direns.gv("type") ~= 0 then
-					list[#list + 1] = {direns.gv("type"), direns.gs("name")}
+				local dinum = direns.gv("inum")
+
+				if dinum ~= 0 then
+					local ino = iget(dinum)
+
+					list[#list + 1] = {ino.kind, direns.gs("name")}
 				end
 
 				off = off + dirent_s.size()
@@ -536,27 +584,25 @@ function fat.mount(image, offset)
 			return list
 		end
 
-		cnodes[#cnodes + 1] = node
-
 		return node
 	end
 	local node_t = fs.node_t
 
-	fs.rootdir = node_t()
+	if not noroot then
+		fs.rootdir = iget(1)
+	end
+
 	local rootdir = fs.rootdir
 
-	rootdir.entry = rootstart
-
-	rootdir.root = true
-
-	rootdir.kind = "dir"
-	rootdir.size = rootsize
-
-	function fs:path(path, create)
+	function fs:path(path, create, dir)
 		local node = rootdir
 
 		local str = true
 		local off = 1
+
+		local ln = rootdir
+
+		local lnm = "/"
 
 		while str do
 			str, off = strtok(path, "/", off)
@@ -565,33 +611,23 @@ function fat.mount(image, offset)
 				break
 			end
 
+			ln = node
+
 			if node.kind ~= "dir" then
-				return false, node.name.." is not a directory"
+				return false, lnm.." is not a directory"
 			end
 
-			local nn = nil
+			local nn = node.lookdir(str)
 
-			-- check if node is already cached in parent dir's children
-			for k,v in ipairs(node.children) do
-				if (not v.deleted) and (v.name == str) then
-					nn = v
-				end
-			end
-
-			-- not so, try to get from dirent
-			if not nn then
-				nn = node.lookdir(str)
-			end
-
-			-- not in dirent either
+			-- not in dirent
 			if not nn then
 				if create then -- create
 					local kind
 
 					if path:sub(off,off) == "/" then
-						kind = 2
+						kind = "dir"
 					else
-						kind = 1
+						kind = "file"
 					end
 
 					nn = node.createchild(str, kind)
@@ -603,13 +639,14 @@ function fat.mount(image, offset)
 			end
 
 			node = nn
+			lnm = str
 		end
 
-		return node
+		return node, nil, ln, lnm
 	end
 
 	function fs:update()
-		for k,v in ipairs(cnodes) do
+		for k,v in pairs(cnodes) do
 			v.update()
 		end
 
@@ -622,6 +659,13 @@ function fat.mount(image, offset)
 			if fat[i] and fat[i].dirty then
 				img:writeBlock(fatstart+i, fat[i])
 				fat[i].dirty = false
+			end
+		end
+
+		for i = istart, istart+isize-1 do
+			if iblk[i] and iblk[i].dirty then
+				img:writeBlock(i, iblk[i])
+				iblk[i].dirty = false
 			end
 		end
 	end
@@ -643,23 +687,39 @@ function fat.format(image, offset)
 
 	local reservedblocks = 15
 
+	local fatsize = math.ceil((img.blocks*4) / 4096)
+
+	local fatstart = reservedblocks + 1
+
+	local istart = fatstart + fatsize
+
+	local icount = math.floor(img.blocks/4)
+
+	local isize = math.ceil((icount * inode_s.size()) / 4096)
+
+	local datastart = istart + isize
+
 	superblock.sv("magic", 0xAFBBAFBB)
-	superblock.sv("version", 0x5)
-	superblock.sv("size", img.blocks)
+	superblock.sv("version", 0x6)
 	superblock.sv("reservedblocks", reservedblocks)
-	superblock.sv("fatstart", reservedblocks + 1)
-	local fsize = math.ceil((img.blocks*4) / 4096)
-	superblock.sv("fatsize", fsize)
-	superblock.sv("rootstart", 0xFFFFFFFF)
-	superblock.sv("datastart", fsize + reservedblocks + 2)
-	superblock.sv("blocksused", fsize + reservedblocks + 1)
-	superblock.sv("rootsize", 0)
+	superblock.sv("fatstart", fatstart)
+	superblock.sv("fatsize", fatsize)
+	superblock.sv("istart", istart)
+	superblock.sv("icount", icount)
+	superblock.sv("datastart", datastart)
+	superblock.sv("datasize", img.blocks)
+	superblock.sv("volsize", img.blocks)
 
 	print("writing superblock")
 	img:writeBlock(0, superblock_b)
 
 	print("zeroing FAT")
-	for i = 16, 16+fsize-1 do
+	for i = fatstart, fatstart+fatsize-1 do
+		img:writeBlock(i, {[0]=0})
+	end
+
+	print("zeroing ilist")
+	for i = istart, istart+isize-1 do
 		img:writeBlock(i, {[0]=0})
 	end
 
@@ -678,9 +738,16 @@ function fat.format(image, offset)
 	end
 
 	print("reserving FAT")
-	for i = reservedblocks+1, reservedblocks+fsize do
+	for i = fatstart, fatstart+fatsize-1 do
 		fsm.setblockstatus(i, 0xFFFFFFFF)
 	end
+
+	print("reserving ilist")
+	for i = istart, istart+isize-1 do
+		fsm.setblockstatus(i, 0xFFFFFFFF)
+	end
+
+	fsm.isetup(nil, fsm.rootdir, "dir")
 
 	print("updating")
 	fsm:update()

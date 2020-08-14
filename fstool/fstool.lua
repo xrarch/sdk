@@ -65,17 +65,19 @@ else
 			if not node then
 				print("fstool: "..errmsg)
 				os.exit(1)
-			elseif node.kind ~= "dir" then
-				print("fstool: "..node.name.." isn't a directory")
-				os.exit(1)
 			end
 
-			local l = node.dirlist()
+			local l, err = node.dirlist()
+
+			if not l then
+				print("fstool: "..err)
+				os.exit(1)
+			end
 
 			print("fstool: listing for "..arg[3]..":")
 			for k,v in ipairs(l) do
 				io.write("\t"..v[2])
-				if v[1] == 2 then
+				if v[1] == "dir" then
 					print("/")
 				else
 					print("")
@@ -140,13 +142,13 @@ else
 		end
 	elseif cmd == "d" then
 		if arg[3] then
-			local node, errmsg = fs:path(arg[3])
+			local node, errmsg, dirnode, fname = fs:path(arg[3])
 			if not node then
 				print("fstool: "..errmsg)
 				os.exit(1)
 			end
 
-			local ok, errmsg = node.delete()
+			local ok, errmsg = dirnode.deletechild(fname)
 
 			if not ok then
 				print("fstool: "..errmsg)

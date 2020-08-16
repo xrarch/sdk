@@ -30,9 +30,9 @@ const STDIN 0
 const STDOUT 1
 const STDERR 2
 
-const O_READ 0
-const O_WRITE 1
-const O_RW 2
+const O_READ 1
+const O_WRITE 2
+const O_RW (O_READ O_WRITE |)
 
 const NP_INHERIT 0
 const NP_SPECIFY 1

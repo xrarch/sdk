@@ -144,8 +144,6 @@ elseif arg[1] == "symtab" then
 
 	local names = ""
 
-	print(image.sections[1].linkedAddress, textoff)
-
 	for k,sym in ipairs(image.isym) do
 		local s = image.sections[1]
 

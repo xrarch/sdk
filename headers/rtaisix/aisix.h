@@ -26,6 +26,16 @@ extern Readline { s max -- eof }
 
 extern NewProcess { path fd0 fd1 fd2 mode udatavec udatac -- pid }
 
+extern Wait { -- pid ret }
+
+extern SetUID { uid -- ok }
+
+extern GetPID { -- pid }
+
+extern GetUID { -- uid }
+
+extern GetEUID { -- euid }
+
 const STDIN 0
 const STDOUT 1
 const STDERR 2

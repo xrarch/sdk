@@ -910,7 +910,7 @@ local function flushincirco()
 		local r = curfn.incirco[i]
 
 		if r.reg.incirco then
-			local e = ralloc(errtok, true)
+			local e = ralloc(r.reg.errtok, true)
 
 			if not e then return false end
 
@@ -928,6 +928,8 @@ local function flushincirco()
 	end
 
 	curfn.incirco = {}
+
+	return true
 end
 
 local muttable = {
@@ -993,7 +995,7 @@ local muttable = {
 	end,
 
 	["call"] = function (errtok, op)
-		flushincirco()
+		if not flushincirco() then return false end
 
 		local an
 

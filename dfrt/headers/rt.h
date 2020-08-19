@@ -40,6 +40,10 @@ extern Printf { ... fmt -- }
 
 extern VPrintf { argvt argcn fmt -- }
 
+extern VFPrintf { argvt argcn fmt fd -- }
+
+extern FPrintf { ... fmt fd -- }
+
 extern Malloc { size -- ptr }
 
 extern Calloc { size -- ptr }
@@ -49,6 +53,10 @@ extern Free { ptr -- }
 extern Gets { s max -- }
 
 extern Putc { c -- }
+
+extern FPutc { fd c -- }
+
+extern FPuts { fd s -- }
 
 extern Getc { -- c }
 

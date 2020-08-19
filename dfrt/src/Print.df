@@ -5,39 +5,62 @@ table KConsoleDigits
 	'0' '1' '2' '3' '4' '5' '6' '7' '8' '9' 'a' 'b' 'c' 'd' 'e' 'f'
 endtable
 
-fn Putx { nx -- }
+fn private Putx { c nx fd -- len }
+	1 c +=
+
 	if (nx@ 15 >)
 		auto a
 		nx@ 16 / a!
 
 		nx@ 16 a@ * - nx!
-		a@ Putx
+		c@ a@ fd@ Putx c!
 	end
 
-	[nx@]KConsoleDigits@ Putc
+	fd@ [nx@]KConsoleDigits@ FPutc
+
+	c@ len!
 end
 
-fn Putn { n -- }
+fn private Putn { c n fd -- len }
+	1 c +=
+
 	if (n@ 9 >)
 		auto a
 		n@ 10 / a!
 
 		n@ 10 a@ * - n!
-		a@ Putn
+		c@ a@ fd@ Putn c!
 	end
 
-	[n@]KConsoleDigits@ Putc
+	fd@ [n@]KConsoleDigits@ FPutc
+
+	c@ len!
 end
 
-fn Puti { n -- }
+fn private Puti { n fd -- len }
+	auto c
+	0 c!
+
 	if (n@ 0 s<)
-		'-' Putc
+		fd@ '-' FPutc
+		1 c!
 	end
 
-	n@ abs Putn
+	c@ n@ abs fd@ Putn len!
 end
 
-fn VPrintf { argvt argcn fmt -- }
+fn private Pad { num -- }
+	auto i
+	0 i!
+
+	while (i@ num@ <)
+		' ' Putc
+
+		1 i +=
+	end
+end
+
+fn VFPrintf { argvt argcn fmt fd -- }
 	auto i
 	0 i!
 
@@ -47,6 +70,8 @@ fn VPrintf { argvt argcn fmt -- }
 	auto a
 	0 a!
 
+	auto fl
+
 	auto max
 	argcn@ 4 * max!
 	
@@ -54,45 +79,89 @@ fn VPrintf { argvt argcn fmt -- }
 		auto char
 		fmt@ i@ + gb char!
 		if (char@ '%' ~=)
-			char@ Putc
+			fd@ char@ FPutc
 		end else
 			1 i +=
 			if (i@ sl@ >=)
 				return
 			end
 
+			auto pad
+			0 pad!
+
 			fmt@ i@ + gb char!
 
+			while (char@ '0' >= char@ '9' <= &&)
+				1 i +=
+
+				pad@ 10 * char@ '0' - + pad!
+
+				fmt@ i@ + gb char!
+			end
+
 			if (char@ '%' ==)
-				'%' Putc
+				fd@ '%' FPutc
 				1 i +=
 				continue
 			end
 
 			if (a@ max@ >=)
-				'?' Putc
+				fd@ '?' FPutc
 				1 i +=
 				continue
 			end
 
+			auto q
+			a@ argvt@ + @ q!
+
 			if (char@ 'd' ==)
-				a@ argvt@ + @ Putn
+				0 q@ fd@ Putn fl!
+
+				if (pad@)
+					if (fl@ pad@ <)
+						pad@ fl@ - Pad
+					end
+				end
 
 				4 a +=
 			end elseif (char@ 'x' ==)
-				a@ argvt@ + @ Putx
+				0 q@ fd@ Putx fl!
+
+				if (pad@)
+					if (fl@ pad@ <)
+						pad@ fl@ - Pad
+					end
+				end
 
 				4 a +=
 			end elseif (char@ 's' ==)
-				a@ argvt@ + @ Puts
+				fd@ q@ FPuts
 				
+				if (pad@)
+					q@ strlen fl!
+
+					if (fl@ pad@ <)
+						pad@ fl@ - Pad
+					end
+				end
+
 				4 a +=
 			end elseif (char@ 'l' ==)
-				a@ argvt@ + @ Putc
+				fd@ q@ FPutc
+
+				if (pad@)
+					pad@ 1 - Pad
+				end
 
 				4 a +=
 			end elseif (char@ 'i' ==)
-				a@ argvt@ + @ Puti
+				q@ fd@ Puti fl!
+
+				if (pad@)
+					if (fl@ pad@ <)
+						pad@ fl@ - Pad
+					end
+				end
 
 				4 a +=
 			end
@@ -102,6 +171,14 @@ fn VPrintf { argvt argcn fmt -- }
 	end
 end
 
+fn VPrintf { argvt argcn fmt -- }
+	argvt@ argcn@ fmt@ 1 VFPrintf
+end
+
 fn Printf { ... fmt -- }
 	argv argc@ fmt@ VPrintf
+end
+
+fn FPrintf { ... fmt fd -- }
+	argv argc@ fmt@ fd@ VFPrintf
 end

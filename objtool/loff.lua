@@ -127,12 +127,15 @@ function loff.new(filename)
 		local magic = hdr.gv("magic")
 
 		if magic == 0x4C4F4646 then
-			-- goooo d
+			print(string.format("objtool: '%s' is in an older LOFF format and needs to be rebuilt", self.path))
+			return false
 		elseif magic == 0x4C455830 then
 			print(string.format("objtool: '%s' is in legacy AIXO format and needs to be rebuilt", self.path))
 			return false
+		elseif magic == 0x4C4F4632 then
+			-- goood
 		else
-			print(string.format("objtool: '%s' has bad magic %X", self.path, hdr.gv("magic")))
+			print(string.format("objtool: '%s' isn't a LOFF format", self.path))
 			return false
 		end
 
@@ -285,41 +288,29 @@ function loff.new(filename)
 
 			local s = self.sections[section]
 
-			for k,v in ipairs(s.fixups) do
-				if not v.symbol then
-					if v.size <= 8 then
-						local type_s = struct({{v.size, "value"}})
-						local addrs = cast(type_s, s.contents, v.offset)
-						addrs.sv("value", ((addrs.gv("value") * v.divisor) - s.linkedAddress + address) / v.divisor)
-					end
-				end
-			end
+			s.linkedAddress = address
 
-			if not relative then
-				s.linkedAddress = address
+			for i = 1, 2 do
+				local s2 = self.sections[i]
 
-				for i = 1, 2 do
-					local s2 = self.sections[i]
+				for k,v in ipairs(s2.fixups) do
+					local sym = v.symbol
 
-					for k,v in ipairs(s2.fixups) do
-						local sym = v.symbol
+					if sym and (sym.section == section) then
+						if v.size <= 8 then
+							local type_s = struct({{v.size, "value"}})
+							local addrs = cast(type_s, s2.contents, v.offset)
 
-						if sym and (sym.section == section) then
-							if v.size <= 8 then
-								local type_s = struct({{v.size, "value"}})
-								local addrs = cast(type_s, s2.contents, v.offset)
-
-								if sym.symtype == 4 then
-									if sym.value == 1 then
-										addrs.sv("value", math.floor(s.linkedAddress / v.divisor))
-									elseif sym.value == 2 then
-										addrs.sv("value", math.floor(s.size / v.divisor))
-									elseif sym.value == 3 then
-										addrs.sv("value", math.floor((s.linkedAddress + s.size) / v.divisor))
-									end
-								else
-									addrs.sv("value", (sym.value + s.linkedAddress) / v.divisor)
+							if sym.symtype == 4 then
+								if sym.value == 1 then
+									addrs.sv("value", math.floor(s.linkedAddress / v.divisor))
+								elseif sym.value == 2 then
+									addrs.sv("value", math.floor(s.size / v.divisor))
+								elseif sym.value == 3 then
+									addrs.sv("value", math.floor((s.linkedAddress + s.size) / v.divisor))
 								end
+							else
+								addrs.sv("value", math.floor((sym.value + s.linkedAddress) / v.divisor))
 							end
 						end
 					end
@@ -331,7 +322,7 @@ function loff.new(filename)
 
 		function self:relocInFile(section, offset) -- blindly assumes linkedAddress = 0, caller check
 			if offset ~= 0 then
-				self:relocTo(section, offset, true)
+				self:relocTo(section, offset)
 
 				for i = 0, #self.symbols do
 					local sym = self.symbols[i]
@@ -566,7 +557,7 @@ function loff.new(filename)
 		-- make header
 		local size = 72
 
-		local header = "FFOL"
+		local header = "2FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)
@@ -758,11 +749,9 @@ function loff.new(filename)
 					else
 						--print("didnt resolve")
 					end
-
-					v.symbol = nil
-				else
-					v.symbol = sym.resolved
 				end
+
+				v.symbol = sym.resolved
 			end
 		end
 

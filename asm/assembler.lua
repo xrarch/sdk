@@ -203,7 +203,7 @@ local function section(block, id, bss)
 	end
 
 	function me:addLocal(name, off)
-		symtab:addSymbol(name, self, "local", off)
+		return symtab:addSymbol(name, self, "local", off)
 	end
 
 	function me:addFixup(sym, off, size, divisor)
@@ -245,6 +245,7 @@ function asm.labels(block)
 	block.sections["bss"] = section(block, 3, true)
 
 	block.localLabels = {}
+	block.localLabelsSym = {}
 
 	local curStruct = false
 	local strCount = 0
@@ -316,6 +317,8 @@ function asm.labels(block)
 
 					ll[word:sub(2,-2)] = section.tbc
 
+					block.localLabelsSym[curLabel][word:sub(2,-2)] = section:addLocal("_"..curLabel.."."..word:sub(2,-2), section.tbc)
+
 					v:destroy()
 				else
 					local sy = symtab:getSymbol(word:sub(1,-2))
@@ -329,6 +332,7 @@ function asm.labels(block)
 						section:addLocal(curLabel, section.tbc)
 
 						block.localLabels[curLabel] = {}
+						block.localLabelsSym[curLabel] = {}
 					end
 				end
 			elseif tokens[2] == "===" then
@@ -549,6 +553,8 @@ function asm.labels(block)
 	return true
 end
 
+local QSY = 0
+
 function asm.decode(block) -- decode labels, registers, strings
 	local curLabel
 
@@ -597,6 +603,8 @@ function asm.decode(block) -- decode labels, registers, strings
 							elseif t:sub(1,1) == "." then -- local label
 								local ll = block.localLabels[curLabel][t:sub(2)]
 
+								local llsym = block.localLabelsSym[curLabel][t:sub(2)]
+
 								local nofix = false
 
 								if ll then
@@ -615,13 +623,13 @@ function asm.decode(block) -- decode labels, registers, strings
 								if (word ~= ".bc") and (not nofix) then
 									if v.offsets then
 										if v.offsets[n-1] then
-											v.section:addFixup(nil, v.offsets[n-1][1], v.offsets[n-1][2], v.offsets[n-1][3])
+											v.section:addFixup(llsym, v.offsets[n-1][1], v.offsets[n-1][2], v.offsets[n-1][3])
 										else
 											lerror(v, "unrecoverable condition")
 											return false
 										end
 									elseif v.offset then
-										v.section:addFixup(nil, v.offset[1], v.offset[2], v.offset[3])
+										v.section:addFixup(llsym, v.offset[1], v.offset[2], v.offset[3])
 									else
 										lerror(v, "unrecoverable condition")
 										return false
@@ -639,8 +647,6 @@ function asm.decode(block) -- decode labels, registers, strings
 
 									if (sym.symtype == "local") or (sym.symtype == "global") then
 										if sym.section == v.section then
-											psym = nil
-
 											if e and e[3][n-1] < 0 then
 												psym = -1
 
@@ -790,25 +796,13 @@ function asm.binary(block, lex)
 	local section = block.sections["data"]
 
 	for k,v in ipairs(section.fixups) do
-		local symx = 0xFFFFFFFF
-
-		if v.sym then
-			symx = v.sym.index
-		end
-
-		section:addBinaryFixup(symx, v.value, v.size, v.divisor)
+		section:addBinaryFixup(v.sym.index, v.value, v.size, v.divisor)
 	end
 
 	section = block.sections["text"]
 
 	for k,v in ipairs(section.fixups) do
-		local symx = 0xFFFFFFFF
-
-		if v.sym then
-			symx = v.sym.index
-		end
-
-		section:addBinaryFixup(symx, v.value, v.size, v.divisor)
+		section:addBinaryFixup(v.sym.index, v.value, v.size, v.divisor)
 	end
 
 	while strtabsize % 4 ~= 0 do
@@ -958,7 +952,7 @@ function asm.binary(block, lex)
 		-- make header
 		local size = 72
 
-		local header = "FFOL"
+		local header = "2FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)
@@ -1103,6 +1097,8 @@ local function symtab(block)
 		sytab[name].symtype = symtype
 		sytab[name].value = value
 		sytab[name].count = count or 1
+
+		return sytab[name]
 	end
 
 	function sym:addConstant(name, value)

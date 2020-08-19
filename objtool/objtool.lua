@@ -144,10 +144,12 @@ elseif arg[1] == "symtab" then
 
 	local names = ""
 
+	local donesym = {}
+
 	for k,sym in ipairs(image.isym) do
 		local s = image.sections[1]
 
-		if (sym.symtype == 1) and (sym.section == 1) then
+		if (sym.symtype == 1) and (sym.section == 1) and (not donesym[sym.name]) then
 			symtab:write("\t.dl __SYMNAM"..tostring(k).."\n")
 			symtab:write("\t.dl "..tostring(sym.value + s.linkedAddress + textoff).."\n")
 
@@ -156,6 +158,8 @@ elseif arg[1] == "symtab" then
 			syms = syms + 1
 
 			symtab:write("\n")
+
+			donesym[sym.name] = true
 		end
 	end
 

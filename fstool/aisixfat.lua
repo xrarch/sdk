@@ -553,6 +553,8 @@ function fat.mount(image, offset, noroot)
 
 			node.write(dirent_s.size(), dirent, off)
 
+			node.permissions = 420
+
 			node.dirty = true
 
 			return ino

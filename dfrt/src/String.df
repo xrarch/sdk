@@ -150,14 +150,14 @@ fn strtok { str buf del -- next }
 	auto i
 	0 i!
 
+	while (str@ gb del@ ==)
+		1 str +=
+	end
+
 	if (str@ gb 0 ==)
 		0 buf@ sb
 		0 next!
 		return
-	end
-
-	while (str@ gb del@ ==)
-		1 str +=
 	end
 
 	while (str@ i@ + gb del@ ~=)
@@ -193,14 +193,14 @@ fn strntok { str buf del n -- next }
 	auto i
 	0 i!
 
+	while (str@ gb del@ ==)
+		1 str +=
+	end
+
 	if (str@ gb 0 ==)
 		0 buf@ sb
 		0 next!
 		return
-	end
-
-	while (str@ gb del@ ==)
-		1 str +=
 	end
 
 	while (str@ i@ + gb del@ ~=)

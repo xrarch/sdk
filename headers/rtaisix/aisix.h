@@ -40,6 +40,8 @@ extern PStat { stat path -- ok }
 
 extern FStat { stat fd -- ok }
 
+extern Chdir { path -- ok }
+
 struct Stat
 	4 Mode
 	4 UID

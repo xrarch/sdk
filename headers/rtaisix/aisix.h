@@ -14,6 +14,8 @@ extern Spawn { ... path -- pid }
 
 extern VSpawn { argcn argvt path -- pid }
 
+extern ASpawn { fd0 fd1 fd2 argcn argvt path -- pid }
+
 extern Exit { ret -- }
 
 extern FDup { fd1 -- fd2 }
@@ -53,6 +55,10 @@ struct Stat
 	4 CTime
 	32 Reserved
 endstruct
+
+const SEEK_SET 1
+const SEEK_CUR 2
+const SEEK_END 3
 
 const STDIN 0
 const STDOUT 1

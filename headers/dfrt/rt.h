@@ -12,7 +12,7 @@ extern reverse { str -- }
 
 extern memcpy { dest src size -- }
 
-extern memset { ptr size wot -- }
+extern memset { ptr size word -- }
 
 extern strcmp { str1 str2 -- equal? }
 

@@ -712,6 +712,8 @@ function fat.format(image, offset)
 	superblock.sv("datasize", img.blocks)
 	superblock.sv("volsize", img.blocks)
 
+	print("size: "..tostring(img.blocks * 4096))
+
 	print("writing superblock")
 	img:writeBlock(0, superblock_b)
 
@@ -719,6 +721,8 @@ function fat.format(image, offset)
 	for i = fatstart, fatstart+fatsize-1 do
 		img:writeBlock(i, {[0]=0})
 	end
+
+	print("fatsize: "..tostring(fatsize))
 
 	print("zeroing ilist")
 	for i = istart, istart+isize-1 do

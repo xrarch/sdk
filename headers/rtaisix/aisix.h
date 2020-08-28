@@ -44,6 +44,10 @@ extern FStat { stat fd -- ok }
 
 extern Chdir { path -- ok }
 
+extern UName { uname -- ok }
+
+extern Unlink { path -- ok }
+
 struct Stat
 	4 Mode
 	4 UID
@@ -54,6 +58,15 @@ struct Stat
 	4 MTime
 	4 CTime
 	32 Reserved
+endstruct
+
+struct UNameS
+	256 Sysname
+	256 Nodename
+	256 Release
+	256 Version
+	256 Machine
+	256 Processor
 endstruct
 
 const SEEK_SET 1

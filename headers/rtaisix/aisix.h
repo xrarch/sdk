@@ -54,6 +54,10 @@ extern Mkdir { path mode -- ok }
 
 extern UMask { umask -- old }
 
+extern Mount { flags dev dir type -- ok }
+
+extern UMount { path -- ok }
+
 struct Stat
 	4 Mode
 	4 UID

@@ -607,7 +607,7 @@ local optable = {
 		-- on &&, eval.lua should convert any non-zero immediate into an equivalence test with 0
 		if imm then error("internally inconsistent") end
 
-		local rd = getmutreg(rootcanmut, reg1, reg2)
+		local rd = getmutreg(rootcanmut)
 
 		if not rd then return false end
 

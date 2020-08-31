@@ -183,8 +183,12 @@ function fat.mount(image, offset, noroot)
 			iparent = parent.inum
 		else
 			uid = 0
-			permissions = 0
+			permissions = 493
 			iparent = 1 -- root inode, iparent is 1
+		end
+
+		if kind == "file" then
+			permissions = band(permissions, 438)
 		end
 
 		ino.kind = kind
@@ -552,8 +556,6 @@ function fat.mount(image, offset, noroot)
 			direns.sv("inum", ino.inum)
 
 			node.write(dirent_s.size(), dirent, off)
-
-			node.permissions = 420
 
 			node.dirty = true
 

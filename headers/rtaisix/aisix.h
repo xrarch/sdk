@@ -2,6 +2,8 @@ extern Main { ... -- ret }
 
 extern Abort { ... fmt -- }
 
+extern Create { path mode pbits -- fd }
+
 extern Open { path mode -- fd }
 
 extern Close { fd -- ok }
@@ -48,6 +50,10 @@ extern UName { uname -- ok }
 
 extern Unlink { path -- ok }
 
+extern Mkdir { path mode -- ok }
+
+extern UMask { umask -- old }
+
 struct Stat
 	4 Mode
 	4 UID
@@ -81,6 +87,8 @@ const O_READ 1
 const O_WRITE 2
 const O_RW (O_READ O_WRITE |)
 const O_TRUNC 4
+const O_CLOEXEC 8
+const O_CREATE 16
 
 const NP_INHERIT 0
 const NP_SPECIFY 1

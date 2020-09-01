@@ -58,6 +58,12 @@ extern Mount { flags dev dir type -- ok }
 
 extern UMount { path -- ok }
 
+extern Chown { path owner -- ok }
+
+extern Chmod { path mode -- ok }
+
+extern Sync { -- ok }
+
 struct Stat
 	4 Mode
 	4 UID
@@ -78,6 +84,9 @@ struct UNameS
 	256 Machine
 	256 Processor
 endstruct
+
+const FS_READONLY 1
+const FS_NOUID 2
 
 const SEEK_SET 1
 const SEEK_CUR 2

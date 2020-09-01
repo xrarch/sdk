@@ -102,6 +102,7 @@ const O_RW (O_READ O_WRITE |)
 const O_TRUNC 4
 const O_CLOEXEC 8
 const O_CREATE 16
+const O_APPEND 32
 
 const NP_INHERIT 0
 const NP_SPECIFY 1

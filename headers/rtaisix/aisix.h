@@ -66,6 +66,10 @@ extern Sync { -- ok }
 
 extern Seek { fd offset whence -- ok }
 
+extern GetCWD { buf -- ok }
+
+extern RealPath { path -- canon }
+
 struct Stat
 	4 Mode
 	4 UID

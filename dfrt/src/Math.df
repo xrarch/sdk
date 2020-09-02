@@ -19,3 +19,19 @@ end
 fn iserr { n -- err }
 	n@ 0 s< err!
 end
+
+fn addoverflow { n1 n2 -- overflow res }
+	n1@ n2@ + res!
+
+	0 overflow!
+
+	if (n1@ 0 s>=)
+		if (n2@ 0x7FFFFFFF n1@ - s>)
+			1 overflow!
+		end
+	end else
+		if (n2@ 0x80000000 n1@ - s<)
+			1 overflow!
+		end
+	end
+end

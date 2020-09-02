@@ -61,3 +61,5 @@ extern FPuts { fd s -- }
 extern Getc { -- c }
 
 extern iserr { v -- err }
+
+extern addoverflow { n1 n2 -- overflow res }

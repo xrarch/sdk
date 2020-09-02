@@ -64,6 +64,8 @@ extern Chmod { path mode -- ok }
 
 extern Sync { -- ok }
 
+extern Seek { fd offset whence -- ok }
+
 struct Stat
 	4 Mode
 	4 UID

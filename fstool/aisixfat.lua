@@ -184,7 +184,7 @@ function fat.mount(image, offset, noroot)
 		else
 			uid = 0
 			permissions = 493
-			iparent = 1 -- root inode, iparent is 1
+			iparent = 1 -- root inode, iparent is 1 (itself)
 		end
 
 		if kind == "file" then

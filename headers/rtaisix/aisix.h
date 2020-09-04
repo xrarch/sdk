@@ -68,6 +68,11 @@ extern Seek { fd offset whence -- ok }
 
 extern GetCWD { buf -- ok }
 
+extern Halt { haltmode -- ok }
+
+const HALT_SHUTDOWN 1
+const HALT_REBOOT 2
+
 extern RealPath { path -- canon }
 
 struct Stat

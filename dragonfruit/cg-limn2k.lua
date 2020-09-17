@@ -638,7 +638,7 @@ local optable = {
 
 		if not rs then return false end
 
-		if (tab.kind ~= "table") and (tab.kind ~= "externconst") then
+		if (tab.kind ~= "table") and (tab.kind ~= "externconst") and (tab.kind ~= "buffer") then
 			error("internally inconsistent")
 		end
 
@@ -1461,11 +1461,13 @@ function cg.gen(edefs, public, extern, asms, const)
 			bss(".align 4")
 			bss(v.name..":")
 			bss("\t.bytes "..v.value.." 0")
+			bss(".align 4")
 		elseif v.kind == "table" then
 			if v.value then
 				bss(".align 4")
 				bss(v.name..":")
 				bss("\t.bytes "..(v.value * 4).." 0")
+				bss(".align 4")
 			else
 				local strs = {}
 

@@ -1016,7 +1016,11 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 			end
 
 			if not sym then
-				lerror(v.errtok, tostring(v.name).." isn't a table")
+				sym = defined(v.name, "buffer")
+			end
+
+			if not sym then
+				lerror(v.errtok, tostring(v.name).." isn't a table or buffer")
 				return false
 			end
 

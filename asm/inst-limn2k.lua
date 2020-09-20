@@ -280,6 +280,7 @@ local regs = {
 	["cpuid"] = 42,
 	["badaddr"] = 43,
 	["tlbv"] = 44,
+	["asid"] = 45,
 
 	-- helpful dragonfruit ABI names
 

@@ -191,7 +191,8 @@ local inst = {
 
 	["rfe"]    = {4, 0x62, {}},
 	["hlt"]    = {4, 0x63, {}},
-
+	["wtlb"]   = {4, 0x64, {1, 1}},
+	["ftlb"]   = {4, 0x65, {1}},
 
 	["bt"]      = {4, 0x67, {-3}, function (n,o)
 		if n == 1 then o = o / 4 end
@@ -278,6 +279,7 @@ local regs = {
 	["timer"] = 41,
 	["cpuid"] = 42,
 	["badaddr"] = 43,
+	["tlbv"] = 44,
 
 	-- helpful dragonfruit ABI names
 

@@ -185,7 +185,13 @@ const	ESPIPE	29
 const	EROFS	30
 const	EMLINK	31
 const	EPIPE	32
-const	EFAULT	33
+const	EBADSYS	33
+const	EFAULT  34
+const	EMAPPED 35
+const	ENOVMEM 36
+const	ENMAPPED 37
+const	EBADS   38
+const   EMSEG   39
 
 const	-EPERM	-1
 const	-ENOENT	-2
@@ -219,5 +225,11 @@ const	-EROFS	-30
 const	-EMLINK	-31
 const	-EPIPE	-32
 const	-EBADSYS	-33
+const	-EFAULT -34
+const	-EMAPPED -35
+const   -ENOVMEM -36
+const	-ENMAPPED -37
+const	-EBADS -38
+const	-EMSEG -39
 
 externptr ErrorNames

@@ -265,7 +265,7 @@ elseif arg[1] == "move" then
 	local bssaddress = image.sections[3].linkedAddress
 
 	if arg[3] == "aisix" then
-		arg[3] = "text=0x00000000,data=0x40000000,bss=data+data_size"
+		arg[3] = "text=0x1000,data=0x40000000,bss=data+data_size+align"
 	end
 
 	local expr = explode(",", arg[3])
@@ -316,8 +316,9 @@ elseif arg[1] == "move" then
 			elseif v == "bss_offset" then
 				r = r + image.sections[3].offset
 			elseif v == "align" then
-				while r % 4096 ~= 0 do
-					r = r + 1
+				if (r % 4096) ~= 0 then
+					r = r + 4096
+					r = r - (r % 4096)
 				end
 			elseif tonumber(v) then
 				r = r + tonumber(v)

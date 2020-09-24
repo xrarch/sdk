@@ -70,6 +70,8 @@ extern GetCWD { buf -- ok }
 
 extern Halt { haltmode -- ok }
 
+extern MemInfo { -- memtotal memused heaptotal heapused }
+
 const HALT_SHUTDOWN 1
 const HALT_REBOOT 2
 

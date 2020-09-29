@@ -78,6 +78,12 @@ if arg[1] == "info" then
 	if image.entrySymbol then
 		print(string.format("entry point: %s @ $%X", image.entrySymbol.name, image.entrySymbol.value))
 	end
+
+	for i = 1, 3 do
+		local s = image.sections[i]
+
+		print(string.format("%s @ $%X", s.name, s.linkedAddress))
+	end
 elseif arg[1] == "symbols" then
 	if not arg[2] then
 		usage()

@@ -72,6 +72,16 @@ extern Halt { haltmode -- ok }
 
 extern MemInfo { -- memtotal memused heaptotal heapused }
 
+const SEG_WRITABLE 1
+
+extern AllocSegment { flags bytes -- sd }
+
+extern MapSegment { sd va must -- ok ava }
+
+extern CloseSegment { sd -- ok  }
+
+extern UnmapSegment { sd -- ok }
+
 const HALT_SHUTDOWN 1
 const HALT_REBOOT 2
 

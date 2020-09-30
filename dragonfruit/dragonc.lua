@@ -48,6 +48,7 @@ local incdir = {}
 
 local targets = {
 	["limn2k"] = "cg-limn2k.lua",
+	["riscv"] = "cg-riscv.lua",
 }
 
 local target = "limn2k"

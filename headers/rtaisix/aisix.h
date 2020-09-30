@@ -16,6 +16,8 @@ extern Spawn { ... path -- pid }
 
 extern VSpawn { argcn argvt path -- pid }
 
+extern SSpawn { ... fd0 fd1 fd2 path -- pid }
+
 extern ASpawn { fd0 fd1 fd2 argcn argvt path -- pid }
 
 extern Exit { ret -- }
@@ -81,6 +83,14 @@ extern MapSegment { sd va must -- ok ava }
 extern CloseSegment { sd -- ok  }
 
 extern UnmapSegment { sd -- ok }
+
+extern AISIXGetMode { -- mode }
+
+extern Time { -- sec ms }
+
+extern FChown { fd owner -- ok }
+
+extern FChmod { fd mode -- ok }
 
 const HALT_SHUTDOWN 1
 const HALT_REBOOT 2

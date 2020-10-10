@@ -66,6 +66,8 @@ extern Chmod { path mode -- ok }
 
 extern Sync { -- ok }
 
+extern IOFlush { -- }
+
 extern Seek { fd offset whence -- ok }
 
 extern GetCWD { buf -- ok }
@@ -80,7 +82,7 @@ extern AllocSegment { flags bytes -- sd }
 
 extern MapSegment { sd va must -- ok ava }
 
-extern CloseSegment { sd -- ok  }
+extern CloseSegment { sd -- ok }
 
 extern UnmapSegment { sd -- ok }
 

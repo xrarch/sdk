@@ -94,6 +94,10 @@ extern FChown { fd owner -- ok }
 
 extern FChmod { fd mode -- ok }
 
+extern ProcessInfo { stat pid -- ok }
+
+extern NextProcessInfo { stat oldindex -- newindex }
+
 const HALT_SHUTDOWN 1
 const HALT_REBOOT 2
 
@@ -118,6 +122,26 @@ struct UNameS
 	256 Version
 	256 Machine
 	256 Processor
+endstruct
+
+struct ProcessStat
+	4 Threads
+	4 UID
+	4 EUID
+
+	4 Zombie
+
+	4 PID
+
+	4 MTStatus
+	4 MTEvQ
+
+	32 TTYName
+
+	256 CWDPathString
+	64 Name
+
+	32 Reserved
 endstruct
 
 const FS_READONLY 1

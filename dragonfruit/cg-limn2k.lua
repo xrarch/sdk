@@ -343,7 +343,7 @@ local function r1r2i(r1, r2, mask, noncommutative, lomask)
 	return reg1, reg2, imm, unaligned
 end
 
-local function retone(block, mutreg, allowinverse)
+local function retone(block, mutreg, allowinverse, lockref)
 	local omutreg = curfn.mutreg
 	curfn.mutreg = nil
 
@@ -355,7 +355,7 @@ local function retone(block, mutreg, allowinverse)
 
 	curfn.mutreg = mutreg
 
-	local ro = cg.expr(ns, false, false, false, mutreg, allowinverse)
+	local ro = cg.expr(ns, false, false, false, mutreg, allowinverse, lockref)
 
 	curfn.mutreg = omutreg
 
@@ -683,13 +683,14 @@ local optable = {
 	end,
 }
 
-function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, allowinverse)
+function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, allowinverse, lockref)
 	if node.kind == "reg" then
 		return node
 	end
 
 	if node.evalr then
 		if not node.evalr.refs then
+			print(node.kind,node.op)
 			error("internally inconsistent")
 		end
 
@@ -880,10 +881,10 @@ local function mkmod(errtok, dest, src, mask, mnem, mnemi, noncommutative)
 	return true
 end
 
-local function conditional(cond, out)
+local function conditional(cond, out, inv, lockref)
 	local e = reg_t(nil, "tf", errtok)
 
-	local rs = retone(cond, e, true)
+	local rs = retone(cond, e, true, lockref)
 
 	if not rs then return false end
 
@@ -894,9 +895,17 @@ local function conditional(cond, out)
 	if rs.typ ~= "imm" then
 		if rs.inverse then
 			rs.inverse = nil
-			text("\tbt "..out)
+			if inv then
+				text("\tbf "..out)
+			else
+				text("\tbt "..out)
+			end
 		else
-			text("\tbf "..out)
+			if inv then
+				text("\tbt "..out)
+			else
+				text("\tbf "..out)
+			end
 		end
 	end
 
@@ -1148,11 +1157,22 @@ local muttable = {
 			flushincirco()
 		end
 
+		local simp = op.conditional.simple
+
+		local cont
+
+		if simp then
+			if not conditional(op.conditional, out) then return false end
+			cont = locallabel()
+		end
+
 		text(loop..":")
 
-		if not conditional(op.conditional, out) then return false end
+		if not simp then
+			if not conditional(op.conditional, out) then return false end
+		end
 
-		wcpushdown[#wcpushdown + 1] = loop
+		wcpushdown[#wcpushdown + 1] = cont or loop
 
 		wpushdown[#wpushdown + 1] = out
 
@@ -1162,7 +1182,12 @@ local muttable = {
 
 		wpushdown[#wpushdown] = nil
 
-		text("\tb "..loop)
+		if simp then
+			text(cont..":")
+			if not conditional(op.conditional, loop, true) then return false end
+		else
+			text("\tb "..loop)
+		end
 
 		text(out..":")
 

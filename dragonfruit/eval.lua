@@ -104,7 +104,9 @@ eval.immop = {
 
 		return
 	end,
-	["dup"] = function (s, tok)
+	["dup"] = function (s, tok, b)
+		b.simple = false
+
 		local op1 = s.pop(tok)
 		if not op1 then return false end
 
@@ -115,7 +117,9 @@ eval.immop = {
 
 		return
 	end,
-	["drop"] = function (s, tok)
+	["drop"] = function (s, tok, b)
+		b.simple = false
+
 		local op1 = s.pop(tok)
 		if not op1 then return false end
 
@@ -846,8 +850,10 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 
 	if curblock then
 		b.ixb = curblock.ixb or ixb
+		b.simple = curblock.simple or true
 	else
 		b.ixb = ixb
+		b.simple = true
 	end
 
 	ixb = b.ixb
@@ -882,7 +888,7 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 					return false
 				end
 
-				local r = immop[tok[1]](s, tok)
+				local r = immop[tok[1]](s, tok, b)
 
 				-- r can be nil, but it can't be false, which are not equivalent in lua
 				if r == false then return false end
@@ -905,6 +911,8 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 				elseif sym.kind == "auto" then
 					s.push(stacknode_t("auto", sym, tok))
 				elseif (sym.kind == "fn") or (sym.kind == "extern") or (sym.kind == "fnptr") then
+					b.simple = false
+
 					if ixb then
 						lerror(errtok, "can't call a function inside of an index block")
 						return false
@@ -1009,6 +1017,8 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 		elseif v.kind == "pointerof" then
 			s.push(stacknode_t("ptr", v.value, tok))
 		elseif v.kind == "index" then
+			b.simple = false
+
 			local sym = defined(v.name, "table")
 
 			if not sym then
@@ -1035,6 +1045,8 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 			lerror(errtok, "can't do a "..v.kind.." inside of an index block")
 			return false
 		elseif v.kind == "while" then
+			b.simple = false
+
 			local op = op_t(v.errtok, "while")
 
 			op.conditional = eval.blockeval(v.w.conditional, v.errtok, false, true)
@@ -1052,6 +1064,10 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 				-- the opposite optimization, for if the conditional is just 1,
 				-- is a burden of the backend
 			else
+				if (tos.kind == "num") then
+					op.conditional.simple = false
+				end
+
 				op.body = eval.blockeval(v.w.body, v.errtok, varin, varout)
 
 				if not op.body then return false end
@@ -1059,6 +1075,8 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 				b.ops[#b.ops + 1] = op
 			end
 		elseif v.kind == "if" then
+			b.simple = false
+
 			local op = op_t(v.errtok, "if")
 
 			op.ifs = {}

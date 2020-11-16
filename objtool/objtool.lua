@@ -198,7 +198,7 @@ elseif arg[1] == "fixups" then
 			local sym = v.symbol
 
 			if sym then
-				print(string.format("%s: %x ref %s: %s (@%x) (target type: %x/%x)", s.name, v.offset, (image.sections[sym.section] or {["name"]="extern"}).name, sym.name, sym.value, v.size, v.divisor))
+				print(string.format("%s: %x ref %s: %s (@%x) (target type: %x>>%x)", s.name, v.offset, (image.sections[sym.section] or {["name"]="extern"}).name, sym.name, sym.value, v.size, v.shift))
 			else
 				print(string.format("%s: %x relocation (target type: %x/%x)", s.name, v.offset, v.size, v.divisor))
 			end

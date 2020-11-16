@@ -254,7 +254,7 @@ function fat.mount(image, offset, noroot)
 		local function dir_allocent()
 			local off = 0
 
-			for i = 1, 1024 do -- 1024 is maxsearch
+			for i = 1, 2048 do -- 2048 is maxsearch
 				local direns, dirent = dir_getent(off, true)
 
 				if direns.gv("inum") == 0 then

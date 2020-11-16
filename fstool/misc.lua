@@ -9,11 +9,23 @@ function bnand(a,b)
 end
 
 function toInt32(byte4, byte3, byte2, byte1)
-    return (byte1*0x1000000) + (byte2*0x10000) + (byte3*0x100) + byte4
+    return lshift(byte1, 24) + lshift(byte2, 16) + lshift(byte3, 8) + byte4
 end
 
 function toInt16(byte2, byte1)
-    return (byte1*0x100) + byte2
+    return lshift(byte1, 8) + byte2
+end
+
+function splitInt32(n) 
+    return band(rshift(n, 24), 0xFF), band(rshift(n, 16), 0xFF), band(rshift(n, 8), 0xFF), band(n, 0xFF)
+end
+
+function splitInt16(n)
+    return band(rshift(n, 8), 0xFF), band(n, 0xFF)
+end
+
+function splitInt24(n) 
+    return band(rshift(n, 16), 0xFF), band(rshift(n, 8), 0xFF), band(n, 0xFF)
 end
 
 function strtok(str, del, off)
@@ -67,18 +79,6 @@ function tods(dat)
         out = out..string.char(v)
     end
     return out
-end
-
-function splitInt32(n) 
-    return (math.modf(n/16777216))%256, (math.modf(n/65536))%256, (math.modf(n/256))%256, n%256
-end
-
-function splitInt16(n)
-    return (math.modf(n/256))%256, n%256
-end
-
-function splitInt24(n) 
-    return (math.modf(n/65536))%256, (math.modf(n/256))%256, n%256
 end
 
 function struct(stuff)

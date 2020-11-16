@@ -206,20 +206,20 @@ local function section(block, id, bss)
 		return symtab:addSymbol(name, self, "local", off)
 	end
 
-	function me:addFixup(sym, off, size, divisor)
+	function me:addFixup(sym, off, size, shift)
 		if size < 0 then return end
 
 		self.fixups[#self.fixups + 1] = {}
 		self.fixups[#self.fixups].sym = sym
 		self.fixups[#self.fixups].value = off
 		self.fixups[#self.fixups].size = size
-		self.fixups[#self.fixups].divisor = (divisor or 1)
+		self.fixups[#self.fixups].shift = (shift or 0)
 	end
 
 	me.fixuptab = ""
 	me.fixupcount = 0
 
-	function me:addBinaryFixup(symindex, offset, size, divisor)
+	function me:addBinaryFixup(symindex, offset, size, shift)
 		local u1, u2, u3, u4 = splitInt32(symindex)
 		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
@@ -229,7 +229,7 @@ local function section(block, id, bss)
 		u1, u2, u3, u4 = splitInt32(size)
 		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-		u1, u2, u3, u4 = splitInt32(divisor)
+		u1, u2, u3, u4 = splitInt32(shift)
 		self.fixuptab = self.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 		self.fixupcount = self.fixupcount + 1
@@ -728,7 +728,7 @@ local fixup_s = struct({
 	{4, "symbolIndex"},
 	{4, "offset"},
 	{4, "size"},
-	{4, "divisor"},
+	{4, "shift"},
 })
 
 function asm.binary(block, lex)
@@ -796,13 +796,13 @@ function asm.binary(block, lex)
 	local section = block.sections["data"]
 
 	for k,v in ipairs(section.fixups) do
-		section:addBinaryFixup(v.sym.index, v.value, v.size, v.divisor)
+		section:addBinaryFixup(v.sym.index, v.value, v.size, v.shift)
 	end
 
 	section = block.sections["text"]
 
 	for k,v in ipairs(section.fixups) do
-		section:addBinaryFixup(v.sym.index, v.value, v.size, v.divisor)
+		section:addBinaryFixup(v.sym.index, v.value, v.size, v.shift)
 	end
 
 	while strtabsize % 4 ~= 0 do
@@ -952,7 +952,7 @@ function asm.binary(block, lex)
 		-- make header
 		local size = 72
 
-		local header = "2FOL"
+		local header = "3FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)

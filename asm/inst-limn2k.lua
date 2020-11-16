@@ -1,6 +1,6 @@
 --[[
 
-	{bytes, opcode, {operands (sizes in bytes)}, modifier func, divisor}
+	{bytes, opcode, {operands (sizes in bytes)}, modifier func, shift}
 
 ]]
 
@@ -33,11 +33,11 @@ local inst = {
 	["sio.i"] = {4, 0xE,  {1, 1, 1}, function (n,o)
 		if n == 2 then o = o / 2 end
 		return o
-	end, 2},
+	end},
 	["sio.l"] = {4, 0xF,  {1, 1, 1}, function (n,o)
 		if n == 2 then o = o / 4 end
 		return o
-	end, 4},
+	end},
 
 	["siio.b"] = {4, 0x10, {1, 1, 1}},
 	["siio.i"] = {4, 0x11, {1, 1, 1}, function (n,o)
@@ -57,7 +57,7 @@ local inst = {
 	["lui"]    = {4, 0x16, {1, 2}, function (n,o)
 		if n == 2 then o = (band(rshift(o, 16), 0xFFFF)) end
 		return o
-	end, 65536},
+	end, 16},
 
 	["swd.b"]  = {4, 0x17, {1, 1, 1}},
 	["swd.i"]  = {4, 0x18, {1, 1, 1}},
@@ -123,11 +123,11 @@ local inst = {
 	["j"]      = {4, 0x35, {3},  function (n,o)
 		if n == 1 then o = o / 4 end
 		return o
-	end, 4},
+	end, 2},
 	["jal"]    = {4, 0x36, {3},  function (n,o)
 		if n == 1 then o = o / 4 end
 		return o
-	end, 4},
+	end, 2},
 	["jalr"]   = {4, 0x37, {1}},
 
 	["jr"]     = {4, 0x38, {1}},

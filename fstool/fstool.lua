@@ -121,6 +121,24 @@ else
 			usage()
 			os.exit(1)
 		end
+	elseif cmd == "test" then
+		if arg[3] then
+			local node, errmsg = fs:path(arg[3], true)
+			if not node then
+				print("fstool: "..errmsg)
+				os.exit(1)
+			elseif node.kind ~= "dir" then
+				print("fstool: "..arg[3].." isn't a directory")
+				os.exit(1)
+			end
+
+			for i = 1, 1025 do
+				node.createchild("t"..tostring(i), "file")
+			end
+		else
+			usage()
+			os.exit(1)
+		end
 	elseif cmd == "r" then
 		if arg[3] then
 			local node, errmsg = fs:path(arg[3])

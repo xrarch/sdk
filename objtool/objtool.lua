@@ -42,6 +42,7 @@ local function usage()
   externs [loff]: dump unresolved external symbols
   move [loff] [move expression]: move a loff file in memory
   strip [loff]: strip linking information from loff file
+  lstrip [loff]: strip local symbol names
   binary (-nobss) [loff] [base address] (bss address): flatten a loff file, will expand BSS section in file unless address is provided
   link (-f) [output] [loff1 loff2 ... ]: link 2 or more loff files
   symtab [output] [loff] (text offset): generate a symbol table
@@ -105,7 +106,7 @@ elseif arg[1] == "symbols" then
 		local v = image.symbols[i]
 
 		if v then
-			print(string.format("%s %s = %s: $%X", symtypen[v.symtype], v.name, (image.sections[v.section] or {["name"]="extern"}).name, v.value))
+			print(string.format("%s %s = %s: $%X", symtypen[v.symtype], (v.name or "_"), (image.sections[v.section] or {["name"]="extern"}).name, v.value))
 			x = true
 		end
 	end
@@ -198,9 +199,7 @@ elseif arg[1] == "fixups" then
 			local sym = v.symbol
 
 			if sym then
-				print(string.format("%s: %x ref %s: %s (@%x) (target type: %x>>%x)", s.name, v.offset, (image.sections[sym.section] or {["name"]="extern"}).name, sym.name, sym.value, v.size, v.shift))
-			else
-				print(string.format("%s: %x relocation (target type: %x/%x)", s.name, v.offset, v.size, v.divisor))
+				print(string.format("%s: %x ref %s: %s (@%x) (target type: %d>>%d)", s.name, v.offset, (image.sections[sym.section] or {["name"]="extern"}).name, (sym.name or "_"), sym.value, v.size, v.shift))
 			end
 		end
 	end
@@ -220,6 +219,26 @@ elseif arg[1] == "strip" then
 	end
 
 	image.linkable = false
+
+	if not image:write() then
+		os.exit(1)
+	end
+elseif arg[1] == "lstrip" then
+	if not arg[2] then
+		usage()
+		os.exit(1)
+	end
+
+	local image = loff.new(arg[2])
+	if not image then
+		os.exit(1)
+	end
+
+	if not image:load() then
+		os.exit(1)
+	end
+
+	image.localSymNames = false
 
 	if not image:write() then
 		os.exit(1)

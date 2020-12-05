@@ -37,11 +37,28 @@ function lex.extractAll(src, filename, stream, spot)
 			error("dragonc: lexer: Windows/DOS line endings aren't supported.")
 		end
 
-		while ((com) and (o == "(")) do
-			if src:sub(cpt, cpt) == "*" then
+		while ((com) and ((o == "(") or (o == "/"))) do
+			if (o == "/") and (src:sub(cpt, cpt) == "/") then
 				cpt = cpt + 1
 
-				o = src:sub(cpt,cpt)
+				o = src:sub(cpt, cpt)
+
+				while true do
+					if o == "\n" then
+						line = line + 1
+					end
+
+					o = src:sub(cpt,cpt)
+					cpt = cpt + 1
+
+					if (o == "\n") or (not o) then
+						break
+					end
+				end
+			elseif (o == "(") and (src:sub(cpt, cpt) == "*") then
+				cpt = cpt + 1
+
+				o = src:sub(cpt, cpt)
 
 				while true do
 					if o == "*" then

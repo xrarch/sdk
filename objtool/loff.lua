@@ -9,6 +9,18 @@ local function getdirectory(p)
 end
 local sd = getdirectory(arg[0])
 
+local function getfilename(p)
+	local qp = 1
+
+	for i = 1, #p do
+		if p:sub(i,i) == "/" then
+			qp = i + 1
+		end
+	end
+
+	return p:sub(qp)
+end
+
 dofile(sd.."misc.lua")
 
 local loff = {}
@@ -33,10 +45,17 @@ local loffheader_s = struct({
 	{4, "targetArchitecture"},
 	{4, "entrySymbol"},
 	{4, "stripped"},
-	{28, "reserved"},
+	{4, "importTableOffset"},
+	{4, "importCount"},
+	{20, "reserved"},
 	{4, "textHeaderOffset"},
 	{4, "dataHeaderOffset"},
 	{4, "bssHeaderOffset"},
+})
+
+local import_s = struct({
+	{4, "name"},
+	{16, "reserved"},
 })
 
 local sectionheader_s = struct({
@@ -52,6 +71,7 @@ local symbol_s = struct({
 	{4, "section"},
 	{4, "type"},
 	{4, "value"},
+	{4, "importIndex"}
 })
 
 local fixup_s = struct({
@@ -65,10 +85,12 @@ local uint32_s = struct {
 	{4, "value"}
 }
 
-function loff.new(filename)
+function loff.new(filename, libname)
 	local iloff = {}
 
 	iloff.path = filename
+
+	iloff.libname = libname or getfilename(filename)
 
 	iloff.bin = {}
 
@@ -85,6 +107,8 @@ function loff.new(filename)
 	iloff.externs = {}
 
 	iloff.specials = {}
+
+	iloff.imports = {}
 
 	for i = 1, 3 do
 		iloff.sections[i] = {}
@@ -108,6 +132,7 @@ function loff.new(filename)
 	local LOFF1MAGIC = 0x4C4F4646
 	local LOFF2MAGIC = 0x4C4F4632
 	local LOFF3MAGIC = 0x4C4F4633
+	local LOFF4MAGIC = 0x4C4F4634
 
 	function iloff:load()
 		local file = io.open(self.path, "rb")
@@ -131,13 +156,13 @@ function loff.new(filename)
 
 		local magic = hdr.gv("magic")
 
-		if (magic == LOFF1MAGIC) or (magic == LOFF2MAGIC) then
+		if (magic == LOFF1MAGIC) or (magic == LOFF2MAGIC) or (magic == LOFF3MAGIC) then
 			print(string.format("objtool: '%s' is in an older LOFF format and needs to be rebuilt", self.path))
 			return false
 		elseif (magic == AIXOMAGIC) then
 			print(string.format("objtool: '%s' is in legacy AIXO format and needs to be rebuilt", self.path))
 			return false
-		elseif (magic == LOFF3MAGIC) then
+		elseif (magic == LOFF4MAGIC) then
 			-- goood
 		else
 			print(string.format("objtool: '%s' isn't a LOFF format image", self.path))
@@ -174,6 +199,19 @@ function loff.new(filename)
 
 		local ptr
 
+		local impcount = hdr.gv("importCount")
+		ptr = hdr.gv("importTableOffset")
+
+		for i = 1, impcount do
+			local imp = cast(import_s, self.bin, ptr)
+
+			local import = {}
+
+			import.name = getString(imp.gv("name"))
+
+			self.imports[i] = import
+		end
+
 		local symcount = hdr.gv("symbolCount")
 		ptr = hdr.gv("symbolTableOffset")
 
@@ -194,6 +232,8 @@ function loff.new(filename)
 				print(string.format("objtool: '%s': section # > 3", self.path))
 				return false
 			end
+
+			symt.importindex = sym.gv("importIndex")
 
 			local noff = sym.gv("nameOffset")
 
@@ -222,6 +262,17 @@ function loff.new(filename)
 					self.externs[name] = symt
 				elseif symt.symtype == 4 then
 					self.specials[name] = symt
+				end
+			end
+
+			if symt.symtype == 3 then
+				if symt.importindex ~= 0 then
+					symt.import = self.imports[symt.importindex]
+
+					if not symt.import then
+						print(string.format("objtool: '%s': non-existent import %d", self.path, symt.importindex))
+						return false
+					end
 				end
 			end
 
@@ -481,7 +532,7 @@ function loff.new(filename)
 		local symtab = ""
 		local symtabindex = 0
 
-		local function addSymbol(name, section, symtype, value)
+		local function addSymbol(name, section, symtype, value, import)
 			local off = symtabindex
 
 			local nameoff = 0xFFFFFFFF
@@ -504,6 +555,9 @@ function loff.new(filename)
 			u1, u2, u3, u4 = splitInt32(value)
 			symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
+			u1, u2, u3, u4 = splitInt32(import or 0)
+			symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
 			symtabindex = symtabindex + 1
 
 			return off
@@ -518,13 +572,13 @@ function loff.new(filename)
 				if sym and (not sym.resolved) then
 					if sym.symtype == 4 then
 						if not sp[sym.name] then
-							sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+							sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value, sym.importindex)
 							sp[sym.name] = sym.index
 						else
 							sym.index = sp[sym.name]
 						end
 					else
-						sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value)
+						sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value, sym.importindex)
 					end
 				end
 			end
@@ -535,7 +589,31 @@ function loff.new(filename)
 				es = es.resolved
 			end
 
-			es.index = addSymbol(es.name, es.section, es.symtype, es.value)
+			es.index = addSymbol(es.name, es.section, es.symtype, es.value, es.importindex)
+		end
+
+		local imptab = ""
+		local imptabindex = 0
+
+		local function addImport(name)
+			local nameoff = addString(name)
+
+			local u1, u2, u3, u4 = splitInt32(nameoff)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			for i = 0, 15 do -- reserved
+				imptab = imptab .. string.char(0)
+			end
+
+			imptabindex = imptabindex + 1
+		end
+
+		for i = 1, #self.imports do
+			local imp = self.imports[i]
+
+			if imp then
+				addImport(imp.name)
+			end
 		end
 
 		local function addFixup(section, symindex, offset, size, shift)
@@ -582,7 +660,7 @@ function loff.new(filename)
 		-- make header
 		local size = 72
 
-		local header = "3FOL"
+		local header = "4FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)
@@ -629,8 +707,17 @@ function loff.new(filename)
 		u1, u2, u3, u4 = splitInt32(stripped)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
+		-- importTableOffset
+		local u1, u2, u3, u4 = splitInt32(size)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+		size = size + (imptabindex * import_s.size())
+
+		-- importCount
+		u1, u2, u3, u4 = splitInt32(imptabindex)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
 		-- reserved
-		for i = 0, 27 do
+		for i = 0, 19 do
 			header = header .. string.char(0)
 		end
 
@@ -720,7 +807,7 @@ function loff.new(filename)
 		u1, u2, u3, u4 = splitInt32(bs.linkedAddress)
 		bssHeader = bssHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-		file:write(header .. symtab .. strtab .. textHeader .. dataHeader .. bssHeader)
+		file:write(header .. symtab .. strtab .. imptab .. textHeader .. dataHeader .. bssHeader)
 
 		for i = 1, 2 do
 			local s = self.sections[i]
@@ -783,7 +870,33 @@ function loff.new(filename)
 		return true
 	end
 
-	function iloff:link(with)
+	function iloff:import(with)
+		for i = 0, #self.imports do
+			if self.imports[i] then
+				if self.imports[i].name == with.libname then
+					return true
+				end
+			end
+		end
+
+		local import = {}
+
+		local impindex
+
+		import.name = with.libname
+
+		impindex = #self.imports + 1
+		self.imports[impindex] = import
+
+		for k,v in pairs(self.externs) do
+			if with.globals[k] then
+				v.import = import
+				v.importindex = impindex
+			end
+		end
+	end
+
+	function iloff:link(with, dynamic)
 		if not self.codeType then
 			self.codeType = with.codeType
 		end
@@ -797,83 +910,79 @@ function loff.new(filename)
 			print(string.format("objtool: warning: linking 2 object files of differing code types, %d and %d\n  %s\n  %s", self.codeType, with.codeType, self.path, with.path))
 		end
 
-		if self.entrySymbol and with.entrySymbol then
-			print(string.format("objtool: conflicting entry symbols: '%s' and '%s'", self.entrySymbol.name, with.entrySymbol.name))
-			return false
-		elseif not self.entrySymbol then
-			self.entrySymbol = with.entrySymbol
-		end
+		if not dynamic then
+			if self.entrySymbol and with.entrySymbol then
+				print(string.format("objtool: conflicting entry symbols: '%s' and '%s'", self.entrySymbol.name, with.entrySymbol.name))
+				return false
+			elseif not self.entrySymbol then
+				self.entrySymbol = with.entrySymbol
+			end
 
-		for k,v in pairs(with.externs) do
-			if self.externs[k] then
-				v.exclude = true
+			for k,v in pairs(with.externs) do
+				if self.externs[k] then
+					v.exclude = true
 
-				for i = 1, 2 do
-					for k2,v2 in ipairs(with.sections[i].fixups) do
-						if v2.symbol == v then
-							v2.symbol = self.externs[k]
+					for i = 1, 2 do
+						for k2,v2 in ipairs(with.sections[i].fixups) do
+							if v2.symbol == v then
+								v2.symbol = self.externs[k]
+							end
 						end
 					end
+				else
+					self.externs[k] = v
 				end
-			else
-				self.externs[k] = v
-			end
 
-			if self.globals[k] then
-				v.resolved = self.globals[k]
-				v.section = 0
-
-				self.externs[k] = nil
-			end
-		end
-
-		for k,v in pairs(with.globals) do
-			if self.globals[k] then
-				local ms = self.globals[k]
-				print(string.format("objtool: symbol conflict: '%s' is defined in both:\n %s\n %s", v.name, ms.file, v.file))
-				return false
-			else
-				self.globals[k] = v
-
-				if self.externs[k] then
-					local e = self.externs[k]
-
-					e.resolved = v
-					e.section = 0
+				if self.globals[k] then
+					v.resolved = self.globals[k]
+					v.section = 0
 
 					self.externs[k] = nil
 				end
 			end
-		end
 
-		for k,v in pairs(with.specials) do
-			with.specials[k].resolved = self.specials[k]
-		end
-
-		for i = 0, #with.symbols do
-			local sym = with.symbols[i]
-
-			if sym and (not sym.exclude) then
-				if not self.symbols[0] then
-					if sym.resolved then
-						self.symbols[0] = sym.resolved
-					else
-						self.symbols[0] = sym
-					end
+			for k,v in pairs(with.globals) do
+				if self.globals[k] then
+					local ms = self.globals[k]
+					print(string.format("objtool: symbol conflict: '%s' is defined in both:\n %s\n %s", v.name, ms.file, v.file))
+					return false
 				else
-					if sym.resolved then
-						self.symbols[#self.symbols + 1] = sym.resolved
-					else
-						self.symbols[#self.symbols + 1] = sym
+					self.globals[k] = v
+
+					if self.externs[k] then
+						local e = self.externs[k]
+
+						e.resolved = v
+						e.section = 0
+
+						self.externs[k] = nil
 					end
 				end
 			end
-		end
 
-		for i = 1, 3 do
-			if not self:mergeSection(with, i) then
-				return false
+			for k,v in pairs(with.specials) do
+				with.specials[k].resolved = self.specials[k]
 			end
+
+			for i = 0, #with.symbols do
+				local sym = with.symbols[i]
+
+				if sym and (not sym.exclude) then
+					if not self.symbols[0] then
+						self.symbols[0] = sym.resolved or sym
+					else
+						self.symbols[#self.symbols + 1] = sym.resolved or sym
+					end
+				end
+			end
+
+			for i = 1, 3 do
+				if not self:mergeSection(with, i) then
+					return false
+				end
+			end
+		else
+			self:import(with)
 		end
 
 		return true

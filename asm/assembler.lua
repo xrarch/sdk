@@ -722,6 +722,7 @@ local symbol_s = struct({
 	{4, "section"},
 	{4, "type"},
 	{4, "value"},
+	{4, "importIndex"}
 })
 
 local fixup_s = struct({
@@ -767,6 +768,8 @@ function asm.binary(block, lex)
 
 		u1, u2, u3, u4 = splitInt32(value)
 		symtab = symtab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		symtab = symtab .. string.char(0) .. string.char(0) .. string.char(0) .. string.char(0)
 
 		symtabindex = symtabindex + 1
 
@@ -952,7 +955,7 @@ function asm.binary(block, lex)
 		-- make header
 		local size = 72
 
-		local header = "3FOL"
+		local header = "4FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)

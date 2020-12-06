@@ -40,6 +40,7 @@ local function usage()
   symbols [loff]: dump symbols
   fixups [loff]: dump fixup table
   externs [loff]: dump unresolved external symbols
+  imports [loff]: dump imported DLLs
   move [loff] [move expression]: move a loff file in memory
   strip [loff]: strip linking information from loff file
   lstrip [loff]: strip local symbol names
@@ -262,8 +263,32 @@ elseif arg[1] == "externs" then
 		local v = image.symbols[i]
 
 		if v and v.symtype == 3 then
-			print(string.format("%s", v.name))
+			if v.import then
+				print(string.format("%s -> %s", v.name, v.import.name))
+			else
+				print(string.format("%s", v.name))
+			end
 		end
+	end
+elseif arg[1] == "imports" then
+	if not arg[2] then
+		usage()
+		os.exit(1)
+	end
+
+	local image = loff.new(arg[2])
+	if not image then
+		os.exit(1)
+	end
+
+	if not image:load() then
+		os.exit(1)
+	end
+
+	for i = 1, #image.imports do
+		local v = image.imports[i]
+
+		print(string.format("%d: %s", i, v.name))
 	end
 elseif arg[1] == "move" then
 	if not arg[2] then
@@ -408,29 +433,37 @@ elseif arg[1] == "link" then
 
 	out.linkable = true
 
+	local dy = false
+
 	for i = 3, #arg do
 		local imgname = arg[i]
 
-		if linked[arg[i]] then
-			print("objtool: warning: ignoring duplicate object "..arg[i])
+		if imgname == "-d" then
+			dy = true
+		elseif imgname == "-s" then
+			dy = false
 		else
-			linked[arg[i]] = true
+			if linked[arg[i]] then
+				print("objtool: warning: ignoring duplicate object "..arg[i])
+			else
+				linked[arg[i]] = true
 
-			if imgname:sub(1,2) == "L/" then
-				imgname = sd.."../lib/"..imgname:sub(3)
-			end
+				if imgname:sub(1,2) == "L/" then
+					imgname = sd.."../lib/"..imgname:sub(3)
+				end
 
-			local image = loff.new(imgname)
-			if not image then
-				os.exit(1)
-			end
+				local image = loff.new(imgname)
+				if not image then
+					os.exit(1)
+				end
 
-			if not image:load() then
-				os.exit(1)
-			end
+				if not image:load() then
+					os.exit(1)
+				end
 
-			if not out:link(image) then
-				os.exit(1)
+				if not out:link(image, dy) then
+					os.exit(1)
+				end
 			end
 		end
 	end
@@ -441,7 +474,7 @@ elseif arg[1] == "link" then
 		for i = 0, #out.symbols do
 			local sym = out.symbols[i]
 
-			if sym and (not sym.resolved) then
+			if sym and (not sym.resolved) and (not sym.import) then
 				if sym.symtype == 3 then
 					unr[#unr + 1] = sym
 				end

@@ -20,6 +20,7 @@ local function usage()
 	print([[commands:
   f: format
   i: dump superblock info
+  wd [dest] [src]: write files to directory dest as specified in file src
   w [dest] [src]: write file from src to dest
   r [path]: read contents of file at path
   ls [path]: list contents of directory at path
@@ -49,6 +50,38 @@ if #arg < 2 then
 end
 
 local cmd = arg[2]
+
+local function writefile(fs, destpath, srcpath)
+	local node, errmsg = fs:path(destpath, true)
+	if not node then
+		print("fstool: "..errmsg)
+		os.exit(1)
+	elseif node.kind == "dir" then
+		print("fstool: "..arg[3].." is a directory")
+		os.exit(1)
+	end
+
+	local inf = io.open(srcpath, "rb")
+	if not inf then
+		print("fstool: couldn't open "..srcpath)
+		os.exit(1)
+	else
+		node.trunc()
+
+		local tab = {}
+
+		local s = inf:read("*a")
+
+		for i = 1, #s do
+			tab[i-1] = string.byte(s:sub(i,i))
+		end
+
+		if node.write(#s, tab, 0) < 0 then
+			print("fstool: couldn't write "..node.name)
+			os.exit(1)
+		end
+	end
+end
 
 if cmd == "f" then -- format
 	fat.format(dimg, offset)
@@ -89,33 +122,32 @@ else
 		end
 	elseif cmd == "w" then
 		if arg[3] and arg[4] then
-			local node, errmsg = fs:path(arg[3], true)
-			if not node then
-				print("fstool: "..errmsg)
-				os.exit(1)
-			elseif node.kind == "dir" then
-				print("fstool: "..arg[3].." is a directory")
-				os.exit(1)
-			end
+			writefile(fs, arg[3], arg[4])
+		else
+			usage()
+			os.exit(1)
+		end
+	elseif cmd == "wd" then
+		if arg[3] and arg[4] then
+			local inf = io.open(arg[4], "r")
 
-			local inf = io.open(arg[4], "rb")
 			if not inf then
 				print("fstool: couldn't open "..arg[4])
 				os.exit(1)
-			else
-				node.trunc()
+			end
 
-				local tab = {}
+			local line = inf:read("*l")
 
-				local s = inf:read("*a")
+			while line do
+				if (#line > 0) and (line:sub(1,1) ~= "#") then
+					local comp = explode(" ", line)
 
-				for i = 1, #s do
-					tab[i-1] = string.byte(s:sub(i,i))
+					if #comp == 2 then
+						writefile(fs, arg[3].."/"..comp[1], comp[2])
+					end
 				end
 
-				if node.write(#s, tab, 0) < 0 then
-					print("fstool: couldn't write "..node.name)
-				end
+				line = inf:read("*l")
 			end
 		else
 			usage()

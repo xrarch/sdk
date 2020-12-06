@@ -42,7 +42,7 @@ local function usage()
   externs [loff]: dump unresolved external symbols
   imports [loff]: dump imported DLLs
   move [loff] [move expression]: move a loff file in memory
-  strip [loff]: strip linking information from loff file
+  strip [loff]: strip all linking information from loff file
   lstrip [loff]: strip local symbol names
   binary (-nobss) [loff] [base address] (bss address): flatten a loff file, will expand BSS section in file unless address is provided
   link (-f) [output] [loff1 loff2 ... ]: link 2 or more loff files
@@ -448,11 +448,20 @@ elseif arg[1] == "link" then
 			else
 				linked[arg[i]] = true
 
+				local comp = explode(imgname, ":")
+
+				local libname
+
+				if comp[2] then
+					libname = comp[1]
+					imgname = comp[2]
+				end
+
 				if imgname:sub(1,2) == "L/" then
 					imgname = sd.."../lib/"..imgname:sub(3)
 				end
 
-				local image = loff.new(imgname)
+				local image = loff.new(imgname, libname)
 				if not image then
 					os.exit(1)
 				end

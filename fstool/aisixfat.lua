@@ -492,6 +492,14 @@ function fat.mount(image, offset, noroot)
 				error("oh no im not a directory u cant do that")
 			end
 
+			if name == "." then
+				return node
+			end
+
+			if name == ".." then
+				return iget(node.iparent)
+			end
+
 			local off = 0
 
 			while off < node.size do

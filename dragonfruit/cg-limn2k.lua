@@ -79,7 +79,13 @@ local function locallabel()
 	return s
 end
 
+local strings = {}
+
 local function cstring(str, n)
+	if (not n) and strings[str] then
+		return strings[str]
+	end
+
 	local sno = n or label()
 
 	data(sno..":")
@@ -97,6 +103,8 @@ local function cstring(str, n)
 	end
 	data("")
 	data("\t.db 0x0")
+
+	strings[str] = sno
 
 	return sno
 end

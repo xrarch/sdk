@@ -210,6 +210,8 @@ function loff.new(filename, libname)
 			import.name = getString(imp.gv("name"))
 
 			self.imports[i] = import
+
+			ptr = ptr + import_s.size()
 		end
 
 		local symcount = hdr.gv("symbolCount")

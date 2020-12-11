@@ -448,7 +448,7 @@ elseif arg[1] == "link" then
 			else
 				linked[arg[i]] = true
 
-				local comp = explode(imgname, ":")
+				local comp = explode(":", imgname)
 
 				local libname
 

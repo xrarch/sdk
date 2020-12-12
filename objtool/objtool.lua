@@ -288,7 +288,7 @@ elseif arg[1] == "imports" then
 	for i = 1, #image.imports do
 		local v = image.imports[i]
 
-		print(string.format("%d: %s", i, v.name))
+		print(string.format("%d: %s ($%x, $%x, $%x)", i, v.name, v.expectedText, v.expectedData, v.expectedBSS))
 	end
 elseif arg[1] == "move" then
 	if not arg[2] then
@@ -426,7 +426,7 @@ elseif arg[1] == "link" then
 
 	local linked = {}
 
-	local out = loff.new(arg[2])
+	local out = loff.new(arg[2], nil, fragment)
 	if not out then
 		os.exit(1)
 	end

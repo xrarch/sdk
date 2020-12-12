@@ -47,7 +47,9 @@ local loffheader_s = struct({
 	{4, "stripped"},
 	{4, "importTableOffset"},
 	{4, "importCount"},
-	{20, "reserved"},
+	{4, "headerSize"},
+	{4, "fragment"},
+	{12, "reserved"},
 	{4, "textHeaderOffset"},
 	{4, "dataHeaderOffset"},
 	{4, "bssHeaderOffset"},
@@ -55,7 +57,10 @@ local loffheader_s = struct({
 
 local import_s = struct({
 	{4, "name"},
-	{16, "reserved"},
+	{4, "expectedText"},
+	{4, "expectedData"},
+	{4, "expectedBSS"},
+	{4, "reserved"},
 })
 
 local sectionheader_s = struct({
@@ -85,8 +90,14 @@ local uint32_s = struct {
 	{4, "value"}
 }
 
-function loff.new(filename, libname)
+function loff.new(filename, libname, fragment)
 	local iloff = {}
+
+	if fragment then
+		iloff.fragment = 1
+	else
+		iloff.fragment = 0
+	end
 
 	iloff.path = filename
 
@@ -183,6 +194,8 @@ function loff.new(filename, libname)
 			self.linkable = true
 		end
 
+		self.fragment = self.header.gv("fragment")
+
 		local function getString(offset)
 			local off = self.header.gv("stringTableOffset") + offset
 
@@ -208,6 +221,10 @@ function loff.new(filename, libname)
 			local import = {}
 
 			import.name = getString(imp.gv("name"))
+
+			import.expectedText = imp.gv("expectedText")
+			import.expectedData = imp.gv("expectedData")
+			import.expectedBSS = imp.gv("expectedBSS")
 
 			self.imports[i] = import
 
@@ -597,13 +614,22 @@ function loff.new(filename, libname)
 		local imptab = ""
 		local imptabindex = 0
 
-		local function addImport(name)
+		local function addImport(name, expectedText, expectedData, expectedBSS)
 			local nameoff = addString(name)
 
 			local u1, u2, u3, u4 = splitInt32(nameoff)
 			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-			for i = 0, 15 do -- reserved
+			u1, u2, u3, u4 = splitInt32(expectedText)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			u1, u2, u3, u4 = splitInt32(expectedData)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			u1, u2, u3, u4 = splitInt32(expectedBSS)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+			for i = 0, 3 do -- reserved
 				imptab = imptab .. string.char(0)
 			end
 
@@ -614,7 +640,7 @@ function loff.new(filename, libname)
 			local imp = self.imports[i]
 
 			if imp then
-				addImport(imp.name)
+				addImport(imp.name, imp.expectedText, imp.expectedData, imp.expectedBSS)
 			end
 		end
 
@@ -718,8 +744,14 @@ function loff.new(filename, libname)
 		u1, u2, u3, u4 = splitInt32(imptabindex)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
+		u1, u2, u3, u4 = splitInt32(0)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
+		u1, u2, u3, u4 = splitInt32(self.fragment)
+		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
+
 		-- reserved
-		for i = 0, 19 do
+		for i = 0, 11 do
 			header = header .. string.char(0)
 		end
 
@@ -886,14 +918,36 @@ function loff.new(filename, libname)
 		local impindex
 
 		import.name = with.libname
+		import.expectedText = with.sections[1].linkedAddress
+		import.expectedData = with.sections[2].linkedAddress
+		import.expectedBSS = with.sections[3].linkedAddress
 
 		impindex = #self.imports + 1
 		self.imports[impindex] = import
 
 		for k,v in pairs(self.externs) do
-			if with.globals[k] then
+			local wsym = with.globals[k]
+
+			if wsym then
 				v.import = import
 				v.importindex = impindex
+				v.dq = wsym
+			end
+		end
+
+		for _,mysection in pairs(self.sections) do
+			for k,v in ipairs(mysection.fixups) do
+				local sym = v.symbol
+
+				if sym and sym.dq and (sym.symtype ~= 4) then
+					if v.size <= 8 then
+						local type_s = struct({{v.size, "value"}})
+						local addrs = cast(type_s, mysection.contents, v.offset)
+						addrs.sv("value", rshift(sym.dq.value+sym.dq.sectiont.linkedAddress, v.shift))
+					else
+						--print("didnt resolve")
+					end
+				end
 			end
 		end
 	end

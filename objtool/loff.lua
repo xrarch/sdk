@@ -47,9 +47,9 @@ local loffheader_s = struct({
 	{4, "stripped"},
 	{4, "importTableOffset"},
 	{4, "importCount"},
-	{4, "headerSize"},
+	{4, "reserved1"},
 	{4, "fragment"},
-	{12, "reserved"},
+	{12, "reserved2"},
 	{4, "textHeaderOffset"},
 	{4, "dataHeaderOffset"},
 	{4, "bssHeaderOffset"},
@@ -744,15 +744,25 @@ function loff.new(filename, libname, fragment)
 		u1, u2, u3, u4 = splitInt32(imptabindex)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
+		-- reserved
 		u1, u2, u3, u4 = splitInt32(0)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
+		-- fragment
 		u1, u2, u3, u4 = splitInt32(self.fragment)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 		-- reserved
 		for i = 0, 11 do
 			header = header .. string.char(0)
+		end
+
+		for i = 1, 2 do
+			local s = self.sections[i]
+
+			s.fixupoffset = size
+
+			size = size + (s.fixupcount * fixup_s.size())
 		end
 
 		local ts = self.sections[1]
@@ -777,9 +787,8 @@ function loff.new(filename, libname, fragment)
 		local textHeader = ""
 
 		-- fixupTableOffset
-		u1, u2, u3, u4 = splitInt32(size)
+		u1, u2, u3, u4 = splitInt32(ts.fixupoffset)
 		textHeader = textHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		size = size + (ts.fixupcount * fixup_s.size())
 
 		-- fixupCount
 		u1, u2, u3, u4 = splitInt32(ts.fixupcount)
@@ -801,9 +810,8 @@ function loff.new(filename, libname, fragment)
 		local dataHeader = ""
 
 		-- fixupTableOffset
-		u1, u2, u3, u4 = splitInt32(size)
+		u1, u2, u3, u4 = splitInt32(ds.fixupoffset)
 		dataHeader = dataHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		size = size + (ds.fixupcount * fixup_s.size())
 
 		-- fixupCount
 		u1, u2, u3, u4 = splitInt32(ds.fixupcount)
@@ -841,12 +849,18 @@ function loff.new(filename, libname, fragment)
 		u1, u2, u3, u4 = splitInt32(bs.linkedAddress)
 		bssHeader = bssHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-		file:write(header .. symtab .. strtab .. imptab .. textHeader .. dataHeader .. bssHeader)
+		file:write(header .. symtab .. strtab .. imptab)
 
 		for i = 1, 2 do
 			local s = self.sections[i]
 
 			file:write(s.fixuptab)
+		end
+
+		file:write(textHeader .. dataHeader .. bssHeader)
+
+		for i = 1, 2 do
+			local s = self.sections[i]
 
 			for b = 0, s.size - 1 do
 				file:write(string.char(s.contents[b]))

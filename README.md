@@ -12,6 +12,6 @@ Then the following scripts can be used as follows:
 
 `./sdk/asm.sh [source file] [output binary]`
 
-`./sdk/fsutil.sh [disk image] [command] ...`
+`./sdk/fstool.sh [disk image] [command] ...`
 
 `./sdk/link.sh [command] [...]`

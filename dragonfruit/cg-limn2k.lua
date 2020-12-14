@@ -122,6 +122,8 @@ local function reg_t(id, typ, errtok, auto, muted)
 		r.n = "v"..tostring(id)
 	elseif typ == "tf" then
 		r.n = "tf"
+	elseif typ == "sp" then
+		r.n = "sp"
 	end
 
 	r.id = id
@@ -638,6 +640,12 @@ local optable = {
 		return op.reg
 	end,
 
+	["alloc"] = function (errtok, op, rootcanmut)
+		local offset = op.opers[1]
+
+		return genarith(errtok, curfn.allocoff, offset, rootcanmut, 0xFF, "add", "addi")
+	end,
+
 	["index"] = function (errtok, op, rootcanmut)
 		local exprb = op.opers[2]
 		local tab = op.opers[1]
@@ -692,6 +700,8 @@ local optable = {
 }
 
 function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, allowinverse, lockref)
+	-- print(node)
+
 	if node.kind == "reg" then
 		return node
 	end
@@ -1330,6 +1340,14 @@ function cg.func(func)
 		end
 	end
 
+	if func.allocated > 0 then
+		func.allocoff = ralloc(func.errtok, true, true)
+
+		if not func.allocoff then
+			return false
+		end
+	end
+
 	for i = 1, #func.isymb do
 		local s = func.isymb[i]
 
@@ -1351,6 +1369,12 @@ function cg.func(func)
 	local fntext = textsection
 	textsection = otext
 
+	if func.allocated > 0xFFFF then
+		lerror(func.errtok, "stack alloc exceeded 64KB")
+
+		return false
+	end
+
 	-- generate prologue
 	local frametop = savareaoff + (func.savedn * 4)
 
@@ -1360,6 +1384,10 @@ function cg.func(func)
 		-- because i'm inexperienced at writing code generators
 		return false
 	end
+
+	func.allocstart = frametop
+
+	frametop = frametop + func.allocated
 
 	text(func.name..":")
 	if func.public then
@@ -1410,6 +1438,10 @@ function cg.func(func)
 
 	if func.varin then
 		text("\taddi "..func.argvoff.n..", t0, "..(reached or 8))
+	end
+
+	if func.allocated > 0 then
+		text("\taddi "..func.allocoff.n..", sp, "..func.allocstart)
 	end
 
 	-- append fn text

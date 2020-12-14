@@ -814,6 +814,19 @@ eval.immop = {
 
 		s.push(stacknode_t("op", nil, tok, "bitclear", op2, op1))
 	end,
+	["alloc"] = function (s, tok) -- (size -- ptr)
+		local size = s.pop(tok)
+		if not size then return false end
+
+		if size.kind ~= "num" then
+			lerror(tok, "can only allocate a static number of bytes on the stack")
+			return false
+		end
+
+		s.push(stacknode_t("op", nil, tok, "alloc", stacknode_t("num", currentfn.allocated, tok)))
+
+		currentfn.allocated = currentfn.allocated + size.ident
+	end,
 }
 local immop = eval.immop
 
@@ -1265,6 +1278,8 @@ function eval.eval(symdeftab, public, extern, asms)
 			fn.public = v.value.public
 
 			fn.calls = {}
+
+			fn.allocated = 0
 
 			currentfn = fn
 

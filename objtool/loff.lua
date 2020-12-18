@@ -47,7 +47,7 @@ local loffheader_s = struct({
 	{4, "stripped"},
 	{4, "importTableOffset"},
 	{4, "importCount"},
-	{4, "reserved1"},
+	{4, "timestamp"},
 	{4, "fragment"},
 	{12, "reserved2"},
 	{4, "textHeaderOffset"},
@@ -60,7 +60,7 @@ local import_s = struct({
 	{4, "expectedText"},
 	{4, "expectedData"},
 	{4, "expectedBSS"},
-	{4, "reserved"},
+	{4, "timestamp"},
 })
 
 local sectionheader_s = struct({
@@ -121,6 +121,8 @@ function loff.new(filename, libname, fragment)
 
 	iloff.imports = {}
 
+	iloff.isym = {}
+
 	for i = 1, 3 do
 		iloff.sections[i] = {}
 		local s = iloff.sections[i]
@@ -144,6 +146,23 @@ function loff.new(filename, libname, fragment)
 	local LOFF2MAGIC = 0x4C4F4632
 	local LOFF3MAGIC = 0x4C4F4633
 	local LOFF4MAGIC = 0x4C4F4634
+
+	local sortedsym
+
+	local function sortsyms(s1,s2)
+		if s1.section == 0 then return false end
+		if s2.section == 0 then return false end
+
+		return (s1.value + s1.sectiont.linkedAddress) < (s2.value + s2.sectiont.linkedAddress)
+	end
+
+	function iloff:iSymSort()
+		if not sortedsym then
+			table.sort(self.isym, sortsyms)
+
+			sortedsym = true
+		end
+	end
 
 	function iloff:load()
 		local file = io.open(self.path, "rb")
@@ -186,6 +205,8 @@ function loff.new(filename, libname, fragment)
 
 		self.localSymNames = false
 
+		self.timestamp = self.header.gv("timestamp")
+
 		local stripped = self.header.gv("stripped")
 
 		if stripped == 1 then
@@ -225,6 +246,7 @@ function loff.new(filename, libname, fragment)
 			import.expectedText = imp.gv("expectedText")
 			import.expectedData = imp.gv("expectedData")
 			import.expectedBSS = imp.gv("expectedBSS")
+			import.timestamp = imp.gv("timestamp")
 
 			self.imports[i] = import
 
@@ -233,8 +255,6 @@ function loff.new(filename, libname, fragment)
 
 		local symcount = hdr.gv("symbolCount")
 		ptr = hdr.gv("symbolTableOffset")
-
-		self.isym = {}
 
 		for i = 1, symcount do
 			local sym = cast(symbol_s, self.bin, ptr)
@@ -477,23 +497,6 @@ function loff.new(filename, libname, fragment)
 			return true
 		end
 
-		local sortedsym
-
-		local function sortsyms(s1,s2)
-			if s1.section == 0 then return false end
-			if s2.section == 0 then return false end
-
-			return (s1.value + s1.sectiont.linkedAddress) < (s2.value + s2.sectiont.linkedAddress)
-		end
-
-		function self:iSymSort()
-			if not sortedsym then
-				table.sort(self.isym, sortsyms)
-
-				sortedsym = true
-			end
-		end
-
 		function self:getSym(address)
 			self:iSymSort()
 
@@ -585,8 +588,10 @@ function loff.new(filename, libname, fragment)
 		if self.linkable then
 			local sp = {}
 
-			for i = 0, #self.symbols do
-				local sym = self.symbols[i]
+			self:iSymSort()
+
+			for i = 1, #self.isym do
+				local sym = self.isym[i]
 
 				if sym and (not sym.resolved) then
 					if sym.symtype == 4 then
@@ -598,6 +603,7 @@ function loff.new(filename, libname, fragment)
 						end
 					else
 						sym.index = addSymbol(sym.name, sym.section, sym.symtype, sym.value, sym.importindex)
+						--print(sym.name)
 					end
 				end
 			end
@@ -614,7 +620,7 @@ function loff.new(filename, libname, fragment)
 		local imptab = ""
 		local imptabindex = 0
 
-		local function addImport(name, expectedText, expectedData, expectedBSS)
+		local function addImport(name, expectedText, expectedData, expectedBSS, timestamp)
 			local nameoff = addString(name)
 
 			local u1, u2, u3, u4 = splitInt32(nameoff)
@@ -629,9 +635,8 @@ function loff.new(filename, libname, fragment)
 			u1, u2, u3, u4 = splitInt32(expectedBSS)
 			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-			for i = 0, 3 do -- reserved
-				imptab = imptab .. string.char(0)
-			end
+			u1, u2, u3, u4 = splitInt32(timestamp)
+			imptab = imptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 			imptabindex = imptabindex + 1
 		end
@@ -640,7 +645,7 @@ function loff.new(filename, libname, fragment)
 			local imp = self.imports[i]
 
 			if imp then
-				addImport(imp.name, imp.expectedText, imp.expectedData, imp.expectedBSS)
+				addImport(imp.name, imp.expectedText, imp.expectedData, imp.expectedBSS, imp.timestamp)
 			end
 		end
 
@@ -744,8 +749,8 @@ function loff.new(filename, libname, fragment)
 		u1, u2, u3, u4 = splitInt32(imptabindex)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-		-- reserved
-		u1, u2, u3, u4 = splitInt32(0)
+		-- timestamp
+		u1, u2, u3, u4 = splitInt32(self.timestamp)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 		-- fragment
@@ -935,6 +940,7 @@ function loff.new(filename, libname, fragment)
 		import.expectedText = with.sections[1].linkedAddress
 		import.expectedData = with.sections[2].linkedAddress
 		import.expectedBSS = with.sections[3].linkedAddress
+		import.timestamp = with.timestamp or 0
 
 		impindex = #self.imports + 1
 		self.imports[impindex] = import
@@ -979,6 +985,9 @@ function loff.new(filename, libname, fragment)
 		if with.codeType ~= self.codeType then
 			print(string.format("objtool: warning: linking 2 object files of differing code types, %d and %d\n  %s\n  %s", self.codeType, with.codeType, self.path, with.path))
 		end
+
+		-- unix time
+		self.timestamp = os.time(os.date("!*t"))
 
 		if not dynamic then
 			if self.entrySymbol and with.entrySymbol then
@@ -1037,12 +1046,16 @@ function loff.new(filename, libname, fragment)
 			for i = 0, #with.symbols do
 				local sym = with.symbols[i]
 
-				if sym and (not sym.exclude) then
+				if sym and (not sym.exclude) and (not sym.resolved) then
 					if not self.symbols[0] then
 						self.symbols[0] = sym.resolved or sym
 					else
 						self.symbols[#self.symbols + 1] = sym.resolved or sym
 					end
+
+					--print(string.format("hi %d %s=%x", sym.symtype, sym.name, sym.value))
+
+					self.isym[#self.isym + 1] = sym.resolved or sym
 				end
 			end
 

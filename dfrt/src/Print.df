@@ -49,14 +49,31 @@ fn private Puti { n fd -- len }
 	c@ n@ abs fd@ Putn len!
 end
 
-fn private Pad { num -- }
+fn private Pad { fd num -- }
 	auto i
 	0 i!
 
 	while (i@ num@ <)
-		' ' Putc
+		fd@ ' ' FPutc
 
 		1 i +=
+	end
+end
+
+fn private ZeroPad { fd num pad base -- }
+	auto d
+	0 d!
+
+	while (num@)
+		1 d +=
+
+		base@ num /=
+	end
+
+	while (d@ pad@ <)
+		fd@ '0' FPutc
+
+		1 d +=
 	end
 end
 
@@ -91,6 +108,17 @@ fn VFPrintf { argvt argcn fmt fd -- }
 
 			fmt@ i@ + gb char!
 
+			auto zero
+			0 zero!
+
+			if (char@ '0' ==)
+				1 zero!
+
+				1 i +=
+
+				fmt@ i@ + gb char!
+			end
+
 			while (char@ '0' >= char@ '9' <= &&)
 				1 i +=
 
@@ -115,21 +143,31 @@ fn VFPrintf { argvt argcn fmt fd -- }
 			a@ argvt@ + @ q!
 
 			if (char@ 'd' ==)
+				if (zero@)
+					fd@ q@ pad@ 10 ZeroPad
+					0 pad!
+				end
+
 				0 q@ fd@ Putn fl!
 
 				if (pad@)
 					if (fl@ pad@ <)
-						pad@ fl@ - Pad
+						fd@ pad@ fl@ - Pad
 					end
 				end
 
 				4 a +=
 			end elseif (char@ 'x' ==)
+				if (zero@)
+					fd@ q@ pad@ 16 ZeroPad
+					0 pad!
+				end
+
 				0 q@ fd@ Putx fl!
 
 				if (pad@)
 					if (fl@ pad@ <)
-						pad@ fl@ - Pad
+						fd@ pad@ fl@ - Pad
 					end
 				end
 
@@ -141,7 +179,7 @@ fn VFPrintf { argvt argcn fmt fd -- }
 					q@ strlen fl!
 
 					if (fl@ pad@ <)
-						pad@ fl@ - Pad
+						fd@ pad@ fl@ - Pad
 					end
 				end
 
@@ -150,7 +188,7 @@ fn VFPrintf { argvt argcn fmt fd -- }
 				fd@ q@ FPutc
 
 				if (pad@)
-					pad@ 1 - Pad
+					fd@ pad@ 1 - Pad
 				end
 
 				4 a +=
@@ -159,7 +197,7 @@ fn VFPrintf { argvt argcn fmt fd -- }
 
 				if (pad@)
 					if (fl@ pad@ <)
-						pad@ fl@ - Pad
+						fd@ pad@ fl@ - Pad
 					end
 				end
 

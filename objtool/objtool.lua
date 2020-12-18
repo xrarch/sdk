@@ -76,6 +76,7 @@ if arg[1] == "info" then
 		os.exit(1)
 	end
 
+	print(string.format("linked at: %s", os.date("%c", image.timestamp)))
 	print(string.format("architecture: %s", archn[image.codeType] or "UNKNOWN"))
 	if image.entrySymbol then
 		print(string.format("entry point: %s @ $%X", image.entrySymbol.name, image.entrySymbol.value))
@@ -288,7 +289,7 @@ elseif arg[1] == "imports" then
 	for i = 1, #image.imports do
 		local v = image.imports[i]
 
-		print(string.format("%d: %s ($%x, $%x, $%x)", i, v.name, v.expectedText, v.expectedData, v.expectedBSS))
+		print(string.format("%d: %s ($%x, $%x, $%x) [%s]", i, v.name, v.expectedText, v.expectedData, v.expectedBSS, os.date("%c", v.timestamp)))
 	end
 elseif arg[1] == "move" then
 	if not arg[2] then
@@ -384,6 +385,8 @@ elseif arg[1] == "move" then
 			os.exit(1)
 		end
 	end
+
+	image.timestamp = os.time(os.date("!*t"))
 
 	if not image:write() then
 		os.exit(1)

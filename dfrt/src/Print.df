@@ -64,10 +64,14 @@ fn private ZeroPad { fd num pad base -- }
 	auto d
 	0 d!
 
-	while (num@)
-		1 d +=
+	if (num@ 0 ==)
+		1 d!
+	end else
+		while (num@)
+			1 d +=
 
-		base@ num /=
+			base@ num /=
+		end
 	end
 
 	while (d@ pad@ <)

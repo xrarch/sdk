@@ -151,30 +151,50 @@ function lex.extractAll(src, filename, stream, spot)
 				table.insert(tokens, spot, {t, "string", line, filename})
 				spot = spot + 1
 			elseif c == "'" then
-				local rc = extractChar()
+				local n = 0
 
-				if rc == "\\" then
-					rc = extractChar()
+				c = extractChar()
 
-					if rc == "n" then
-						rc = "\n"
-					elseif rc == "r" then
-						rc = string.char(0xD)
-					elseif rc == "t" then
-						rc = "\t"
-					elseif rc == "b" then
-						rc = "\b"
-					elseif rc == "[" then
-						rc = string.char(0x1b)
+				while (c ~= "'") and c do
+					if c == "\\" then
+						c = extractChar()
+
+						if not c then
+							print(string.format("%s:%d: malformed char", filename, line))
+							return false
+						else
+							if c == "\\" then
+								n = n*256 + string.byte("\\")
+							elseif c == "n" then
+								n = n*256 + string.byte("\n")
+							elseif c == "t" then
+								n = n*256 + string.byte("\t")
+							elseif c == "r" then
+								n = n*256 + 0xD
+							elseif c == "b" then
+								n = n*256 + string.byte("\b")
+							elseif c == "[" then
+								n = n*256 + 0x1b
+							else
+								n = n*256 + string.byte(c)
+							end
+						end
+					elseif c == "\n" then
+						line = line + 1
+						n = n*256 + string.byte(c)
+					else
+						n = n*256 + string.byte(c)
 					end
+
+					c = extractChar()
 				end
 
-				if extractChar() ~= "'" then
+				if not c then
 					print(string.format("%s:%d: malformed char", filename, line))
 					return false
 				end
 
-				table.insert(tokens, spot, {string.byte(rc), "number", line, filename})
+				table.insert(tokens, spot, {n, "number", line, filename})
 				spot = spot + 1
 			else
 				while (not whitespace[c]) and (not kc[c]) and (c) do

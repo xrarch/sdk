@@ -153,15 +153,14 @@ function loff.new(filename, libname, fragment)
 		if s1.section == 0 then return false end
 		if s2.section == 0 then return false end
 
-		return (s1.value + s1.sectiont.linkedAddress) < (s2.value + s2.sectiont.linkedAddress)
+		local s1t = iloff.sections[s1.section]
+		local s2t = iloff.sections[s2.section]
+
+		return (s1.value + s1t.linkedAddress) < (s2.value + s2t.linkedAddress)
 	end
 
 	function iloff:iSymSort()
-		if not sortedsym then
-			table.sort(self.isym, sortsyms)
-
-			sortedsym = true
-		end
+		table.sort(self.isym, sortsyms)
 	end
 
 	function iloff:load()
@@ -498,8 +497,6 @@ function loff.new(filename, libname, fragment)
 		end
 
 		function self:getSym(address)
-			self:iSymSort()
-
 			for i = 1, 3 do
 				local s = self.sections[i]
 

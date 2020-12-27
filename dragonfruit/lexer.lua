@@ -51,7 +51,7 @@ function lex.extractAll(src, filename, stream, spot)
 					o = src:sub(cpt,cpt)
 					cpt = cpt + 1
 
-					if (o == "\n") or (not o) then
+					if (o == "\n") or (o == "") then
 						break
 					end
 				end
@@ -77,7 +77,7 @@ function lex.extractAll(src, filename, stream, spot)
 					o = src:sub(cpt,cpt)
 					cpt = cpt + 1
 
-					if not o then
+					if o == "" then
 						break
 					end
 				end

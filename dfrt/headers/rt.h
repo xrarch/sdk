@@ -14,7 +14,9 @@ extern memcpy { dest src size -- }
 
 extern memset { ptr size word -- }
 
-extern strcmp { str1 str2 -- equal? }
+extern strcmp { str1 str2 -- eq }
+
+extern strncmp { str1 str2 n -- eq }
 
 extern strlen { str -- size }
 

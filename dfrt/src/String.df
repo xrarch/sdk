@@ -461,7 +461,32 @@ fn strcmp { str1 str2 -- eq }
 	end
 
 	0 eq!
-	return
+end
+
+fn strncmp { str1 str2 n -- eq }
+	auto i
+	0 i!
+
+	if (n@ 0 ==)
+		1 eq!
+		return
+	end
+
+	while (str1@ i@ + gb str2@ i@ + gb ==)
+		if (str1@ i@ + gb 0 ==)
+			1 eq!
+			return
+		end
+
+		1 i +=
+
+		if (i@ n@ >=)
+			1 eq!
+			return
+		end
+	end
+
+	0 eq!
 end
 
 fn strlen { str -- size }

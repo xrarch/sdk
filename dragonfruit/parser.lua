@@ -154,9 +154,8 @@ function parser.directive()
 	return true
 end
 
--- parses the form { in1 in2 in3 ... -- out1 out2 out3 ... }
+-- parses the form { ... in1 in2 in3 -- out1 out2 out3 }
 -- { in1 ... -- } is not allowed, { ... in1 -- } is.
--- { -- ... out1 } is allowed, { -- out1 ... } is not.
 function parser.signature(extern, fnptr)
 	local sig = {}
 

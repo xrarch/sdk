@@ -534,6 +534,7 @@ end
 fn strzero { str -- }
 	auto i
 	0 i!
+	
 	while (str@ i@ + gb 0 ~=)
 		0 str@ i@ + sb
 		

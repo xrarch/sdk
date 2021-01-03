@@ -55,6 +55,11 @@ function fat.mount(image, offset, noroot)
 	fs.image = block.new(image, 4096, offset)
 	local img = fs.image
 
+	if not img then
+		print("couldn't open image "..image)
+		return false
+	end
+
 	fs.superblock_b = img:readBlock(0)
 	fs.superblock = cast(superblock_s, fs.superblock_b, 0)
 	local superblock = fs.superblock
@@ -197,6 +202,7 @@ function fat.mount(image, offset, noroot)
 		ino.permissions = permissions
 		ino.size = 0
 		ino.iparent = iparent
+		ino.timestamp = getepoch()
 
 		ino.dirty = true
 	end
@@ -220,6 +226,7 @@ function fat.mount(image, offset, noroot)
 
 		node.inum = inum
 		node.entry = 0xFFFFFFFF
+		node.timestamp = 0
 		node.parent = parent
 		node.size = 0
 		node.uid = 0
@@ -270,6 +277,7 @@ function fat.mount(image, offset, noroot)
 		node.entry = ino_s.gv("startblock")
 		node.size = ino_s.gv("bytesize")
 		node.iparent = ino_s.gv("iparent")
+		node.timestamp = ino_s.gv("timestamp")
 
 		local kind = ino_s.gv("type")
 
@@ -345,6 +353,7 @@ function fat.mount(image, offset, noroot)
 			ino_s.sv("startblock", node.entry)
 			ino_s.sv("bytesize", node.size)
 			ino_s.sv("iparent", node.iparent)
+			ino_s.sv("timestamp", node.timestamp)
 
 			for k,v in pairs(node.blocks) do
 				if v.dirty then
@@ -466,6 +475,8 @@ function fat.mount(image, offset, noroot)
 			if off > node.size then
 				node.size = off
 			end
+
+			node.timestamp = getepoch()
 
 			node.dirty = true
 
@@ -616,6 +627,8 @@ function fat.mount(image, offset, noroot)
 
 		local lnm = "/"
 
+		local created = false
+
 		while str do
 			str, off = strtok(path, "/", off)
 
@@ -644,7 +657,9 @@ function fat.mount(image, offset, noroot)
 
 					nn = node.createchild(str, kind)
 
-					print("created "..str)
+					created = true
+
+					-- print("created "..str)
 				else
 					return false, str.." does not exist"
 				end
@@ -654,7 +669,7 @@ function fat.mount(image, offset, noroot)
 			lnm = str
 		end
 
-		return node, nil, ln, lnm
+		return node, nil, ln, lnm, created
 	end
 
 	function fs:update()

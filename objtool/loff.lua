@@ -150,11 +150,11 @@ function loff.new(filename, libname, fragment)
 	local sortedsym
 
 	local function sortsyms(s1,s2)
-		if s1.section == 0 then return false end
-		if s2.section == 0 then return false end
-
 		local s1t = iloff.sections[s1.section]
 		local s2t = iloff.sections[s2.section]
+
+		if not s1t then return false end
+		if not s2t then return true end
 
 		return (s1.value + s1t.linkedAddress) < (s2.value + s2t.linkedAddress)
 	end

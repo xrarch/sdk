@@ -29,6 +29,8 @@ local public = {}
 
 local extern = {}
 
+local structs = {}
+
 local lex
 
 local basedir
@@ -815,18 +817,14 @@ function parser.table()
 end
 
 function parser.struct()
-	local t, ok = lex:expect("tag")
+	local snt, ok = lex:expect("tag")
 
 	if not ok then
-		lerror(t, "expected tag, got "..t[2])
+		lerror(snt, "expected tag, got "..snt[2])
 		return false
 	end
 
-	local name = t[1]
-
-	if not define(name, "struct", t) then
-		return false
-	end
+	local name = snt[1]
 
 	local t = lex:peek()
 
@@ -835,11 +833,23 @@ function parser.struct()
 		return false
 	end
 
-	local off = 0
+	local struc = {}
+
+	struc.name = name
+
+	local szofblock = {}
+	szofblock.block = {}
+
+	if not define(name.."_SIZEOF", "const", t, false, szofblock) then
+		return false
+	end
 
 	while t[1] ~= "endstruct" do
-		local num = parser.constant(nil, nil, true)
-		if not num then return false end
+		local const, consttype, tok = parser.constant(nil, nil)
+
+		if not const then
+			return false
+		end
 
 		local n, ok = lex:expect("tag")
 
@@ -848,11 +858,16 @@ function parser.struct()
 			return false
 		end
 
-		if not define(name.."_"..n[1], "const", n, false, off) then
+		local cn = name.."_"..n[1]
+
+		local v = {}
+		v.block = {}
+
+		if not define(name.."_"..n[1], "const", tok, false, v) then
 			return false
 		end
 
-		off = off + num
+		struc[#struc + 1] = {tok=tok, size=const, valblock=v, name=cn}
 
 		t = lex:peek()
 
@@ -864,7 +879,11 @@ function parser.struct()
 
 	lex:extract()
 
-	if not define(name.."_SIZEOF", "const", t, false, off) then
+	struc[#struc + 1] = {tok=snt, size=0, valblock=szofblock, name=name.."_SIZEOF"}
+
+	structs[#structs + 1] = struc
+
+	if not define(name, "struct", snt, false, struc) then
 		return false
 	end
 
@@ -956,7 +975,7 @@ function parser.parse(lexer, sourcetext, filename, incd, reserve)
 		token = lex:extract()
 	end
 
-	return def, public, extern, asms
+	return def, public, extern, structs, asms
 end
 
 return parser

@@ -1240,10 +1240,32 @@ local function basicdef(symdef)
 	return true
 end
 
-function eval.eval(symdeftab, public, extern, asms)
+function eval.eval(symdeftab, public, extern, structs, asms)
 	if not symdeftab then return false end
 
 	symb = symdeftab
+
+	for k,struc in ipairs(structs) do
+		local off = 0
+
+		for k2,elem in ipairs(struc) do
+			const[elem.name] = off
+
+			elem.valblock.block[1] = {kind="lazy", ident={off, "number"}}
+
+			if type(elem.size) == "number" then
+				off = off + elem.size
+			else
+				local v = eval.blockeval(elem.size, elem.tok, true)
+
+				if not v then
+					return false
+				end
+
+				off = off + v
+			end
+		end
+	end
 
 	for k,v in pairs(symdeftab) do
 		if v.kind == "const" then

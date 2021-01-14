@@ -55,12 +55,12 @@ function tods(dat)
     return out
 end
 
-function struct(stuff)
+function struct(elements)
     local s = {}
     s.o = {}
     s.sz = {}
     local offset = 0
-    for k,v in ipairs(stuff) do
+    for k,v in ipairs(elements) do
         local size = v[1]
         local name = v[2]
         s.o[name] = offset

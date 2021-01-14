@@ -36,7 +36,7 @@ archinfo[2] = {}
 archinfo[2].name = "limn2k"
 archinfo[2].align = 4
 
-local loffheader_s = struct({
+local loffheader_s = struct {
 	{4, "magic"},
 	{4, "symbolTableOffset"},
 	{4, "symbolCount"},
@@ -53,7 +53,7 @@ local loffheader_s = struct({
 	{4, "textHeaderOffset"},
 	{4, "dataHeaderOffset"},
 	{4, "bssHeaderOffset"},
-})
+}
 
 local import_s = struct({
 	{4, "name"},
@@ -192,7 +192,7 @@ function loff.new(filename, libname, fragment)
 			print(string.format("objtool: '%s' is in legacy AIXO format and needs to be rebuilt", self.path))
 			return false
 		elseif (magic == LOFF4MAGIC) then
-			-- goood
+			-- goood........
 		else
 			print(string.format("objtool: '%s' isn't a LOFF format image", self.path))
 			return false

@@ -286,7 +286,7 @@ end
 
 local function loadimmf(r, mask)
 	if (r.typ == "imm") then
-		if (not tonumber(r.id)) or (band(r.id, bnot(mask)) ~= 0) then
+		if (not tonumber(r.id)) or (band(r.id, bnot(mask)) ~= 0) or (r.id == 0) then
 			local e = ralloc(r.errtok)
 
 			if not e then return false end
@@ -821,7 +821,9 @@ local function mkstore(errtok, dest, src, auto, mnem, mask, lomask)
 
 		muted = shouldmut(dest)
 
-		rd = loadimmf(rd, 0x0)
+		local e
+
+		rd, e = loadimmf(rd, 0)
 	end
 
 	if not rd then return false end
@@ -876,7 +878,7 @@ local function mkstore(errtok, dest, src, auto, mnem, mask, lomask)
 				mn = "\ts."..mnem.." "
 			end
 
-			--tprint(rd)
+			-- tprint(rd)
 
 			text(mn..rd.n..", "..rn..", "..rs.n)
 		end

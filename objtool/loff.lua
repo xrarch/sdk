@@ -36,6 +36,10 @@ archinfo[2] = {}
 archinfo[2].name = "limn2k"
 archinfo[2].align = 4
 
+archinfo[3] = {}
+archinfo[3].name = "riscv32"
+archinfo[3].align = 4
+
 local loffheader_s = struct {
 	{4, "magic"},
 	{4, "symbolTableOffset"},

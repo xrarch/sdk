@@ -16,7 +16,7 @@ local asm = dofile(sd.."assembler.lua")
 
 local function printhelp()
 	print("== asm.lua ==")
-	print("assembler for aisav3 lemon")
+	print("assembler for limn2k")
 	print("usage: asm.lua [source] [dest]")
 end
 

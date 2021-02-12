@@ -542,12 +542,72 @@ eval.immop = {
 		local op2 = s.pop(tok)
 		if not op2 then return false end
 
+		local n
+		local nid
+		local k
+
+		if op1.kind == "num" then
+			n = op1
+			nid = op1.ident
+			
+			if nid == 0 then
+				s.push(op2)
+				return
+			end
+
+			k = op2
+		elseif op2.kind == "num" then
+			n = op2
+			nid = op2.ident
+			
+			if nid == 0 then
+				s.push(op1)
+				return
+			end
+
+			k = op1
+		end
+
 		if (op1.kind == "num") and (op2.kind == "num") then
 			s.push(stacknode_t("num", op1.ident + op2.ident, tok))
 			return
+		elseif (op1.opers[3]) and (op2.kind == "num") then
+			local q = op1.opers[4] + op2.ident
+
+			op1.opers[3].ident = math.abs(q)
+			op1.opers[4] = q
+
+			if q < 0 then
+				op1.op = "-"
+			elseif q == 0 then
+				s.push(op1.opers[5])
+				return
+			elseif q > 0 then
+				op1.op = "+"
+			end
+
+			s.push(op1)
+			return
+		elseif (op2.opers[3]) and (op1.kind == "num") then
+			local q = op2.opers[4] + op1.ident
+
+			op2.opers[3].ident = math.abs(q)
+			op2.opers[4] = q
+
+			if q < 0 then
+				op2.op = "-"
+			elseif q == 0 then
+				s.push(op2.opers[5])
+				return
+			elseif q > 0 then
+				op2.op = "+"
+			end
+
+			s.push(op2)
+			return
 		end
 
-		s.push(stacknode_t("op", nil, tok, "+", op1, op2))
+		s.push(stacknode_t("op", nil, tok, "+", op1, op2, n, nid, k))
 
 		return
 	end,
@@ -558,12 +618,45 @@ eval.immop = {
 		local op2 = s.pop(tok)
 		if not op2 then return false end
 
+		local n
+		local nid
+		local k
+
+		if op1.kind == "num" then
+			n = op1
+			nid = -op1.ident
+
+			if nid == 0 then
+				s.push(op2)
+				return
+			end
+
+			k = op2
+		end
+
 		if (op1.kind == "num") and (op2.kind == "num") then
 			s.push(stacknode_t("num", op2.ident - op1.ident, tok))
 			return
+		elseif (op2.opers[3]) and (op1.kind == "num") then
+			local q = op2.opers[4] - op1.ident
+
+			op2.opers[3].ident = math.abs(q)
+			op2.opers[4] = q
+
+			if q < 0 then
+				op2.op = "-"
+			elseif q == 0 then
+				s.push(op2.opers[5])
+				return
+			elseif q > 0 then
+				op2.op = "+"
+			end
+
+			s.push(op2)
+			return
 		end
 
-		s.push(stacknode_t("op", nil, tok, "-", op2, op1))
+		s.push(stacknode_t("op", nil, tok, "-", op2, op1, n, nid, k))
 
 		return
 	end,
@@ -645,6 +738,12 @@ eval.immop = {
 
 		local src = s.pop(tok)
 		if not src then return false end
+
+		if (dest.kind == "auto") and (src.kind == "auto") then
+			if dest.ident == src.ident then
+				return
+			end
+		end
 
 		return op_t(tok, "!", dest, src)
 	end,

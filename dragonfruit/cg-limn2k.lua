@@ -838,7 +838,9 @@ local function mkstore(errtok, dest, src, auto, mnem, mask, lomask)
 		if rs.typ == "imm" then
 			loadimm(rd, rs.id)
 		elseif not rd.muted then
-			text("\tmov "..rd.n..", "..rs.n)
+			if rd.n ~= rs.n then
+				text("\tmov "..rd.n..", "..rs.n)
+			end
 		end
 	else
 		local l

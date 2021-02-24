@@ -86,13 +86,42 @@ local symbol_s = struct({
 local fixup_s = struct({
 	{4, "symbolIndex"},
 	{4, "offset"},
-	{4, "size"},
-	{4, "shift"},
+	{4, "type"},
 })
 
 local uint32_s = struct {
 	{4, "value"}
 }
+
+local RELOC_LIMN2K_16 = 2
+local RELOC_LIMN2K_24 = 3
+local RELOC_LIMN2K_32 = 4
+local RELOC_LIMN2K_LA = 5
+
+local function doFixup(tab, off, nval, rtype)
+	local old = gv32(tab, off)
+	local new = old
+
+	if rtype == RELOC_LIMN2K_16 then
+		new = bor(band(old, 0xFFFF), lshift(band(rshift(nval, 2), 0xFFFF), 16))
+	elseif rtype == RELOC_LIMN2K_24 then
+		new = bor(band(old, 0xFF), lshift(band(rshift(nval, 2), 0xFFFFFF), 8))
+	elseif rtype == RELOC_LIMN2K_32 then
+		new = nval
+	elseif rtype == RELOC_LIMN2K_LA then
+		local old2 = gv32(tab, off + 4)
+
+		new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
+
+		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+
+		sv32(tab, off + 4, new2)
+	else
+		error("unknown relocation type "..rtype)
+	end
+
+	sv32(tab, off, new)
+end
 
 function loff.new(filename, libname, fragment)
 	local iloff = {}
@@ -150,6 +179,7 @@ function loff.new(filename, libname, fragment)
 	local LOFF2MAGIC = 0x4C4F4632
 	local LOFF3MAGIC = 0x4C4F4633
 	local LOFF4MAGIC = 0x4C4F4634
+	local LOFF5MAGIC = 0x4C4F4635
 
 	local sortedsym
 
@@ -189,13 +219,13 @@ function loff.new(filename, libname, fragment)
 
 		local magic = hdr.gv("magic")
 
-		if (magic == LOFF1MAGIC) or (magic == LOFF2MAGIC) or (magic == LOFF3MAGIC) then
+		if (magic == LOFF1MAGIC) or (magic == LOFF2MAGIC) or (magic == LOFF3MAGIC) or (magic == LOFF4MAGIC) then
 			print(string.format("objtool: '%s' is in an older LOFF format and needs to be rebuilt", self.path))
 			return false
 		elseif (magic == AIXOMAGIC) then
 			print(string.format("objtool: '%s' is in legacy AIXO format and needs to be rebuilt", self.path))
 			return false
-		elseif (magic == LOFF4MAGIC) then
+		elseif (magic == LOFF5MAGIC) then
 			-- goood........
 		else
 			print(string.format("objtool: '%s' isn't a LOFF format image", self.path))
@@ -366,16 +396,14 @@ function loff.new(filename, libname, fragment)
 					for i = 0, fixupcount-1 do
 						local fent = cast(fixup_s, self.bin, fixupoff + (i * fixup_s.size()))
 
-						s.fixups[#s.fixups + 1] = {}
-						local f = s.fixups[#s.fixups]
+						local f = {}
+						s.fixups[#s.fixups + 1] = f
 
 						f.symbol = self.symbols[fent.gv("symbolIndex")]
 
 						f.offset = fent.gv("offset")
 
-						f.size = fent.gv("size")
-
-						f.shift = fent.gv("shift")
+						f.type = fent.gv("type")
 
 						f.file = self.path
 					end
@@ -383,55 +411,10 @@ function loff.new(filename, libname, fragment)
 			end
 		end
 
-		function self:relocTo(section, address, relative)
-			if not self.linkable then
-				print(string.format("objtool: '%s' cannot be moved", self.path))
-				return false
-			end
-
-			if self.archinfo and (address % self.archinfo.align ~= 0) then
-				print(string.format("objtool: %s requires section addresses to be aligned to a boundary of %d bytes", self.archinfo.name, self.archinfo.align))
-				return false
-			end
-
-			local s = self.sections[section]
-
-			s.linkedAddress = address
-
-			for i = 1, 2 do
-				local s2 = self.sections[i]
-
-				for k,v in ipairs(s2.fixups) do
-					local sym = v.symbol
-
-					if sym and (sym.section == section) then
-						if v.size <= 8 then
-							local type_s = struct({{v.size, "value"}})
-							local addrs = cast(type_s, s2.contents, v.offset)
-
-							if sym.symtype == 4 then
-								if sym.value == 1 then
-									addrs.sv("value", rshift(s.linkedAddress, v.shift))
-								elseif sym.value == 2 then
-									addrs.sv("value", rshift(s.size, v.shift))
-								elseif sym.value == 3 then
-									addrs.sv("value", rshift(s.linkedAddress + s.size, v.shift))
-								end
-							else
-								addrs.sv("value", rshift(sym.value + s.linkedAddress, v.shift))
-							end
-						end
-					end
-				end
-			end
-
-			return true
-		end
-
 		function self:relocInFile(section, offset) -- blindly assumes linkedAddress = 0, caller check
-			if offset ~= 0 then
-				self:relocTo(section, offset)
+			-- print("reloc", section, offset)
 
+			if offset ~= 0 then
 				for i = 0, #self.symbols do
 					local sym = self.symbols[i]
 
@@ -650,17 +633,14 @@ function loff.new(filename, libname, fragment)
 			end
 		end
 
-		local function addFixup(section, symindex, offset, size, shift)
+		local function addFixup(section, symindex, offset, rtype)
 			local u1, u2, u3, u4 = splitInt32(symindex)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
 			u1, u2, u3, u4 = splitInt32(offset)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 
-			u1, u2, u3, u4 = splitInt32(size)
-			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-
-			u1, u2, u3, u4 = splitInt32(shift)
+			u1, u2, u3, u4 = splitInt32(rtype)
 			section.fixuptab = section.fixuptab .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		end
 
@@ -679,7 +659,7 @@ function loff.new(filename, libname, fragment)
 						sindex = v.symbol.index
 					end
 
-					addFixup(s, sindex, v.offset, v.size, v.shift)
+					addFixup(s, sindex, v.offset, v.type)
 
 					s.fixupcount = s.fixupcount + 1
 				end
@@ -694,7 +674,7 @@ function loff.new(filename, libname, fragment)
 		-- make header
 		local size = 72
 
-		local header = "4FOL"
+		local header = "5FOL"
 
 		-- symbolTableOffset
 		local u1, u2, u3, u4 = splitInt32(size)
@@ -905,18 +885,6 @@ function loff.new(filename, libname, fragment)
 			local sym = v.symbol
 
 			if sym and sym.resolved and (sym.symtype ~= 4) then
-				if sym.resolved.section == section then
-					--print(string.format("resolving %s @ %X", sym.name, v.offset))
-
-					if v.size <= 8 then
-						local type_s = struct({{v.size, "value"}})
-						local addrs = cast(type_s, mysection.contents, v.offset)
-						addrs.sv("value", rshift(sym.resolved.value, v.shift))
-					else
-						--print("didnt resolve")
-					end
-				end
-
 				v.symbol = sym.resolved
 			end
 		end
@@ -955,19 +923,75 @@ function loff.new(filename, libname, fragment)
 				v.dq = wsym
 			end
 		end
+	end
 
-		for _,mysection in pairs(self.sections) do
-			for k,v in ipairs(mysection.fixups) do
+	function iloff:relocTo(section, address, relative)
+		if not self.linkable then
+			print(string.format("objtool: '%s' cannot be moved", self.path))
+			return false
+		end
+
+		if self.archinfo and (address % self.archinfo.align ~= 0) then
+			print(string.format("objtool: %s requires section addresses to be aligned to a boundary of %d bytes", self.archinfo.name, self.archinfo.align))
+			return false
+		end
+
+		local s = self.sections[section]
+
+		s.linkedAddress = address
+
+		for i = 1, 2 do
+			local s2 = self.sections[i]
+
+			for k,v in ipairs(s2.fixups) do
+				local sym = v.symbol
+
+				if sym.resolved then
+					sym = sym.resolved
+				end
+
+				if sym and (sym.section == section) then
+					local nval
+
+					if sym.symtype == 4 then
+						if sym.value == 1 then
+							nval = s.linkedAddress
+						elseif sym.value == 2 then
+							nval = s.size
+						elseif sym.value == 3 then
+							nval = s.linkedAddress + s.size
+						end
+					else
+						nval = sym.value + s.linkedAddress
+					end
+
+					-- print(string.format("%s %s $%x %d", v.symbol.name, v.file, v.offset, v.type))
+
+					doFixup(s2.contents, v.offset, nval, v.type)
+				end
+			end
+		end
+
+		return true
+	end
+
+	function iloff:relocate()
+		-- perform all fixups
+
+		for s = 1, 3 do
+			local section = self.sections[s]
+
+			if not self:relocTo(s, section.linkedAddress) then return false end
+		end
+
+		for s = 1, 3 do
+			local section = self.sections[s]
+
+			for k,v in ipairs(section.fixups) do
 				local sym = v.symbol
 
 				if sym and sym.dq and (sym.symtype ~= 4) then
-					if v.size <= 8 then
-						local type_s = struct({{v.size, "value"}})
-						local addrs = cast(type_s, mysection.contents, v.offset)
-						addrs.sv("value", rshift(sym.dq.value+sym.dq.sectiont.linkedAddress, v.shift))
-					else
-						--print("didnt resolve")
-					end
+					doFixup(section.contents, v.offset, sym.dq.value+sym.dq.sectiont.linkedAddress, v.type)
 				end
 			end
 		end
@@ -977,6 +1001,8 @@ function loff.new(filename, libname, fragment)
 		if not self.codeType then
 			self.codeType = with.codeType
 		end
+
+		-- print(self.path, with.path)
 
 		if (not with.linkable) then
 			print(string.format("objtool: '%s' cannot be linked", with.path))
@@ -1061,6 +1087,8 @@ function loff.new(filename, libname, fragment)
 			end
 
 			for i = 1, 3 do
+				-- print(self.path, with.path, with.sections[i].name)
+
 				if not self:mergeSection(with, i) then
 					return false
 				end

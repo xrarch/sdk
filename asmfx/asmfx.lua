@@ -9,18 +9,22 @@ local function getdirectory(p)
 end
 local sd = getdirectory(arg[0])
 
+dofile(sd.."misc.lua")
+
 local asm = dofile(sd.."assembler.lua")
 
--- asm.lua [source] [dest]
+-- asmfx.lua [source] [dest]
 -- tested under lua 5.1
 
 local function printhelp()
-	print("== asm.lua ==")
-	print("assembler for limn2k")
-	print("usage: asm.lua [source] [dest]")
+	print("== asmfx.lua ==")
+	print("retargetable assembler")
+	print("usage: asmfx.lua [source] [dest]")
 end
 
 local target = "limn2k"
+
+local format = "loff"
 
 for k,v in pairs(arg) do
 	if v:sub(1,7) == "target=" then
@@ -29,10 +33,11 @@ for k,v in pairs(arg) do
 	end
 end
 
-local flat = false
-if arg[1] == "-flat" then
-	table.remove(arg, 1)
-	flat = true
+for k,v in pairs(arg) do
+	if v:sub(1,7) == "format=" then
+		format = v:sub(8)
+		table.remove(arg, k)
+	end
 end
 
 if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
@@ -40,6 +45,10 @@ if (#arg < 2) or (math.floor(#arg/2) ~= #arg/2) then
 	printhelp()
 	os.exit(1)
 end
+
+local encoder = dofile(sd.."format-"..format..".lua")
+
+local isa = dofile(sd.."isa-"..target..".lua")
 
 for i = 1, #arg/2 do
 	local source = arg[i]
@@ -52,10 +61,17 @@ for i = 1, #arg/2 do
 		os.exit(1)
 	end
 
-	local o = asm.assemble(target, srcf:read("*a"), source, flat)
+	local sections, symbols = asm.assemble(srcf:read("*a"), source, isa, encoder)
 
-	if not o then
+	if not sections then
 		print("asm: couldn't assemble "..source.."!")
+		os.exit(1)
+	end
+
+	local binary = encoder.encode(sections, symbols, isa)
+
+	if not binary then
+		print("asm: couldn't encode "..source.."!")
 		os.exit(1)
 	else
 		destf = io.open(dest, "w")
@@ -65,7 +81,7 @@ for i = 1, #arg/2 do
 			os.exit(1)
 		end
 
-		destf:write(o)
+		destf:write(binary)
 		return true
 	end
 end

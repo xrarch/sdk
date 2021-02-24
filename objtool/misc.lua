@@ -183,3 +183,27 @@ function cast(struct, tab, offset)
 
     return s
 end
+
+function gv16(tab, offset)
+    return lshift(tab[offset + 1], 8) + tab[offset]
+end
+
+function gv32(tab, offset)
+    return lshift(tab[offset + 3], 24) + lshift(tab[offset + 2], 16) + lshift(tab[offset + 1], 8) + tab[offset]
+end
+
+function sv16(tab, offset, value)
+    local b1,b2 = splitInt16(value)
+
+    tab[offset] = b2
+    tab[offset + 1] = b1
+end
+
+function sv32(tab, offset, value)
+    local b1,b2,b3,b4 = splitInt32(value)
+
+    tab[offset] = b4
+    tab[offset + 1] = b3
+    tab[offset + 2] = b2
+    tab[offset + 3] = b1
+end

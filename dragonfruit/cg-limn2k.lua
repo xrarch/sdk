@@ -89,20 +89,17 @@ local function cstring(str, n)
 	local sno = n or label()
 
 	data(sno..":")
-	adata("\t.ds ")
+	adata('\t.ds "')
 
 	for i = 1, #str do
 		local c = str:sub(i,i)
 		if c == "\n" then
-			data("")
-			data("\t.db 0xA")
-			adata("\t.ds ")
+			adata("\\n")
 		else
 			adata(c)
 		end
 	end
-	data("")
-	data("\t.db 0x0")
+	data('\\0"')
 
 	strings[str] = sno
 
@@ -396,7 +393,7 @@ local function genarith(errtok, oper1, oper2, rootcanmut, mask, mnem, mnemi, non
 	if not rd then return false end
 
 	if imm then
-		text("\t"..mnemi.." "..rd.n..", "..reg1.n..", "..tostring(imm))
+		text("\t"..mnem.." "..rd.n..", "..reg1.n..", "..tostring(imm))
 	else
 		text("\t"..mnem.." "..rd.n..", "..reg1.n..", "..reg2.n)
 	end
@@ -440,11 +437,11 @@ local function mkload(errtok, src, auto, mnem, mask, rootcanmut, lomask)
 	if not rd then return false end
 
 	if not add then
-		text("\tl."..mnem.." "..rd.n..", "..rs.n..", zero")
+		text("\tmov "..rd.n..", "..mnem.." ["..rs.n.."]")
 	elseif reg2 then
-		text("\tl."..mnem.." "..rd.n..", "..rs.n..", "..reg2.n)
+		text("\tmov "..rd.n..", "..mnem.." ["..rs.n.." + "..reg2.n.."]")
 	elseif imm then
-		text("\tlio."..mnem.." "..rd.n..", "..rs.n..", "..tostring(imm))
+		text("\tmov "..rd.n..", "..mnem.." ["..rs.n.." + "..tostring(imm).."]")
 	end
 
 	freeofp(rd, rs, reg2)
@@ -454,13 +451,13 @@ end
 
 local optable = {
 	["@"] = function (errtok, op, rootcanmut)
-		return mkload(errtok, op.opers[1], true, "l", 0x3FC, rootcanmut, 3)
+		return mkload(errtok, op.opers[1], true, "long", 0x3FC, rootcanmut, 3)
 	end,
 	["gi"] = function (errtok, op, rootcanmut)
-		return mkload(errtok, op.opers[1], false, "i", 0x1FE, rootcanmut, 1)
+		return mkload(errtok, op.opers[1], false, "int", 0x1FE, rootcanmut, 1)
 	end,
 	["gb"] = function (errtok, op, rootcanmut)
-		return mkload(errtok, op.opers[1], false, "b", 0xFF, rootcanmut)
+		return mkload(errtok, op.opers[1], false, "byte", 0xFF, rootcanmut)
 	end,
 
 	["+"] = function (errtok, op, rootcanmut)
@@ -540,10 +537,10 @@ local optable = {
 	end,
 
 	["s<"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "slt.s", "slti.s", true)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "slt signed", "slti signed", true)
 	end,
 	["s>"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFF, "slt.s", "slti.s", true)
+		return genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFF, "slt signed", "slti signed", true)
 	end,
 
 	["<="] = function (errtok, op, rootcanmut) -- same thing as not-greater
@@ -566,7 +563,7 @@ local optable = {
 	end,
 
 	["s<="] = function (errtok, op, rootcanmut) -- same thing as not-greater
-		local e = genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFF, "slt.s", "slti.s", true)
+		local e = genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFF, "slt signed", "slti signed", true)
 
 		if not e then return false end
 
@@ -575,7 +572,7 @@ local optable = {
 		return e
 	end,
 	["s>="] = function (errtok, op, rootcanmut) -- same thing as not-less
-		local e = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "slt.s", "slti.s", true)
+		local e = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "slt signed", "slt signed", true)
 
 		if not e then return false end
 
@@ -688,12 +685,12 @@ local optable = {
 
 		if imm2 then
 			if imm2 ~= 0 then
-				text("\taddi "..rd.n..", "..ri.n..", "..tostring(rs.id * 4))
+				text("\tadd "..rd.n..", "..ri.n..", "..tostring(rs.id * 4))
 			else
 				freeofp(ri, rd)
 			end
 		else
-			text("\tlshi at, "..rs.n..", 2")
+			text("\tlsh at, "..rs.n..", 2")
 			text("\tadd "..rd.n..", "..ri.n..", at")
 		end
 
@@ -774,7 +771,7 @@ function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, al
 
 				if not rd then return false end
 
-				text("\tseqi "..rd.n..", "..ro.n..", 0")
+				text("\tseq "..rd.n..", "..ro.n..", 0")
 
 				freeofp(rd, ro)
 
@@ -867,22 +864,22 @@ local function mkstore(errtok, dest, src, auto, mnem, mask, lomask)
 
 		if imm2 then
 			if imm then
-				mn = "\tsiio."..mnem.." "
+				mn = "\tmov "..mnem.." ["
 			else
-				mn = "\tsi."..mnem.." "
+				mn = "\tmov "..mnem.." ["
 			end
 
-			text(mn..rd.n..", "..rn..", "..tostring(imm2))
+			text(mn..rd.n.." + "..rn.."], "..tostring(imm2))
 		else
 			if imm then
-				mn = "\tsio."..mnem.." "
+				mn = "\tmov "..mnem.." ["
 			else
-				mn = "\ts."..mnem.." "
+				mn = "\tmov "..mnem.." ["
 			end
 
 			-- tprint(rd)
 
-			text(mn..rd.n..", "..rn..", "..rs.n)
+			text(mn..rd.n.." + "..rn.."], "..rs.n)
 		end
 	end
 
@@ -894,7 +891,7 @@ end
 local function mkmod(errtok, dest, src, mask, mnem, mnemi, noncommutative)
 	local rcm = shouldmut(dest)
 
-	local rd = mkload(errtok, dest, true, "l", 0x3FC, true)
+	local rd = mkload(errtok, dest, true, "long", 0x3FC, true)
 
 	if not rd then return false end
 
@@ -902,7 +899,7 @@ local function mkmod(errtok, dest, src, mask, mnem, mnemi, noncommutative)
 
 	if not rd then return false end
 
-	if not mkstore(errtok, dest, rd, true, "l", 0x3FC) then return false end
+	if not mkstore(errtok, dest, rd, true, "long", 0x3FC) then return false end
 
 	return true
 end
@@ -969,13 +966,13 @@ end
 
 local muttable = {
 	["!"] = function (errtok, op)
-		return mkstore(errtok, op.opers[1], op.opers[2], true, "l", 0x3FC, 3)
+		return mkstore(errtok, op.opers[1], op.opers[2], true, "long", 0x3FC, 3)
 	end,
 	["si"] = function (errtok, op)
-		return mkstore(errtok, op.opers[1], op.opers[2], false, "i", 0x1FE, 1)
+		return mkstore(errtok, op.opers[1], op.opers[2], false, "int", 0x1FE, 1)
 	end,
 	["sb"] = function (errtok, op)
-		return mkstore(errtok, op.opers[1], op.opers[2], false, "b", 0xFF)
+		return mkstore(errtok, op.opers[1], op.opers[2], false, "byte", 0xFF)
 	end,
 
 	["+="] = function (errtok, op)
@@ -1082,9 +1079,9 @@ local muttable = {
 				end
 
 				if imm2 then
-					text("\tsiio.l sp, "..tostring(reached)..", "..tostring(imm2))
+					text("\tmov long [sp + "..tostring(reached).."], "..tostring(imm2))
 				else
-					text("\tsio.l sp, "..tostring(reached)..", "..r.n)
+					text("\tmov long [sp + "..tostring(reached).."], "..r.n)
 				end
 
 				freeof(r)
@@ -1109,9 +1106,9 @@ local muttable = {
 			end
 
 			if imm2 then
-				text("\tsiio.l sp, "..tostring(reached)..", "..tostring(imm2))
+				text("\tmov long [sp + "..tostring(reached).."], "..tostring(imm2))
 			else
-				text("\tsio.l sp, "..tostring(reached)..", "..r.n)
+				text("\tmov long [sp + "..tostring(reached).."], "..r.n)
 			end
 
 			freeof(r)
@@ -1124,7 +1121,7 @@ local muttable = {
 
 			if not r then return false end
 
-			text("\tjalr "..r.n)
+			text("\tjal "..r.n)
 
 			freeof(r)
 		else
@@ -1152,7 +1149,7 @@ local muttable = {
 
 					if not fa.reg then return false end
 
-					text("\tlio.l "..fa.reg.n..", sp, "..tostring(reached))
+					text("\tmov "..fa.reg.n..", long [sp + "..tostring(reached).."]")
 
 					reached = reached + 4
 				end
@@ -1402,14 +1399,14 @@ function cg.func(func)
 		text(".global "..func.name)
 	end
 	text("\tmov t0, sp")
-	text("\tsubi.i sp, "..tostring(frametop))
-	text("\ts.l sp, zero, t0")
+	text("\tsub sp, "..tostring(frametop))
+	text("\tmov long [sp], t0")
 	if savelink then
-		text("\tsio.l sp, 4, lr")
+		text("\tmov long [sp + 4], lr")
 	end
 	for i = 0, SAVEMAX do
 		if func.saved[i] then
-			text("\tsio.l sp, "..tostring(savareaoff + (i * 4))..", s"..tostring(i))
+			text("\tmov long [sp + "..tostring(savareaoff + (i * 4)).."], s"..tostring(i))
 		end
 	end
 
@@ -1438,18 +1435,18 @@ function cg.func(func)
 				reached = 8
 			end
 		else
-			text("\tlio.l "..s.reg.n..", sp, "..tostring(frametop + reached))
+			text("\tmov "..s.reg.n..", long [sp + "..tostring(frametop + reached).."]")
 
 			reached = reached + 4
 		end
 	end
 
 	if func.varin then
-		text("\taddi "..func.argvoff.n..", t0, "..(reached or 8))
+		text("\tadd "..func.argvoff.n..", t0, "..(reached or 8))
 	end
 
 	if func.allocated > 0 then
-		text("\taddi "..func.allocoff.n..", sp, "..func.allocstart)
+		text("\tadd "..func.allocoff.n..", sp, "..func.allocstart)
 	end
 
 	-- append fn text
@@ -1474,7 +1471,7 @@ function cg.func(func)
 				reached = 8
 			end
 		else
-			text("\tsio.l sp, "..tostring(frametop + reached)..", "..s.reg.n)
+			text("\tmov long [sp + "..tostring(frametop + reached).."], "..s.reg.n)
 
 			reached = reached + 4
 		end
@@ -1482,13 +1479,13 @@ function cg.func(func)
 
 	for i = 0, SAVEMAX do
 		if func.saved[i] then
-			text("\tlio.l s"..tostring(i)..", sp, "..tostring(savareaoff + (i * 4)))
+			text("\tmov s"..tostring(i)..", long [sp + "..tostring(savareaoff + (i * 4)).."]")
 		end
 	end
 	if savelink then
-		text("\tlio.l lr, sp, 4")
+		text("\tmov lr, long [sp + 4]")
 	end
-	text("\taddi.i sp, "..tostring(frametop))
+	text("\tadd sp, "..tostring(frametop))
 	text("\tret")
 
 	return true
@@ -1515,7 +1512,7 @@ function cg.gen(edefs, public, extern, asms, const)
 
 	for k,v in pairs(const) do
 		if not extern[k] then
-			text(k.." === "..tostring(v))
+			text(".define "..k.." "..tostring(v))
 		end
 	end
 

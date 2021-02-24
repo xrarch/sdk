@@ -19,4 +19,4 @@ obj/dfrt.f.o: $(OBJ) $(SOBJ)
 	$(AS) $< $@
 
 cleanup:
-	rm $(OBJ) $(SOBJ) obj/dfrt.f.o
+	rm -f $(OBJ) $(SOBJ) obj/dfrt.f.o

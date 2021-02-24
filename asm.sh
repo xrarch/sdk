@@ -2,4 +2,4 @@
 
 path=$(dirname $0)
 
-${path}/lua.sh ${path}/asm/asm.lua "$@"
+${path}/lua.sh ${path}/asmfx/asmfx.lua "$@"

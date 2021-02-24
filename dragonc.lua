@@ -54,10 +54,10 @@ end
 
 local lua = sd.."lua.sh "
 local dragonc = sd.."dragonfruit/dragonc.lua "..target.." "..incdir.." "
-local asm = sd.."asm/asm.lua "..target.." "
+local asm = sd.."asmfx/asmfx.lua "..target.." "
 
 if flat then
-	asm = asm .. "-flat "
+	asm = asm .. "format=flat "
 end
 
 local dx = 0

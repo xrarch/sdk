@@ -30,6 +30,86 @@ function readBinFile(file)
 	return out
 end
 
+local hexlookup = {
+    ["0"] = 0,
+    ["1"] = 1,
+    ["2"] = 2,
+    ["3"] = 3,
+    ["4"] = 4,
+    ["5"] = 5,
+    ["6"] = 6,
+    ["7"] = 7,
+    ["8"] = 8,
+    ["9"] = 9,
+    ["A"] = 10,
+    ["B"] = 11,
+    ["C"] = 12,
+    ["D"] = 13,
+    ["E"] = 14,
+    ["F"] = 15,
+
+    ["a"] = 10,
+    ["b"] = 11,
+    ["c"] = 12,
+    ["d"] = 13,
+    ["e"] = 14,
+    ["f"] = 15
+}
+
+-- supports hex and octal
+function myToNumber(str)
+    local num = 0
+
+    local neg
+
+    if str:sub(1,1) == "-" then
+        neg = true
+        str = str:sub(2)
+    end
+
+    if str:sub(1,2) == "0x" then
+        if #str < 3 then
+            return nil
+        end
+
+        for i = 3, #str do
+            local c = hexlookup[str:sub(i,i)]
+
+            if not c then
+                return nil
+            end
+
+            num = num*16 + c
+        end
+    elseif str:sub(1,1) == "0" then
+        for i = 2, #str do
+            local c = tonumber(str:sub(i,i))
+
+            if not c then
+                return nil
+            end
+
+            if c >= 8 then
+                return nil
+            end
+
+            num = num*8 + c
+        end
+    else
+        if neg then
+            return -tonumber(str)
+        else
+            return tonumber(str)
+        end
+    end
+
+    if neg then
+        num = -num
+    end
+
+    return num
+end
+
 function toInt32(byte4, byte3, byte2, byte1)
     return lshift(byte1, 24) + lshift(byte2, 16) + lshift(byte3, 8) + byte4
 end
@@ -229,4 +309,28 @@ function cast(struct, tab, offset)
     end
 
     return s
+end
+
+function gv16(tab, offset)
+    return lshift(tab[offset + 1], 8) + tab[offset]
+end
+
+function gv32(tab, offset)
+    return lshift(tab[offset + 3], 24) + lshift(tab[offset + 2], 16) + lshift(tab[offset + 1], 8) + tab[offset]
+end
+
+function sv16(tab, offset, value)
+    local b1,b2 = splitInt16(value)
+
+    tab[offset] = b2
+    tab[offset + 1] = b1
+end
+
+function sv32(tab, offset, value)
+    local b1,b2,b3,b4 = splitInt32(value)
+
+    tab[offset] = b4
+    tab[offset + 1] = b3
+    tab[offset + 2] = b2
+    tab[offset + 3] = b1
 end

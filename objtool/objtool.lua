@@ -85,7 +85,7 @@ if arg[1] == "info" then
 	for i = 1, 3 do
 		local s = image.sections[i]
 
-		print(string.format("%s @ $%X", s.name, s.linkedAddress))
+		print(string.format("%s %d bytes @ $%X (off $%X)", s.name, s.size, s.linkedAddress, s.offset))
 	end
 elseif arg[1] == "symbols" then
 	if not arg[2] then
@@ -201,7 +201,7 @@ elseif arg[1] == "fixups" then
 			local sym = v.symbol
 
 			if sym then
-				print(string.format("%s: %x ref %s: %s (@%x) (target type: %d>>%d)", s.name, v.offset, (image.sections[sym.section] or {["name"]="extern"}).name, (sym.name or "_"), sym.value, v.size, v.shift))
+				print(string.format("%s: %x ref %s: %s (@%x) (target type: %d)", s.name, v.offset, (image.sections[sym.section] or {["name"]="extern"}).name, (sym.name or "_"), sym.value, v.type))
 			end
 		end
 	end
@@ -443,8 +443,6 @@ elseif arg[1] == "link" then
 
 		if imgname == "-d" then
 			dy = true
-		elseif imgname == "-s" then
-			dy = false
 		else
 			if linked[arg[i]] then
 				print("objtool: warning: ignoring duplicate object "..arg[i])
@@ -479,6 +477,8 @@ elseif arg[1] == "link" then
 			end
 		end
 	end
+
+	out:relocate()
 
 	if not fragment then
 		local unr = {}

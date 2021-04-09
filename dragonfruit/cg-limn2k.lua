@@ -905,7 +905,7 @@ local function mkmod(errtok, dest, src, mask, mnem, mnemi, noncommutative)
 end
 
 local function conditional(cond, out, inv, lockref)
-	local e = reg_t(nil, "tf", errtok)
+	local e = reg_t(nil, "tf", nil)
 
 	local rs = retone(cond, e, true, lockref)
 

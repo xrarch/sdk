@@ -94,7 +94,7 @@ fn VFPrintf { argvt argcn fmt fd -- }
 	auto fl
 
 	auto max
-	argcn@ 4 * max!
+	argcn@ WORD * max!
 	
 	while (i@ sl@ <)
 		auto char

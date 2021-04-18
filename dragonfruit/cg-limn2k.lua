@@ -19,6 +19,9 @@ end
 
 local cg = {}
 
+cg.ptrsize = 4
+cg.wordsize = 4
+
 local textsection
 
 local datasection
@@ -283,7 +286,7 @@ end
 
 local function loadimmf(r, mask)
 	if (r.typ == "imm") then
-		if (not tonumber(r.id)) or (band(r.id, bnot(mask)) ~= 0) or (r.id == 0) then
+		if (not tonumber(r.id)) or (band(r.id, bnot(mask)) ~= 0) or (mask == 0) then
 			local e = ralloc(r.errtok)
 
 			if not e then return false end

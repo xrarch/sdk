@@ -93,7 +93,7 @@ for i = 1, #arg/2 do
 		os.exit(1)
 	end
 
-	local o = codegen.gen(eval.eval(parser.parse(lexer, srcf:read("*a"), source, incdir, eval.immop)))
+	local o = codegen.gen(eval.eval(parser.parse(lexer, srcf:read("*a"), source, incdir, eval.immop, codegen)))
 
 	if not o then
 		print("dragonc: couldn't compile "..source.."!")

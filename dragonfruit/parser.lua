@@ -916,7 +916,7 @@ function parser.asm()
 	return t[1]
 end
 
-function parser.parse(lexer, sourcetext, filename, incd, reserve)
+function parser.parse(lexer, sourcetext, filename, incd, reserve, cg)
 	lex = lexer.new(sourcetext, filename)
 
 	res = reserve
@@ -929,6 +929,9 @@ function parser.parse(lexer, sourcetext, filename, incd, reserve)
 
 	currentfn = {}
 	currentfn.def = {}
+
+	define("WORD", "const", nil, false, cg.wordsize)
+	define("PTR", "const", nil, false, cg.ptrsize)
 
 	local asms = {}
 

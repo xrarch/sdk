@@ -1171,7 +1171,7 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 				error("no tos")
 			end
 
-			if (tos.kind == "num") and (tos.value == 0) then
+			if (tos.kind == "num") and (tos.ident == 0) then
 				-- forget this ever happened, this while loop will never run
 				-- the opposite optimization, for if the conditional is just 1,
 				-- is a burden of the backend
@@ -1212,10 +1212,10 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 
 				local done = false
 
-				if (tos.kind == "num") and (tos.value == 0) then
+				if (tos.kind == "num") and (tos.ident == 0) then
 					-- forget this ever happened, this if block will never run
 				else
-					if (tos.kind == "num") and (tos.value ~= 0) then -- this block will always run eventually, so dont bother including the other conditionals
+					if (tos.kind == "num") and (tos.ident ~= 0) then -- this block will always run eventually, so dont bother including the other conditionals
 						done = true
 					end
 

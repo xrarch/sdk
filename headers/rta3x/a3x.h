@@ -51,3 +51,7 @@ externptr a3xCIPtr (* var *)
 externptr a3xFwctx (* var *)
 
 externptr a3xMyDevice (* var *)
+
+const MEMORYFREE     1
+const MEMORYRESERVED 2
+const MEMORYBAD      3

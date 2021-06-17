@@ -25,21 +25,6 @@ dofile(sd.."misc.lua")
 
 local loff = {}
 
-loff.archinfo = {}
-local archinfo = loff.archinfo
-
-archinfo[1] = {}
-archinfo[1].name = "limn1k"
-archinfo[1].align = 1
-
-archinfo[2] = {}
-archinfo[2].name = "limn2k"
-archinfo[2].align = 4
-
-archinfo[3] = {}
-archinfo[3].name = "riscv32"
-archinfo[3].align = 4
-
 local loffheader_s = struct {
 	{4, "magic"},
 	{4, "symbolTableOffset"},
@@ -98,7 +83,7 @@ local RELOC_LIMN2K_24 = 3
 local RELOC_LIMN2K_32 = 4
 local RELOC_LIMN2K_LA = 5
 
-local function doFixup(tab, off, nval, rtype)
+local function doFixupLimn2k(tab, off, nval, rtype)
 	local old = gv32(tab, off)
 	local new = old
 
@@ -122,6 +107,54 @@ local function doFixup(tab, off, nval, rtype)
 
 	sv32(tab, off, new)
 end
+
+local RELOC_LIMN2500_LONG = 1
+local RELOC_LIMN2500_ABSJ = 2
+local RELOC_LIMN2500_LA   = 3
+
+local function doFixupLimn2500(tab, off, nval, rtype)
+	local old = gv32(tab, off)
+	local new = old
+
+	if rtype == RELOC_LIMN2500_ABSJ then
+		new = bor(band(old, 0x7), lshift(band(rshift(nval, 2), 0x1FFFFFFF), 3))
+	elseif rtype == RELOC_LIMN2500_LONG then
+		new = nval
+	elseif rtype == RELOC_LIMN2500_LA then
+		local old2 = gv32(tab, off + 4)
+
+		new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
+
+		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+
+		sv32(tab, off + 4, new2)
+	else
+		error("unknown relocation type "..rtype)
+	end
+
+	sv32(tab, off, new)
+end
+
+loff.archinfo = {}
+local archinfo = loff.archinfo
+
+archinfo[1] = {}
+archinfo[1].name = "limn1k"
+archinfo[1].align = 1
+
+archinfo[2] = {}
+archinfo[2].name = "limn2k"
+archinfo[2].align = 4
+archinfo[2].fixup = doFixupLimn2k
+
+archinfo[3] = {}
+archinfo[3].name = "riscv32"
+archinfo[3].align = 4
+
+archinfo[4] = {}
+archinfo[4].name = "limn2500"
+archinfo[4].align = 4
+archinfo[4].fixup = doFixupLimn2500
 
 function loff.new(filename, libname, fragment)
 	local iloff = {}
@@ -155,6 +188,8 @@ function loff.new(filename, libname, fragment)
 	iloff.imports = {}
 
 	iloff.isym = {}
+
+	local doFixup
 
 	for i = 1, 3 do
 		iloff.sections[i] = {}
@@ -235,6 +270,8 @@ function loff.new(filename, libname, fragment)
 		self.codeType = self.header.gv("targetArchitecture")
 
 		self.archinfo = archinfo[self.codeType]
+
+		doFixup = self.archinfo.fixup
 
 		self.localSymNames = false
 
@@ -1000,6 +1037,8 @@ function loff.new(filename, libname, fragment)
 	function iloff:link(with, dynamic)
 		if not self.codeType then
 			self.codeType = with.codeType
+
+			doFixup = with.archinfo.fixup
 		end
 
 		-- print(self.path, with.path)

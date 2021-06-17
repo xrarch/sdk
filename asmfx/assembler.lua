@@ -98,6 +98,8 @@ local function match(isa, format, formattok, linetok)
 		elseif state == 1 then -- get format type
 			if fc == "r" then
 				operandtype = 0
+			elseif fc == "c" then
+				operandtype = 6 -- control register
 			elseif fc == "n" then
 				operandtype = 1
 
@@ -141,7 +143,7 @@ local function match(isa, format, formattok, linetok)
 
 			local lc = linetok:sub(place, place)
 
-			if operandtype == 0 then -- match register name
+			if (operandtype == 0) or (operandtype == 6) then -- match register name
 				local rn = ""
 
 				while #lc > 0 do
@@ -156,8 +158,16 @@ local function match(isa, format, formattok, linetok)
 					lc = linetok:sub(place, place)
 				end
 
-				if isa.registers[rn] then
-					operandvalue = isa.registers[rn]
+				local chktab
+
+				if operandtype == 0 then
+					chktab = isa.registers
+				else
+					chktab = isa.controlregisters
+				end
+
+				if chktab[rn] then
+					operandvalue = chktab[rn]
 				else
 					return false
 				end

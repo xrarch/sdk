@@ -58,6 +58,10 @@ local isas = {
 		archid = 2,
 		align = 4,
 	},
+	["limn2500"] = {
+		archid = 4,
+		align = 4,
+	},
 }
 
 local symbolnames = {

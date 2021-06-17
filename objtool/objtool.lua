@@ -59,7 +59,7 @@ local symtypen = {"global","local","extern","special"}
 
 local sectionn = {"text","data","bss"}
 
-local archn = {"limn1k","limn2k","riscv32"}
+local archn = {"limn1k","limn2k","riscv32","limn2500"}
 
 if arg[1] == "info" then
 	if not arg[2] then

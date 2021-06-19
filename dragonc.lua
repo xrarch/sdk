@@ -15,7 +15,7 @@ local sd = getdirectory(arg[0])
 
 local flat = false
 local incdir = ""
-local target = "target=limn2k"
+local target = "target=limn2500"
 
 local narg = {}
 
@@ -33,7 +33,7 @@ end
 
 local function printhelp()
 	print("== dragonc.lua ==")
-	print("compiler for dragonfruit to loff/limn2k object files")
+	print("compiler for dragonfruit to loff/limn2500 object files")
 	print("(or flat binaries with the -flat argument)")
 	print("usage: dragonc.lua [source1 source2 ...] [dest1 dest2 ...]")
 end

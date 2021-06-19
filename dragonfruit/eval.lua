@@ -871,48 +871,6 @@ eval.immop = {
 		return op_t(tok, "break")
 	end,
 
-	["bitget"] = function (s, tok) -- (v bit -- bit)
-		local op1 = s.pop(tok)
-		if not op1 then return false end
-
-		local op2 = s.pop(tok)
-		if not op2 then return false end
-
-		if (op1.kind == "num") and (op2.kind == "num") then
-			s.push(stacknode_t("num", band(rshift(op2.ident, op1.ident), 1), tok))
-			return
-		end
-
-		s.push(stacknode_t("op", nil, tok, "bitget", op2, op1))
-	end,
-	["bitset"] = function (s, tok) -- (v bit -- v)
-		local op1 = s.pop(tok)
-		if not op1 then return false end
-
-		local op2 = s.pop(tok)
-		if not op2 then return false end
-
-		if (op1.kind == "num") and (op2.kind == "num") then
-			s.push(stacknode_t("num", bor(op1.ident, lshift(1, op2.ident)), tok))
-			return
-		end
-
-		s.push(stacknode_t("op", nil, tok, "bitset", op2, op1))
-	end,
-	["bitclear"] = function (s, tok) -- (v bit -- v)
-		local op1 = s.pop(tok)
-		if not op1 then return false end
-
-		local op2 = s.pop(tok)
-		if not op2 then return false end
-
-		if (op1.kind == "num") and (op2.kind == "num") then
-			s.push(stacknode_t("num", band(op1.ident, bnot(lshift(1, op2.ident))), tok))
-			return
-		end
-
-		s.push(stacknode_t("op", nil, tok, "bitclear", op2, op1))
-	end,
 	["alloc"] = function (s, tok) -- (size -- ptr)
 		local size = s.pop(tok)
 		if not size then return false end

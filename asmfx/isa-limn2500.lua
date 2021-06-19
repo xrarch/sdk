@@ -358,6 +358,49 @@ addFormat(
 	"rori ^rd ^rb ^ns"
 )
 
+addFormat(
+	{
+		["d"] = {
+			repeatbits=2,
+			repeatbitsby=5,
+		}
+	},
+	"0000000000000001dddddddddd10110000100000000bbbbbaaaaaddddd111001", -- xor rd, ra, rb; slti rd, rd, 1
+	"seq ^rd ^ra ^rb"
+)
+addFormat(
+	{
+		["d"] = {
+			repeatbits=2,
+			repeatbitsby=5,
+		}
+	},
+	"0000000000000001dddddddddd101100iiiiiiiiiiiiiiiiaaaaaddddd010100", -- xori rd, ra, i; slti rd, rd, 1
+	"seqi ^rd ^ra ^ni"
+)
+
+
+addFormat(
+	{
+		["d"] = {
+			repeatbits=2,
+			repeatbitsby=5,
+		}
+	},
+	"01010000000ddddd00000ddddd11100100100000000bbbbbaaaaaddddd111001", -- xor rd, ra, rb; slt rd, zero, rd
+	"sne ^rd ^ra ^rb"
+)
+addFormat(
+	{
+		["d"] = {
+			repeatbits=2,
+			repeatbitsby=5,
+		}
+	},
+	"01010000000ddddd00000ddddd111001iiiiiiiiiiiiiiiiaaaaaddddd010100", -- xori rd, ra, i; slt rd, zero, rd
+	"snei ^rd ^ra ^ni"
+)
+
 -- REAL INSTRUCTIONS
 
 addFormat(

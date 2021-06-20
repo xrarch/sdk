@@ -51,8 +51,14 @@ asm "
 ;a2 - ptr
 memset:
 .global memset
+	mov  t0, sp
+	subi sp, sp, 8
+	mov  long [sp + 4], lr
+	mov  long [sp], t0
+
 	bne  a1, zero, .gzero
 
+	addi sp, sp, 8
 	ret
 
 .gzero:
@@ -138,6 +144,7 @@ memset:
 	bne  t1, zero, .b1
 
 .b1done:
+	addi sp, sp, 8
 	ret
 
 ;a0 - sz
@@ -145,6 +152,11 @@ memset:
 ;a2 - dest
 memcpy:
 .global memcpy
+	mov  t0, sp
+	subi sp, sp, 8
+	mov  long [sp + 4], lr
+	mov  long [sp], t0
+
 	beq  a0, zero, .zerosize
 
 	xor  t0, a1, a2
@@ -155,6 +167,7 @@ memcpy:
 	b     .unaligned
 
 .zerosize:
+	addi sp, sp, 8
 	ret
 
 .aligned_with_eachother:
@@ -443,6 +456,7 @@ memcpy:
 	bne  t0, zero, .b1
 
 .done:
+	addi sp, sp, 8
 	ret
 
 "

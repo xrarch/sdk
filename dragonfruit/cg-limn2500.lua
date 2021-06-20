@@ -1317,11 +1317,11 @@ function cg.func(func)
 
 		exarg = math.max(exarg, cgc.argvs)
 
-		if cgc.args > 4 then -- the limn2k ABI gives us 4 registers to use for arguments
+		if cgc.args > 4 then -- the limn2500 ABI gives us 4 registers to use for arguments
 			exarg = math.max(exarg, cgc.args - 4)
 		end
 
-		if cgc.os > 4 then -- the limn2k ABI gives us 4 registers to use for outputs
+		if cgc.os > 4 then -- the limn2500 ABI gives us 4 registers to use for outputs
 			exret = math.max(exret, cgc.os - 4)
 		end
 

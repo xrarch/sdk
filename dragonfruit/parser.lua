@@ -289,6 +289,14 @@ function parser.signature(extern, fnptr)
 			return false
 		end
 
+		if #sig.fin ~= #sig2.fin then
+			return false
+		end
+
+		if #sig.out ~= #sig2.out then
+			return false
+		end
+
 		for k,v in ipairs(sig.fin) do
 			if sig2.fin[k] ~= v then
 				return false

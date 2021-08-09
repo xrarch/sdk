@@ -619,7 +619,7 @@ local optable = {
 
 		if not rd then return false end
 
-		text("\tli "..rd.n..", 0")
+		text("\tli   "..rd.n..", 0")
 
 		local out = locallabel()
 

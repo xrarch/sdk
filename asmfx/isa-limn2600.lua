@@ -1,6 +1,6 @@
 local isa = {}
 
-isa.name = "limn2500"
+isa.name = "limn2600"
 
 isa.bits = 32
 
@@ -129,7 +129,7 @@ function isa.reloctype(format, relocation)
 			error("weird relocation")
 		end
 	else
-		print("asm: isa-limn2500: I don't support "..format.name)
+		print("asm: isa-limn2600: I don't support "..format.name)
 		return false
 	end
 end
@@ -289,7 +289,7 @@ addFormat(
 			relative=true
 		}
 	},
-	"jjjjjjjjjjjjjjjj0000000000011101", -- beqi zero, 0, j
+	"jjjjjjjjjjjjjjjjjjjjj00000111101", -- beq zero, j
 	"b ^nj"
 )
 
@@ -432,8 +432,8 @@ addFormat(
 			relative=true
 		}
 	},
-	"jjjjjjjjjjjjjjjjbbbbbaaaaa111101", -- beq ra, rb, j
-	"beq ^ra ^rb ^nj"
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa111101", -- beq ra, j
+	"beq ^ra ^nj"
 )
 addFormat(
 	{
@@ -443,8 +443,8 @@ addFormat(
 			relative=true
 		}
 	},
-	"jjjjjjjjjjjjjjjjbbbbbaaaaa110101", -- bne ra, rb, j
-	"bne ^ra ^rb ^nj"
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa110101", -- bne ra, j
+	"bne ^ra ^nj"
 )
 addFormat(
 	{
@@ -454,63 +454,8 @@ addFormat(
 			relative=true
 		}
 	},
-	"jjjjjjjjjjjjjjjjbbbbbaaaaa101101", -- blt ra, rb, j
-	"blt ^ra ^rb ^nj"
-)
-addFormat(
-	{
-		["j"] = {
-			mask=0x3,
-			shift=2,
-			relative=true
-		}
-	},
-	"jjjjjjjjjjjjjjjjbbbbbaaaaa100101", -- blt signed ra, rb, j
-	"blt signed ^ra ^rb ^nj"
-)
-addFormat(
-	{
-		["j"] = {
-			mask=0x3,
-			shift=2,
-			relative=true
-		}
-	},
-	"jjjjjjjjjjjjjjjjiiiiiaaaaa011101", -- beqi ra, i, j
-	"beqi ^ra ^ni ^nj"
-)
-addFormat(
-	{
-		["j"] = {
-			mask=0x3,
-			shift=2,
-			relative=true
-		}
-	},
-	"jjjjjjjjjjjjjjjjiiiiiaaaaa010101", -- bnei ra, i, j
-	"bnei ^ra ^ni ^nj"
-)
-addFormat(
-	{
-		["j"] = {
-			mask=0x3,
-			shift=2,
-			relative=true
-		}
-	},
-	"jjjjjjjjjjjjjjjjiiiiiaaaaa001101", -- blti ra, i, j
-	"blti ^ra ^ni ^nj"
-)
-addFormat(
-	{
-		["j"] = {
-			mask=0x3,
-			shift=2,
-			relative=true
-		}
-	},
-	"jjjjjjjjjjjjjjjjiiiiiaaaaa001101", -- blti signed ra, i, j
-	"blti signed ^ra ^ni ^nj"
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa101101", -- blt ra, j
+	"blt ^ra ^nj"
 )
 
 addFormat(
@@ -1158,41 +1103,3 @@ addFormat(
 )
 
 return isa
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

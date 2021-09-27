@@ -50,9 +50,10 @@ local targets = {
 	["limn2k"] = "cg-limn2k.lua",
 	["riscv"] = "cg-riscv.lua",
 	["limn2500"] = "cg-limn2500.lua",
+	["limn2600"] = "cg-limn2600.lua"
 }
 
-local target = "limn2500"
+local target = "limn2600"
 
 local narg = {}
 

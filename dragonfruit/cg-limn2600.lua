@@ -14,7 +14,7 @@ local function tprint (tbl, indent)
 end
 
 local function lerror(token, err)
-	print(string.format("dragonc: cg-limn2k: %s:%d: %s", token[4], token[3], err))
+	print(string.format("dragonc: cg-limn2600: %s:%d: %s", token[4], token[3], err))
 end
 
 local cg = {}
@@ -32,9 +32,9 @@ local defs
 
 local curfn
 
-local SAVEMAX = 14
+local SAVEMAX = 18
 
-local TEMPMAX = 4
+local TEMPMAX = 5
 
 local wpushdown = {}
 
@@ -119,9 +119,9 @@ local function reg_t(id, typ, errtok, auto, muted)
 	elseif typ == "arg" then
 		r.n = "a"..tostring(id)
 	elseif typ == "ret" then
-		r.n = "v"..tostring(id)
+		r.n = "a"..tostring(id)
 	elseif typ == "tf" then
-		r.n = "tf"
+		error("oop")
 	elseif typ == "sp" then
 		r.n = "sp"
 	end
@@ -273,20 +273,24 @@ end
 local function loadimm(r, imm)
 	if tonumber(imm) then
 		if band(imm, 0xFFFF0000) == 0 then
-			text("\tli "..r.n..", "..tostring(imm))
+			text("\tli   "..r.n..", "..tostring(imm))
 		elseif band(imm, 0xFFFF) == 0 then
-			text("\tlui "..r.n..", "..tostring(imm))
+			text("\tlui  "..r.n..", zero, "..tostring(imm))
+		elseif (imm < 0) and (imm >= -65535) then
+			text("\tsubi "..r.n..", zero, "..tostring(math.abs(imm)))
 		else
-			text("\tla "..r.n..", "..tostring(imm))
+			text("\tla   "..r.n..", "..tostring(imm))
 		end
 	else
-		text("\tla "..r.n..", "..imm)
+		text("\tla   "..r.n..", "..imm)
 	end
 end
 
-local function loadimmf(r, mask)
+local function loadimmf(r, mask, min, max)
 	if (r.typ == "imm") then
-		if (not tonumber(r.id)) or (band(r.id, bnot(mask)) ~= 0) or (mask == 0) then
+		if min and tonumber(r.id) and (r.id >= min) and (r.id <= max) then
+			return r, false
+		elseif (not tonumber(r.id)) or (band(r.id, bnot(mask)) ~= 0) or (mask == 0) then
 			local e = ralloc(r.errtok)
 
 			if not e then return false end
@@ -396,7 +400,7 @@ local function genarith(errtok, oper1, oper2, rootcanmut, mask, mnem, mnemi, non
 	if not rd then return false end
 
 	if imm then
-		text("\t"..mnem.." "..rd.n..", "..reg1.n..", "..tostring(imm))
+		text("\t"..mnemi.." "..rd.n..", "..reg1.n..", "..tostring(imm))
 	else
 		text("\t"..mnem.." "..rd.n..", "..reg1.n..", "..reg2.n)
 	end
@@ -440,11 +444,11 @@ local function mkload(errtok, src, auto, mnem, mask, rootcanmut, lomask)
 	if not rd then return false end
 
 	if not add then
-		text("\tmov "..rd.n..", "..mnem.." ["..rs.n.."]")
+		text("\tmov  "..rd.n..", "..mnem.." ["..rs.n.."]")
 	elseif reg2 then
-		text("\tmov "..rd.n..", "..mnem.." ["..rs.n.." + "..reg2.n.."]")
+		text("\tmov  "..rd.n..", "..mnem.." ["..rs.n.." + "..reg2.n.."]")
 	elseif imm then
-		text("\tmov "..rd.n..", "..mnem.." ["..rs.n.." + "..tostring(imm).."]")
+		text("\tmov  "..rd.n..", "..mnem.." ["..rs.n.." + "..tostring(imm).."]")
 	end
 
 	freeofp(rd, rs, reg2)
@@ -454,56 +458,46 @@ end
 
 local optable = {
 	["@"] = function (errtok, op, rootcanmut)
-		return mkload(errtok, op.opers[1], true, "long", 0x3FC, rootcanmut, 3)
+		return mkload(errtok, op.opers[1], true, "long", 0x3FFFC, rootcanmut, 3)
 	end,
 	["gi"] = function (errtok, op, rootcanmut)
-		return mkload(errtok, op.opers[1], false, "int", 0x1FE, rootcanmut, 1)
+		return mkload(errtok, op.opers[1], false, "int", 0x1FFFE, rootcanmut, 1)
 	end,
 	["gb"] = function (errtok, op, rootcanmut)
-		return mkload(errtok, op.opers[1], false, "byte", 0xFF, rootcanmut)
+		return mkload(errtok, op.opers[1], false, "byte", 0xFFFF, rootcanmut)
 	end,
 
 	["+"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "add", "addi")
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "add ", "addi")
 	end,
 	["-"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "sub", "subi", true)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "sub ", "subi", true)
 	end,
 	["*"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "mul", "muli")
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0, "mul ", nil)
 	end,
 	["/"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "div", "divi", true)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0, "div ", nil, true)
 	end,
 	["%"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "mod", "modi", true)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0, "mod ", nil, true)
 	end,
 
 	[">>"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "rsh", "rshi", true)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "rsh ", "rshi", true)
 	end,
 	["<<"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "lsh", "lshi", true)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "lsh ", "lshi", true)
 	end,
 
 	["&"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "and", "andi")
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "and ", "andi")
 	end,
 	["|"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "or", "ori")
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "or  ", "ori ")
 	end,
 	["^"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "xor", "xori")
-	end,
-
-	["bitget"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "bget", "bgeti", true)
-	end,
-	["bitset"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "bset", "bseti", true)
-	end,
-	["bitclear"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "bclr", "bclri", true)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "xor ", "xori")
 	end,
 
 	["~"] = function (errtok, op, rootcanmut)
@@ -517,7 +511,7 @@ local optable = {
 
 		if not rd then return false end
 
-		text("\tnot "..rd.n..", "..rs.n)
+		text("\tnor  "..rd.n..", "..rs.n..", "..rs.n)
 
 		freeofp(rd, rs)
 
@@ -525,29 +519,29 @@ local optable = {
 	end,
 
 	["=="] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "seq", "seqi")
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "seq ", "seqi")
 	end,
 
 	["~="] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "sne", "snei")
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "sne ", "snei")
 	end,
 
 	["<"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "slt", "slti", true)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "slt ", "slti", true)
 	end,
 	[">"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFF, "slt", "slti", true)
+		return genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFFFF, "slt ", "slti", true)
 	end,
 
 	["s<"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "slt signed", "slti signed", true)
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "slt  signed", "slti  signed", true)
 	end,
 	["s>"] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFF, "slt signed", "slti signed", true)
+		return genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFFFF, "slt  signed", "slti  signed", true)
 	end,
 
 	["<="] = function (errtok, op, rootcanmut) -- same thing as not-greater
-		local e = genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFF, "slt", "slti", true)
+		local e = genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFFFF, "slt ", "slti", true)
 
 		if not e then return false end
 
@@ -556,7 +550,7 @@ local optable = {
 		return e
 	end,
 	[">="] = function (errtok, op, rootcanmut) -- same thing as not-less
-		local e = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "slt", "slti", true)
+		local e = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "slt ", "slti", true)
 
 		if not e then return false end
 
@@ -566,7 +560,7 @@ local optable = {
 	end,
 
 	["s<="] = function (errtok, op, rootcanmut) -- same thing as not-greater
-		local e = genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFF, "slt signed", "slti signed", true)
+		local e = genarith(errtok, op.opers[2], op.opers[1], rootcanmut, 0xFFFF, "slt  signed", "slti  signed", true)
 
 		if not e then return false end
 
@@ -575,7 +569,7 @@ local optable = {
 		return e
 	end,
 	["s>="] = function (errtok, op, rootcanmut) -- same thing as not-less
-		local e = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "slt signed", "slt signed", true)
+		local e = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "slt  signed", "slti  signed", true)
 
 		if not e then return false end
 
@@ -597,14 +591,14 @@ local optable = {
 	end,
 
 	["||"] = function (errtok, op, rootcanmut)
-		local rd = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFF, "or", "ori")
+		local rd = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "or  ", "ori ")
 
 		if not rd then return false end
 
 		-- doing getmutreg isnt necessary because genarith already did that for us,
 		-- so rd is guaranteed not to be directly an auto
 
-		text("\tsne "..rd.n..", "..rd.n..", zero")
+		text("\tsne  "..rd.n..", "..rd.n..", zero")
 
 		return rd
 	end,
@@ -625,13 +619,13 @@ local optable = {
 
 		if not rd then return false end
 
-		text("\tli "..rd.n..", 0")
+		text("\tli   "..rd.n..", 0")
 
 		local out = locallabel()
 
-		text("\tbeq "..reg1.n..", zero, "..out)
+		text("\tbeq  "..reg1.n..", "..out)
 
-		text("\tsne "..rd.n..", "..reg2.n..", zero")
+		text("\tsne  "..rd.n..", "..reg2.n..", zero")
 
 		text(out..":")
 
@@ -647,7 +641,7 @@ local optable = {
 	["alloc"] = function (errtok, op, rootcanmut)
 		local offset = op.opers[1]
 
-		return genarith(errtok, curfn.allocoff, offset, rootcanmut, 0xFF, "add", "addi")
+		return genarith(errtok, curfn.allocoff, offset, rootcanmut, 0xFFFF, "add ", "addi")
 	end,
 
 	["index"] = function (errtok, op, rootcanmut)
@@ -676,7 +670,7 @@ local optable = {
 			ri = curfn.argvoff
 		end
 
-		rs, l = loadimmf(rs, 0x3F)
+		rs, l = loadimmf(rs, 0x3FFF)
 
 		if not rs then return false end
 
@@ -688,13 +682,12 @@ local optable = {
 
 		if imm2 then
 			if imm2 ~= 0 then
-				text("\tadd "..rd.n..", "..ri.n..", "..tostring(rs.id * 4))
+				text("\taddi "..rd.n..", "..ri.n..", "..tostring(rs.id * 4))
 			else
 				freeofp(ri, rd)
 			end
 		else
-			text("\tlsh at, "..rs.n..", 2")
-			text("\tadd "..rd.n..", "..ri.n..", at")
+			text("\tadd  "..rd.n..", "..ri.n..", "..rs.n.." LSH 2")
 		end
 
 		freeofp(rd, rs)
@@ -774,7 +767,7 @@ function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, al
 
 				if not rd then return false end
 
-				text("\tseq "..rd.n..", "..ro.n..", 0")
+				text("\tseq  "..rd.n..", "..ro.n..", zero")
 
 				freeofp(rd, ro)
 
@@ -839,13 +832,22 @@ local function mkstore(errtok, dest, src, auto, mnem, mask, lomask)
 			loadimm(rd, rs.id)
 		elseif not rd.muted then
 			if rd.n ~= rs.n then
-				text("\tmov "..rd.n..", "..rs.n)
+				text("\tmov  "..rd.n..", "..rs.n)
 			end
 		end
 	else
 		local l
 
-		rs, l = loadimmf(rs, 0xFF)
+		if (rs.typ == "imm") and (reg2) then
+			-- can't have a reg offset and imm src in limn2500.
+			-- we have to load the imm here
+
+			rs, l = loadimmf(rs, 0)
+
+			if not rs then return false end
+		else
+			rs, l = loadimmf(rs, 0, -16, 15)
+		end
 
 		local imm2
 
@@ -853,7 +855,7 @@ local function mkstore(errtok, dest, src, auto, mnem, mask, lomask)
 			imm2 = rs.id
 		end
 
-		local rn = "zero"
+		local rn = "0"
 
 		if add then
 			if reg2 then
@@ -863,26 +865,12 @@ local function mkstore(errtok, dest, src, auto, mnem, mask, lomask)
 			end
 		end
 
-		local mn
-
 		if imm2 then
-			if imm then
-				mn = "\tmov "..mnem.." ["
-			else
-				mn = "\tmov "..mnem.." ["
-			end
-
-			text(mn..rd.n.." + "..rn.."], "..tostring(imm2))
+			text("\tmov  "..mnem.." ["..rd.n.." + "..rn.."], "..tostring(imm2))
 		else
-			if imm then
-				mn = "\tmov "..mnem.." ["
-			else
-				mn = "\tmov "..mnem.." ["
-			end
-
 			-- tprint(rd)
 
-			text(mn..rd.n.." + "..rn.."], "..rs.n)
+			text("\tmov  "..mnem.." ["..rd.n.." + "..rn.."], "..rs.n)
 		end
 	end
 
@@ -894,7 +882,7 @@ end
 local function mkmod(errtok, dest, src, mask, mnem, mnemi, noncommutative)
 	local rcm = shouldmut(dest)
 
-	local rd = mkload(errtok, dest, true, "long", 0x3FC, true)
+	local rd = mkload(errtok, dest, true, "long", 0x3FFFC, true)
 
 	if not rd then return false end
 
@@ -902,40 +890,42 @@ local function mkmod(errtok, dest, src, mask, mnem, mnemi, noncommutative)
 
 	if not rd then return false end
 
-	if not mkstore(errtok, dest, rd, true, "long", 0x3FC) then return false end
+	if not mkstore(errtok, dest, rd, true, "long", 0x3FFFC) then return false end
 
 	return true
 end
 
 local function conditional(cond, out, inv, lockref)
-	local e = reg_t(nil, "tf", nil)
+	-- TODO make this generate nicer branches
+
+	local e = ralloc(cond.errtok)
 
 	local rs = retone(cond, e, true, lockref)
 
 	if not rs then return false end
 
 	if (rs.typ ~= "imm") and (not e.muted) then
-		text("\tmov "..e.n..", "..rs.n)
+		text("\tmov  "..e.n..", "..rs.n)
 	end
 
 	if rs.typ ~= "imm" then
 		if rs.inverse then
 			rs.inverse = nil
 			if inv then
-				text("\tbf "..out)
+				text("\tbeq  "..e.n..", "..out)
 			else
-				text("\tbt "..out)
+				text("\tbne  "..e.n..", "..out)
 			end
 		else
 			if inv then
-				text("\tbt "..out)
+				text("\tbne  "..e.n..", "..out)
 			else
-				text("\tbf "..out)
+				text("\tbeq  "..e.n..", "..out)
 			end
 		end
 	end
 
-	freeofp(e, rs)
+	freeof(e, rs)
 
 	return true
 end
@@ -949,7 +939,7 @@ local function flushincirco()
 
 			if not e then return false end
 
-			text("\tmov "..e.n..", "..r.reg.n)
+			text("\tmov  "..e.n..", "..r.reg.n)
 
 			freeof(r.reg)
 
@@ -969,56 +959,56 @@ end
 
 local muttable = {
 	["!"] = function (errtok, op)
-		return mkstore(errtok, op.opers[1], op.opers[2], true, "long", 0x3FC, 3)
+		return mkstore(errtok, op.opers[1], op.opers[2], true, "long", 0x3FFFC, 3)
 	end,
 	["si"] = function (errtok, op)
-		return mkstore(errtok, op.opers[1], op.opers[2], false, "int", 0x1FE, 1)
+		return mkstore(errtok, op.opers[1], op.opers[2], false, "int", 0x1FFFE, 1)
 	end,
 	["sb"] = function (errtok, op)
-		return mkstore(errtok, op.opers[1], op.opers[2], false, "byte", 0xFF)
+		return mkstore(errtok, op.opers[1], op.opers[2], false, "byte", 0xFFFF)
 	end,
 
 	["+="] = function (errtok, op)
-		return mkmod(errtok, op.opers[1], op.opers[2], 0xFF, "add", "addi")
+		return mkmod(errtok, op.opers[1], op.opers[2], 0xFFFF, "add ", "addi")
 	end,
 	["-="] = function (errtok, op)
-		return mkmod(errtok, op.opers[1], op.opers[2], 0xFF, "sub", "subi", true)
+		return mkmod(errtok, op.opers[1], op.opers[2], 0xFFFF, "sub ", "subi", true)
 	end,
 
 	["*="] = function (errtok, op)
-		return mkmod(errtok, op.opers[1], op.opers[2], 0xFF, "mul", "muli")
+		return mkmod(errtok, op.opers[1], op.opers[2], 0, "mul ", nil)
 	end,
 	["/="] = function (errtok, op)
-		return mkmod(errtok, op.opers[1], op.opers[2], 0xFF, "div", "divi", true)
+		return mkmod(errtok, op.opers[1], op.opers[2], 0, "div ", nil, true)
 	end,
 
 	["%="] = function (errtok, op)
-		return mkmod(errtok, op.opers[1], op.opers[2], 0xFF, "mod", "modi", true)
+		return mkmod(errtok, op.opers[1], op.opers[2], 0, "mod ", nil, true)
 	end,
 
 	[">>="] = function (errtok, op)
-		return mkmod(errtok, op.opers[1], op.opers[2], 0xFF, "rsh", "rshi", true)
+		return mkmod(errtok, op.opers[1], op.opers[2], 0x1F, "rsh ", "rshi", true)
 	end,
 	["<<="] = function (errtok, op)
-		return mkmod(errtok, op.opers[1], op.opers[2], 0xFF, "lsh", "lshi", true)
+		return mkmod(errtok, op.opers[1], op.opers[2], 0x1F, "lsh ", "lshi", true)
 	end,
 
 	["&="] = function (errtok, op)
-		return mkmod(errtok, op.opers[1], op.opers[2], 0xFF, "and", "andi")
+		return mkmod(errtok, op.opers[1], op.opers[2], 0xFFFF, "and ", "andi")
 	end,
 
 	["|="] = function (errtok, op)
-		return mkmod(errtok, op.opers[1], op.opers[2], 0xFF, "or", "ori")
+		return mkmod(errtok, op.opers[1], op.opers[2], 0xFFFF, "or  ", "ori ")
 	end,
 
 	["return"] = function (errtok, op)
-		text("\tb .epilogue")
+		text("\tb    .epilogue")
 
 		return true
 	end,
 
 	["break"] = function (errtok, op)
-		text("\tb "..wpushdown[#wpushdown])
+		text("\tb    "..wpushdown[#wpushdown])
 
 		return true
 	end,
@@ -1035,7 +1025,7 @@ local muttable = {
 		local an
 
 		if op.fn.varin then
-			text("\tli a0, "..op.argvs)
+			text("\tli  a0, "..op.argvs)
 			an = 1
 		else
 			an = 0
@@ -1057,7 +1047,7 @@ local muttable = {
 				if r.typ == "imm" then
 					loadimm(e, r.id)
 				elseif not e.muted then
-					text("\tmov "..e.n..", "..r.n)
+					text("\tmov  "..e.n..", "..r.n)
 				end
 
 				curfn.mutreg = nil
@@ -1073,7 +1063,7 @@ local muttable = {
 
 				if not r then return false end
 
-				r, l = loadimmf(r, 0xFF)
+				r, l = loadimmf(r, 0, -16, 15)
 
 				local imm2
 
@@ -1082,9 +1072,9 @@ local muttable = {
 				end
 
 				if imm2 then
-					text("\tmov long [sp + "..tostring(reached).."], "..tostring(imm2))
+					text("\tmov  long [sp + "..tostring(reached).."], "..tostring(imm2))
 				else
-					text("\tmov long [sp + "..tostring(reached).."], "..r.n)
+					text("\tmov  long [sp + "..tostring(reached).."], "..r.n)
 				end
 
 				freeof(r)
@@ -1100,7 +1090,7 @@ local muttable = {
 
 			if not r then return false end
 
-			r, l = loadimmf(r, 0xFF)
+			r, l = loadimmf(r, 0, -16, 15)
 
 			local imm2
 
@@ -1109,9 +1099,9 @@ local muttable = {
 			end
 
 			if imm2 then
-				text("\tmov long [sp + "..tostring(reached).."], "..tostring(imm2))
+				text("\tmov  long [sp + "..tostring(reached).."], "..tostring(imm2))
 			else
-				text("\tmov long [sp + "..tostring(reached).."], "..r.n)
+				text("\tmov  long [sp + "..tostring(reached).."], "..r.n)
 			end
 
 			freeof(r)
@@ -1124,11 +1114,11 @@ local muttable = {
 
 			if not r then return false end
 
-			text("\tjal "..r.n)
+			text("\tjalr lr, "..r.n..", 0")
 
 			freeof(r)
 		else
-			text("\tjal "..op.fn.ident)
+			text("\tjal  "..op.fn.ident)
 		end
 
 		local vn = 0
@@ -1144,7 +1134,7 @@ local muttable = {
 
 					vn = vn + 1
 
-					if vn > 1 then
+					if vn > 3 then
 						vn = nil
 					end
 				else
@@ -1152,7 +1142,7 @@ local muttable = {
 
 					if not fa.reg then return false end
 
-					text("\tmov "..fa.reg.n..", long [sp + "..tostring(reached).."]")
+					text("\tmov  "..fa.reg.n..", long [sp + "..tostring(reached).."]")
 
 					reached = reached + 4
 				end
@@ -1163,7 +1153,7 @@ local muttable = {
 			elseif vn then
 				vn = vn + 1
 
-				if vn > 1 then
+				if vn > 3 then
 					vn = nil
 				end
 			else
@@ -1212,7 +1202,7 @@ local muttable = {
 			text(cont..":")
 			if not conditional(op.conditional, loop, true) then return false end
 		else
-			text("\tb "..loop)
+			text("\tb    "..loop)
 		end
 
 		text(out..":")
@@ -1251,7 +1241,7 @@ local muttable = {
 			if not cg.block(ifn.body) then return false end
 
 			if dn then
-				text("\tb "..satisfied)
+				text("\tb    "..satisfied)
 
 				text(nex..":")
 			end
@@ -1327,12 +1317,12 @@ function cg.func(func)
 
 		exarg = math.max(exarg, cgc.argvs)
 
-		if cgc.args > 4 then -- the limn2k ABI gives us 4 registers to use for arguments
+		if cgc.args > 4 then -- the limn2500 ABI gives us 4 registers to use for arguments
 			exarg = math.max(exarg, cgc.args - 4)
 		end
 
-		if cgc.os > 2 then -- the limn2k ABI gives us 2 registers to use for outputs
-			exret = math.max(exret, cgc.os - 2)
+		if cgc.os > 4 then -- the limn2500 ABI gives us 4 registers to use for outputs
+			exret = math.max(exret, cgc.os - 4)
 		end
 
 		savelink = true
@@ -1386,10 +1376,8 @@ function cg.func(func)
 	-- generate prologue
 	local frametop = savareaoff + (func.savedn * 4)
 
-	if frametop > 1024 then
-		lerror(func.errtok, "frame size exceeded 1KB")
-		-- TODO handle this case intelligently which will probably require a major refactor
-		-- because i'm inexperienced at writing code generators
+	if frametop > 0x40000 then
+		lerror(func.errtok, "frame size exceeded 256KB")
 		return false
 	end
 
@@ -1401,15 +1389,15 @@ function cg.func(func)
 	if func.public then
 		text(".global "..func.name)
 	end
-	text("\tmov t0, sp")
-	text("\tsub sp, "..tostring(frametop))
-	text("\tmov long [sp], t0")
+	text("\tmov  t0, sp")
+	text("\tsubi sp, sp, "..tostring(frametop))
+	text("\tmov  long [sp], t0")
 	if savelink then
-		text("\tmov long [sp + 4], lr")
+		text("\tmov  long [sp + 4], lr")
 	end
 	for i = 0, SAVEMAX do
 		if func.saved[i] then
-			text("\tmov long [sp + "..tostring(savareaoff + (i * 4)).."], s"..tostring(i))
+			text("\tmov  long [sp + "..tostring(savareaoff + (i * 4)).."], s"..tostring(i))
 		end
 	end
 
@@ -1420,7 +1408,7 @@ function cg.func(func)
 	if func.varin then
 		local argcs = func.symb["argc"]
 
-		text("\tmov "..argcs.reg.n..", a0")
+		text("\tmov  "..argcs.reg.n..", a0")
 
 		ac = 1
 	end
@@ -1431,25 +1419,25 @@ function cg.func(func)
 		--print(func.fin[i], s.reg.n)
 
 		if not reached then
-			text("\tmov "..s.reg.n..", a"..tostring(ac))
+			text("\tmov  "..s.reg.n..", a"..tostring(ac))
 			ac = ac + 1
 
 			if ac == 4 then
 				reached = 8
 			end
 		else
-			text("\tmov "..s.reg.n..", long [sp + "..tostring(frametop + reached).."]")
+			text("\tmov  "..s.reg.n..", long [sp + "..tostring(frametop + reached).."]")
 
 			reached = reached + 4
 		end
 	end
 
 	if func.varin then
-		text("\tadd "..func.argvoff.n..", t0, "..(reached or 8))
+		text("\taddi "..func.argvoff.n..", t0, "..(reached or 8))
 	end
 
 	if func.allocated > 0 then
-		text("\tadd "..func.allocoff.n..", sp, "..func.allocstart)
+		text("\taddi "..func.allocoff.n..", sp, "..func.allocstart)
 	end
 
 	-- append fn text
@@ -1467,14 +1455,14 @@ function cg.func(func)
 		local s = func.symb[func.out[i]]
 
 		if not reached then
-			text("\tmov v"..tostring(vc)..", "..s.reg.n)
+			text("\tmov  a"..tostring(vc)..", "..s.reg.n)
 			vc = vc + 1
 
-			if vc == 2 then
+			if vc == 4 then
 				reached = 8
 			end
 		else
-			text("\tmov long [sp + "..tostring(frametop + reached).."], "..s.reg.n)
+			text("\tmov  long [sp + "..tostring(frametop + reached).."], "..s.reg.n)
 
 			reached = reached + 4
 		end
@@ -1482,13 +1470,13 @@ function cg.func(func)
 
 	for i = 0, SAVEMAX do
 		if func.saved[i] then
-			text("\tmov s"..tostring(i)..", long [sp + "..tostring(savareaoff + (i * 4)).."]")
+			text("\tmov  s"..tostring(i)..", long [sp + "..tostring(savareaoff + (i * 4)).."]")
 		end
 	end
 	if savelink then
-		text("\tmov lr, long [sp + 4]")
+		text("\tmov  lr, long [sp + 4]")
 	end
-	text("\tadd sp, "..tostring(frametop))
+	text("\taddi sp, sp, "..tostring(frametop))
 	text("\tret")
 
 	return true

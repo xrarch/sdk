@@ -156,6 +156,11 @@ archinfo[4].name = "limn2500"
 archinfo[4].align = 4
 archinfo[4].fixup = doFixupLimn2500
 
+archinfo[5] = {}
+archinfo[5].name = "limn2600"
+archinfo[5].align = 4
+archinfo[5].fixup = doFixupLimn2500
+
 function loff.new(filename, libname, fragment)
 	local iloff = {}
 

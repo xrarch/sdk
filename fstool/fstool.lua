@@ -57,7 +57,7 @@ end
 
 local cmd = arg[2]
 
-local function writefile(fs, destpath, srcpath, update)
+local function writefile(fs, destpath, srcpath, update, mode)
 	local node, errmsg, _1, _2, created = fs:path(destpath, true)
 	if not node then
 		print("fstool: "..errmsg)
@@ -109,6 +109,15 @@ local function writefile(fs, destpath, srcpath, update)
 		if node.write(#s, tab, 0) < 0 then
 			print("fstool: couldn't write "..node.name)
 			os.exit(1)
+		end
+
+		if mode then
+			local ok, errmsg = node.chmod(mode)
+
+			if not ok then
+				print("fstool: "..errmsg)
+				os.exit(1)
+			end
 		end
 	end
 end
@@ -176,8 +185,8 @@ else
 				if (#line > 0) and (line:sub(1,1) ~= "#") then
 					local comp = explode(" ", line)
 
-					if #comp == 2 then
-						writefile(fs, arg[3].."/"..comp[1], comp[2], update)
+					if (#comp == 2) or (#comp == 3) then
+						writefile(fs, arg[3].."/"..comp[1], comp[2], update, comp[3])
 					end
 				end
 

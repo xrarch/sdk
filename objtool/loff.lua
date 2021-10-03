@@ -161,7 +161,7 @@ archinfo[5].name = "limn2600"
 archinfo[5].align = 4
 archinfo[5].fixup = doFixupLimn2500
 
-function loff.new(filename, libname, fragment)
+function loff.new(filename, libname, fragment, pagealignrequired)
 	local iloff = {}
 
 	if fragment then
@@ -173,6 +173,8 @@ function loff.new(filename, libname, fragment)
 	iloff.path = filename
 
 	iloff.libname = libname or getfilename(filename)
+
+	iloff.pagealignrequired = pagealignrequired
 
 	iloff.bin = {}
 
@@ -812,6 +814,27 @@ function loff.new(filename, libname, fragment)
 		header = header .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
 		size = size + sectionheader_s.size()
 
+		-- horrible page align shenanigans for MINTIA
+		-- (this entire thing is horrible but still)
+
+		local alignby
+		alignby = 0
+
+		if self.pagealignrequired then
+			alignby = 4096 - band(size, 0xFFF)
+
+			if alignby == 4096 then
+				alignby = 0
+			end
+
+			size = band(size + 4095, 0xFFFFF000)
+			ts.fakesize = band(ts.size + 4095, 0xFFFFF000)
+			ds.fakesize = ds.size
+		else
+			ts.fakesize = ts.size
+			ds.fakesize = ds.size
+		end
+
 		local textHeader = ""
 
 		-- fixupTableOffset
@@ -825,7 +848,7 @@ function loff.new(filename, libname, fragment)
 		-- sectionOffset
 		u1, u2, u3, u4 = splitInt32(size)
 		textHeader = textHeader .. string.char(u4) .. string.char(u3) .. string.char(u2) .. string.char(u1)
-		size = size + ts.size
+		size = size + ts.fakesize
 
 		-- sectionSize
 		u1, u2, u3, u4 = splitInt32(ts.size)
@@ -885,13 +908,17 @@ function loff.new(filename, libname, fragment)
 			file:write(s.fixuptab)
 		end
 
+		for i = 1, alignby do
+			bssHeader = bssHeader .. string.char(0)
+		end
+
 		file:write(textHeader .. dataHeader .. bssHeader)
 
 		for i = 1, 2 do
 			local s = self.sections[i]
 
-			for b = 0, s.size - 1 do
-				file:write(string.char(s.contents[b]))
+			for b = 0, s.fakesize - 1 do
+				file:write(string.char(s.contents[b] or 0))
 			end
 		end
 

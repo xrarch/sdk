@@ -317,6 +317,12 @@ elseif arg[1] == "move" then
 
 	if arg[3] == "aisix" then
 		arg[3] = "text=0x1000,data=0x40000000,bss=data+data_size+align"
+	elseif arg[3] == "mintiadll" then
+		image.pagealignrequired = true
+		arg[3] = arg[4]
+	elseif arg[3] == "mintia" then
+		image.pagealignrequired = true
+		arg[3] = "text=0x100000,data=0x40000000,bss=data+data_size+align"
 	end
 
 	local expr = explode(",", arg[3])

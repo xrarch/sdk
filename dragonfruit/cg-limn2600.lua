@@ -900,6 +900,8 @@ local function conditional(cond, out, inv, lockref)
 
 	local e = ralloc(cond.errtok)
 
+	if not e then return false end
+
 	local rs = retone(cond, e, true, lockref)
 
 	if not rs then return false end

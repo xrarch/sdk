@@ -1,6 +1,5 @@
 #include "<inc>/const.h"
-
-extern Malloc { sz -- ptr }
+#include "<inc>/rt.h"
 
 fn itoa { n str -- }
 	auto i
@@ -461,23 +460,43 @@ memcpy:
 	addi sp, sp, 8
 	ret
 
+;a0 - src
+;a1 - dest
+strcpy:
+.global strcpy
+	li   t2, 0
+
+.loop:
+	mov  t0, byte [a0 + t2]
+	mov  byte [a1 + t2], t0
+	addi t2, t2, 1
+	bne  t0, .loop
+	ret
+
+;a0 - str2
+;a1 - str1
+;returns:
+;a0 - eq
+strcmp:
+.global strcmp
+	li   t2, 0
+
+.loop:
+	mov  t0, byte [a0 + t2]
+	mov  t1, byte [a1 + t2]
+	sub  t0, t0, t1
+	bne  t0, .notequal
+	addi t2, t2, 1
+	bne  t1, .loop
+
+	li   a0, 1
+	ret
+
+.notequal:
+	li   a0, 0
+	ret
+
 "
-
-fn strcmp { str1 str2 -- eq }
-	auto i
-	0 i!
-
-	while (str1@ i@ + gb str2@ i@ + gb ==)
-		if (str1@ i@ + gb 0 ==)
-			1 eq!
-			return
-		end
-
-		1 i +=
-	end
-
-	0 eq!
-end
 
 fn strncmp { str1 str2 n -- eq }
 	auto i
@@ -591,17 +610,6 @@ fn strntok { str buf del n -- next }
 	0 buf@ i@ + sb
 
 	str@ i@ + next!
-end
-
-fn strcpy { dest src -- }
-	while (src@ gb 0 ~=)
-		src@ gb dest@ sb
-
-		1 dest +=
-		1 src +=
-	end
-
-	0 dest@ sb
 end
 
 fn strncpy { dest src max -- }

@@ -4,9 +4,9 @@ extern max { n1 n2 -- max }
 
 extern min { n1 n2 -- min }
 
-extern itoa { n buf -- }
+extern itoa { n str -- }
 
-extern strdup { str -- allocstr }
+extern strdup { str -- astr }
 
 extern reverse { str -- }
 
@@ -34,7 +34,7 @@ extern strcat { dest src -- }
 
 extern strncat { dest src max -- }
 
-extern atoi { str -- n }
+extern atoi { str -- res }
 
 extern Puts { s -- }
 

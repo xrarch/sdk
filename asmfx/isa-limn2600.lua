@@ -1068,14 +1068,14 @@ addFormat(
 
 addFormat(
 	{},
-	"11110000000000000ssssddddd101001", -- mfcr rd, cs
+	"111100000000ssss00000ddddd101001", -- mfcr rd, cs
 	"mfcr ^rd ^cs"
 )
 
 addFormat(
 	{},
-	"11100000000000000ssssddddd101001", -- mtcr cs, rd
-	"mtcr ^cs ^rd"
+	"111000000000ssssaaaaa00000101001", -- mtcr cs, ra
+	"mtcr ^cs ^ra"
 )
 
 addFormat(

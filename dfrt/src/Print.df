@@ -213,10 +213,6 @@ fn VFPrintf { argvt argcn fmt fd -- }
 	end
 end
 
-fn VPrintf { argvt argcn fmt -- }
-	argvt@ argcn@ fmt@ 1 VFPrintf
-end
-
 fn Printf { ... fmt -- }
 	argv argc@ fmt@ VPrintf
 end

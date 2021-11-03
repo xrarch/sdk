@@ -135,6 +135,16 @@ local function doFixupLimn2500(tab, off, nval, rtype)
 	sv32(tab, off, new)
 end
 
+local function doStubLimn2600(tab, off, ptr)
+	sv32(tab, off, bor(lshift(rshift(ptr, 2), 3), 6))
+
+	return 4, RELOC_LIMN2500_ABSJ
+end
+
+local function shouldStubLimn2600(rtype)
+	return rtype == RELOC_LIMN2500_ABSJ
+end
+
 loff.archinfo = {}
 local archinfo = loff.archinfo
 
@@ -160,6 +170,8 @@ archinfo[5] = {}
 archinfo[5].name = "limn2600"
 archinfo[5].align = 4
 archinfo[5].fixup = doFixupLimn2500
+archinfo[5].stub = doStubLimn2600
+archinfo[5].shouldstub = shouldStubLimn2600
 
 function loff.new(filename, libname, fragment, pagealignrequired)
 	local iloff = {}
@@ -987,9 +999,50 @@ function loff.new(filename, libname, fragment, pagealignrequired)
 			local wsym = with.globals[k]
 
 			if wsym then
+				-- found the extern in the DLL. create a call stub and resolve all applicable fixups to point to the call stub instead.
+
+				local stubsz, reloctype
+
+				local stub = self.sections[1].size
+
+				stubsz, reloctype = with.archinfo.stub(self.sections[1].contents, stub, 0)
+
+				self.sections[1].size = stub + stubsz
+
+				local symt = {}
+
+				symt.value = stub -- value
+				symt.symtype = 2 -- local
+				symt.section = 1 -- text
+				symt.importindex = 0
+				symt.file = self.path
+				symt.sectiont = self.sections[1]
+
+				self.symbols[#self.symbols + 1] = symt
+				self.isym[#self.isym + 1] = symt
+
+				for i = 1, #self.sections[1].fixups do
+					local f = self.sections[1].fixups[i]
+
+					if f.symbol == v then
+						if with.archinfo.shouldstub(f.type) then
+							f.symbol = symt
+						end
+					end
+				end
+
+				local f = {}
+				self.sections[1].fixups[#self.sections[1].fixups + 1] = f
+
+				f.symbol = v
+				f.offset = stub
+				f.type = reloctype
+				f.file = self.path
+
 				v.import = import
 				v.importindex = impindex
 				v.dq = wsym
+				v.stubsym = symt
 			end
 		end
 	end

@@ -322,7 +322,7 @@ elseif arg[1] == "move" then
 		arg[3] = arg[4]
 	elseif arg[3] == "mintia" then
 		image.pagealignrequired = true
-		arg[3] = "text=0x100000,data=0x40000000,bss=data+data_size+align"
+		arg[3] = "text=0x100000,data=text+text_size+align,bss=data+data_size+align"
 	end
 
 	local expr = explode(",", arg[3])

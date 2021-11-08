@@ -681,7 +681,7 @@ local optable = {
 		end
 
 		if imm2 then
-			if imm2 ~= 0 then
+			if (imm2 ~= 0) or (rd.n ~= ri.n) then
 				text("\taddi "..rd.n..", "..ri.n..", "..tostring(rs.id * 4))
 			else
 				freeofp(ri, rd)

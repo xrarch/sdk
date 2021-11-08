@@ -16,5 +16,12 @@ const OSNONE           -1
 const OSCURRENTPROCESS -2
 const OSCURRENTTHREAD  -3
 
-extern OSRealPath { path canon max -- ok }
+extern OSGetStdIn { -- fd }
+extern OSGetStdOut { -- fd }
+extern OSGetStdErr { -- fd }
+
+extern OSLastComponent { path -- lcomp }
+extern OSDirectoryName { path dirname bufsize -- ok }
+extern OSRealPath { path canon bufsize -- ok }
+
 extern OSOpen { flags access path -- handle ok }

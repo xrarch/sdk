@@ -62,13 +62,22 @@ end
 
 local dx = 0
 
+local function getfilename(p)
+	local qp = 1
+
+	for i = 1, #p do
+		if p:sub(i,i) == "/" then
+			qp = i + 1
+		end
+	end
+
+	return p:sub(qp)
+end
+
 for k,v in ipairs(sourcef) do
 	local ed = getdirectory(v)
 
-	-- this is unlikely to appear twice during multi-core building, I hope.
-	local i = math.floor(os.clock()*10000000 + math.random()*100000)
-
-	local eout = ed..".__out"..tostring(i)..".s "
+	local eout = ed..".__out"..getfilename(v)..".s "
 
 	local err
 

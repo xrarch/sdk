@@ -1033,7 +1033,7 @@ local muttable = {
 			an = 0
 		end
 
-		local reached = 8
+		local reached = 4
 
 		for i = 1, #op.fin do
 			local fa = op.fin[i]
@@ -1125,7 +1125,7 @@ local muttable = {
 
 		local vn = 0
 
-		reached = 8
+		reached = 4
 
 		for i = 1, #op.rets do
 			local fa = op.rets[i]
@@ -1330,7 +1330,7 @@ function cg.func(func)
 		savelink = true
 	end
 
-	local savareaoff = math.max(exret, exarg) * 4 + 8
+	local savareaoff = math.max(exret, exarg) * 4 + 4
 
 	if func.varin then
 		func.argvoff = ralloc(func.errtok, true, true)
@@ -1371,14 +1371,13 @@ function cg.func(func)
 
 	if func.allocated > 0xFFFF then
 		lerror(func.errtok, "stack alloc exceeded 64KB")
-
 		return false
 	end
 
 	-- generate prologue
 	local frametop = savareaoff + (func.savedn * 4)
 
-	if frametop > 0x40000 then
+	if frametop > 0x3FFFF then
 		lerror(func.errtok, "frame size exceeded 256KB")
 		return false
 	end
@@ -1391,11 +1390,9 @@ function cg.func(func)
 	if func.public then
 		text(".global "..func.name)
 	end
-	text("\tmov  t0, sp")
 	text("\tsubi sp, sp, "..tostring(frametop))
-	text("\tmov  long [sp], t0")
 	if savelink then
-		text("\tmov  long [sp + 4], lr")
+		text("\tmov  long [sp], lr")
 	end
 	for i = 0, SAVEMAX do
 		if func.saved[i] then
@@ -1425,7 +1422,7 @@ function cg.func(func)
 			ac = ac + 1
 
 			if ac == 4 then
-				reached = 8
+				reached = 4
 			end
 		else
 			text("\tmov  "..s.reg.n..", long [sp + "..tostring(frametop + reached).."]")
@@ -1435,7 +1432,7 @@ function cg.func(func)
 	end
 
 	if func.varin then
-		text("\taddi "..func.argvoff.n..", t0, "..(reached or 8))
+		text("\taddi "..func.argvoff.n..", sp, "..tostring(frametop + (reached or 4)))
 	end
 
 	if func.allocated > 0 then
@@ -1461,7 +1458,7 @@ function cg.func(func)
 			vc = vc + 1
 
 			if vc == 4 then
-				reached = 8
+				reached = 4
 			end
 		else
 			text("\tmov  long [sp + "..tostring(frametop + reached).."], "..s.reg.n)
@@ -1476,7 +1473,7 @@ function cg.func(func)
 		end
 	end
 	if savelink then
-		text("\tmov  lr, long [sp + 4]")
+		text("\tmov  lr, long [sp]")
 	end
 	text("\taddi sp, sp, "..tostring(frametop))
 	text("\tret")

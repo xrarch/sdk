@@ -174,18 +174,16 @@ if stubs then
 
 		local savedneeded = math.max(#sys.args, #sys.rets) - FIRSTSAVED + FIRSTREG
 
-		local stackoffset = 8
+		local stackoffset = 4
 
 		if savedneeded > 0 then
-			stackoffset = stackoffset + savedneeded*4 + 8
+			stackoffset = stackoffset + savedneeded*4 + 4
 
-			stubs:write(string.format("\tmov  t0, sp\n"))
-			stubs:write(string.format("\tsubi sp, sp, %d\n", savedneeded*4 + 8))
-			stubs:write(string.format("\tmov  long [sp], t0\n"))
-			stubs:write(string.format("\tmov  long [sp + 4], lr\n"))
+			stubs:write(string.format("\tsubi sp, sp, %d\n", savedneeded*4 + 4))
+			stubs:write(string.format("\tmov  long [sp], lr\n"))
 
 			for reg = 0, savedneeded-1 do
-				stubs:write(string.format("\tmov  long [sp + %d], %s\n", reg*4 + 8, regnames[reg + FIRSTSAVED]))
+				stubs:write(string.format("\tmov  long [sp + %d], %s\n", reg*4 + 4, regnames[reg + FIRSTSAVED]))
 			end
 
 			stubs:write("\n")
@@ -231,10 +229,10 @@ if stubs then
 
 		if savedneeded > 0 then
 			for reg = 0, savedneeded-1 do
-				stubs:write(string.format("\tmov  %s, long [sp + %d]\n", regnames[reg + FIRSTSAVED], reg*4 + 8))
+				stubs:write(string.format("\tmov  %s, long [sp + %d]\n", regnames[reg + FIRSTSAVED], reg*4 + 4))
 			end
 
-			stubs:write(string.format("\taddi sp, sp, %d\n", savedneeded*4 + 8))
+			stubs:write(string.format("\taddi sp, sp, %d\n", savedneeded*4 + 4))
 		end
 
 		stubs:write("\tret\n\n")
@@ -281,13 +279,12 @@ if trampolines then
 
 		local stackneeded = math.max((math.max(#sys.args, #sys.rets) - ARGCOUNT)*4, 0)
 
-		trampolines:write(string.format("\tsubi sp, sp, %d\n", stackneeded + 8))
-		trampolines:write(string.format("\tmov  long [sp], zero\n"))
-		trampolines:write(string.format("\tmov  long [sp + 4], lr\n\n"))
+		trampolines:write(string.format("\tsubi sp, sp, %d\n", stackneeded + 4))
+		trampolines:write(string.format("\tmov  long [sp], lr\n"))
 
-		local stackoffset = 8
+		local stackoffset = 4
 
-		local saveoffset = 8
+		local saveoffset = 4
 		local regnum = FIRSTREG
 
 		for argn = #sys.args, 1, -1 do
@@ -329,8 +326,8 @@ if trampolines then
 
 		trampolines:write("\n")
 
-		trampolines:write(string.format("\tmov  lr, long [sp + 4]\n"))
-		trampolines:write(string.format("\taddi sp, sp, %d\n", stackneeded + 8))
+		trampolines:write(string.format("\tmov  lr, long [sp]\n"))
+		trampolines:write(string.format("\taddi sp, sp, %d\n", stackneeded + 4))
 		trampolines:write("\tret\n\n")
 	end
 end

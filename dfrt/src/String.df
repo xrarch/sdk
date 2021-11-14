@@ -50,14 +50,12 @@ asm "
 ;a2 - ptr
 memset:
 .global memset
-	mov  t0, sp
-	subi sp, sp, 8
-	mov  long [sp + 4], lr
-	mov  long [sp], t0
+	subi sp, sp, 4
+	mov  long [sp], lr
 
 	bne  a1, .gzero
 
-	addi sp, sp, 8
+	addi sp, sp, 4
 	ret
 
 .gzero:
@@ -144,7 +142,7 @@ memset:
 	bne  t1, .b1
 
 .b1done:
-	addi sp, sp, 8
+	addi sp, sp, 4
 	ret
 
 ;a0 - sz
@@ -152,10 +150,8 @@ memset:
 ;a2 - dest
 memcpy:
 .global memcpy
-	mov  t0, sp
-	subi sp, sp, 8
-	mov  long [sp + 4], lr
-	mov  long [sp], t0
+	subi sp, sp, 4
+	mov  long [sp], lr
 
 	beq  a0, .zerosize
 
@@ -167,7 +163,7 @@ memcpy:
 	b     .unaligned
 
 .zerosize:
-	addi sp, sp, 8
+	addi sp, sp, 4
 	ret
 
 .aligned_with_eachother:
@@ -457,13 +453,16 @@ memcpy:
 	bne  t0, .b1
 
 .done:
-	addi sp, sp, 8
+	addi sp, sp, 4
 	ret
 
 ;a0 - src
 ;a1 - dest
 strcpy:
 .global strcpy
+	subi sp, sp, 4
+	mov  long [sp], lr
+
 	li   t2, 0
 
 .loop:
@@ -471,6 +470,8 @@ strcpy:
 	mov  byte [a1 + t2], t0
 	addi t2, t2, 1
 	bne  t0, .loop
+
+	addi sp, sp, 4
 	ret
 
 ;a0 - str2
@@ -479,6 +480,9 @@ strcpy:
 ;a0 - eq
 strcmp:
 .global strcmp
+	subi sp, sp, 4
+	mov  long [sp], lr
+
 	li   t2, 0
 
 .loop:
@@ -490,10 +494,14 @@ strcmp:
 	bne  t1, .loop
 
 	li   a0, 1
+
+	addi sp, sp, 4
 	ret
 
 .notequal:
 	li   a0, 0
+
+	addi sp, sp, 4
 	ret
 
 "

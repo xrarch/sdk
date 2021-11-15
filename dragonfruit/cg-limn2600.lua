@@ -1377,14 +1377,14 @@ function cg.func(func)
 	-- generate prologue
 	local frametop = savareaoff + (func.savedn * 4)
 
-	if frametop > 0x3FFFF then
-		lerror(func.errtok, "frame size exceeded 256KB")
-		return false
-	end
-
 	func.allocstart = frametop
 
 	frametop = frametop + func.allocated
+
+	if frametop > 0xFFFF then
+		lerror(func.errtok, "frame size exceeded 64KB")
+		return false
+	end
 
 	text(func.name..":")
 	if func.public then

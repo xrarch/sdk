@@ -1080,7 +1080,7 @@ addFormat(
 
 addFormat(
 	{},
-	"1101000000000000bbbbbaaaaa101001", -- ftlb ra rb
+	"11010000000bbbbbaaaaa00000101001", -- ftlb ra rb
 	"ftlb ^ra ^rb"
 )
 

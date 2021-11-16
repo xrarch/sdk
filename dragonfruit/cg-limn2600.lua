@@ -1027,7 +1027,7 @@ local muttable = {
 		local an
 
 		if op.fn.varin then
-			text("\tli  a0, "..op.argvs)
+			text("\tli   a0, "..op.argvs)
 			an = 1
 		else
 			an = 0

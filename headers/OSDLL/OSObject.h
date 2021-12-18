@@ -20,8 +20,26 @@ extern OSGetStdIn { -- fd }
 extern OSGetStdOut { -- fd }
 extern OSGetStdErr { -- fd }
 
+extern OSSetStdIn { fd -- }
+extern OSSetStdOut { fd -- }
+extern OSSetStdErr { fd -- }
+
+extern OSFlushLine { -- }
+extern OSPutc { c filehandle -- ok }
+
+extern OSReadline { s max -- eof }
+
 extern OSLastComponent { path -- lcomp }
 extern OSDirectoryName { path dirname bufsize -- ok }
 extern OSRealPath { path canon bufsize -- ok }
 
+extern OSGetCWD { cwd bufsize -- ok }
+extern OSChangeCWD { path -- ok }
+
 extern OSOpen { flags access path -- handle ok }
+
+const OSEVENT_SYNCH 1
+const OSEVENT_NOTIF 2
+
+const OSWAITALL 1
+const OSWAITANY 2

@@ -474,6 +474,29 @@ strcpy:
 	addi sp, sp, 4
 	ret
 
+;a0 - max
+;a1 - src
+;a2 - dest
+strncpy:
+.global strncpy
+	subi sp, sp, 4
+	mov  long [sp], lr
+
+	addi a0, a0, 1 ;to account for the zero
+	li   t2, 0
+
+.loop:
+	beq  a0, .done
+	mov  t0, byte [a1 + t2]
+	mov  byte [a2 + t2], t0
+	addi t2, t2, 1
+	subi a0, a0, 1
+	bne  t0, .loop
+
+.done:
+	addi sp, sp, 4
+	ret
+
 ;a0 - str2
 ;a1 - str1
 ;returns:
@@ -618,19 +641,6 @@ fn strntok { str buf del n -- next }
 	0 buf@ i@ + sb
 
 	str@ i@ + next!
-end
-
-fn strncpy { dest src max -- }
-	dest@ max@ + max!
-
-	while (src@ gb 0 ~= dest@ max@ < &&)
-		src@ gb dest@ sb
-
-		1 dest +=
-		1 src +=
-	end
-
-	0 dest@ sb
 end
 
 fn strcat { dest src -- }

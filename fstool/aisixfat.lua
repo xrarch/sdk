@@ -52,7 +52,7 @@ local fat = {}
 function fat.mount(image, offset, noroot)
 	local fs = {}
 
-	fs.image = block.new(image, 4096, offset)
+	fs.image = block.new(image, 512, offset)
 	local img = fs.image
 
 	if not img then
@@ -77,7 +77,7 @@ function fat.mount(image, offset, noroot)
 	local datastart = superblock.gv("datastart")
 	local istart = superblock.gv("istart")
 	local icount = superblock.gv("icount")
-	local isize = math.ceil((icount * inode_s.size())/4096)
+	local isize = math.ceil((icount * inode_s.size())/512)
 
 	local fat = {}
 
@@ -86,7 +86,7 @@ function fat.mount(image, offset, noroot)
 	local cnodes = {}
 
 	local function fatblockbybn(bn)
-		return math.floor((bn * 4)/4096)
+		return math.floor((bn * 4)/512)
 	end
 
 	function fs.getblockstatus(bn)
@@ -99,7 +99,7 @@ function fat.mount(image, offset, noroot)
 			fat_b = fat[fbn]
 		end
 
-		local b = cast(fat_s, fat_b, (bn % 1024)*4)
+		local b = cast(fat_s, fat_b, (bn % 128)*4)
 
 		return b.gv("block")
 	end
@@ -117,7 +117,7 @@ function fat.mount(image, offset, noroot)
 
 		fat_b.dirty = true
 
-		local b = cast(fat_s, fat_b, (bn % 1024)*4)
+		local b = cast(fat_s, fat_b, (bn % 128)*4)
 
 		b.sv("block", status)
 	end
@@ -157,9 +157,9 @@ function fat.mount(image, offset, noroot)
 		if not ino then
 			local ioffb = inum * inode_s.size()
 
-			local ibn = math.floor(ioffb / 4096) + istart
+			local ibn = math.floor(ioffb / 512) + istart
 
-			local ioff = ioffb % 4096
+			local ioff = ioffb % 512
 
 			local i_b = iblk[ibn]
 
@@ -423,12 +423,12 @@ function fat.mount(image, offset, noroot)
 			local tabindx = 0
 
 			while tot < bytes do
-				local b = ngetb(math.floor(off/4096), true)
+				local b = ngetb(math.floor(off/512), true)
 
-				local m = math.min(bytes - tot, 4096 - (off % 4096))
+				local m = math.min(bytes - tot, 512 - (off % 512))
 
 				for i = 0, m-1 do
-					tab[tabindx + i] = b[(off % 4096) + i]
+					tab[tabindx + i] = b[(off % 512) + i]
 				end
 
 				tabindx = tabindx + m
@@ -453,15 +453,15 @@ function fat.mount(image, offset, noroot)
 			local tabindx = 0
 
 			while tot < bytes do
-				local b, ent = ngetb(math.floor(off/4096))
+				local b, ent = ngetb(math.floor(off/512))
 
-				local m = math.min(bytes - tot, 4096 - (off % 4096))
+				local m = math.min(bytes - tot, 512 - (off % 512))
 
 				for i = 0, m-1 do
 					if zeroes then
-						b[(off % 4096) + i] = 0
+						b[(off % 512) + i] = 0
 					else
-						b[(off % 4096) + i] = tab[tabindx + i]
+						b[(off % 512) + i] = tab[tabindx + i]
 					end
 				end
 
@@ -703,26 +703,26 @@ end
 function fat.format(image, offset)
 	print("formatting...")
 
-	local img = block.new(image, 4096, offset)
+	local img = block.new(image, 512, offset)
 
 	local superblock_b = {}
-	for i = 0, 4095 do
+	for i = 0, 511 do
 		superblock_b[i] = 0
 	end
 
 	local superblock = cast(superblock_s, superblock_b, 0)
 
-	local reservedblocks = 15
+	local reservedblocks = 63
 
-	local fatsize = math.ceil((img.blocks*4) / 4096)
+	local fatsize = math.ceil((img.blocks*4) / 512)
 
 	local fatstart = reservedblocks + 1
 
 	local istart = fatstart + fatsize
 
-	local icount = math.floor(img.blocks/4)
+	local icount = math.floor(img.blocks/32)
 
-	local isize = math.ceil((icount * inode_s.size()) / 4096)
+	local isize = math.ceil((icount * inode_s.size()) / 512)
 
 	local datastart = istart + isize
 
@@ -737,7 +737,7 @@ function fat.format(image, offset)
 	superblock.sv("datasize", img.blocks)
 	superblock.sv("volsize", img.blocks)
 
-	print("size: "..tostring(img.blocks * 4096))
+	print("size: "..tostring(img.blocks * 512))
 
 	print("writing superblock")
 	img:writeBlock(0, superblock_b)

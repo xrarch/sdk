@@ -482,7 +482,6 @@ strncpy:
 	subi sp, sp, 4
 	mov  long [sp], lr
 
-	addi a0, a0, 1 ;to account for the zero
 	li   t2, 0
 
 .loop:
@@ -494,6 +493,8 @@ strncpy:
 	bne  t0, .loop
 
 .done:
+	mov  byte [a2 + t2], zero
+
 	addi sp, sp, 4
 	ret
 

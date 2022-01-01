@@ -212,7 +212,7 @@ function mktime(time)
         error("date before 1970")
     end
 
-    local s = (secsperyear * y) + ( ((y+1)/4) * secsperday)
+    local s = (secsperyear * y) + (math.floor(((y+1)/4)) * secsperday)
 
     if ((y+2)%4 ~= 0) then
         days_per_mth[2] = 28

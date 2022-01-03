@@ -107,10 +107,21 @@ fn VFPrintf { argvt argcn fmt fd -- }
 				return
 			end
 
+			auto rev
+			0 rev!
+
 			auto pad
 			0 pad!
 
 			fmt@ i@ + gb char!
+
+			if (char@ '-' ==)
+				1 rev!
+
+				1 i +=
+
+				fmt@ i@ + gb char!
+			end
 
 			auto zero
 			0 zero!
@@ -177,14 +188,20 @@ fn VFPrintf { argvt argcn fmt fd -- }
 
 				4 a +=
 			end elseif (char@ 's' ==)
-				fd@ q@ FPuts
-				
+				if (rev@ ~~)
+					fd@ q@ FPuts
+				end
+
 				if (pad@)
 					q@ strlen fl!
 
 					if (fl@ pad@ <)
 						fd@ pad@ fl@ - Pad
 					end
+				end
+
+				if (rev@)
+					fd@ q@ FPuts
 				end
 
 				4 a +=

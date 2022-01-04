@@ -1056,6 +1056,18 @@ addFormat(
 
 addFormat(
 	{},
+	"1001000000000000aaaaaddddd110001", -- mov rd, locked [ra]
+	"mov ^rd locked [^ra]"
+)
+
+addFormat(
+	{},
+	"10000000000bbbbbaaaaaddddd110001", -- sc rd, ra, rb
+	"sc ^rd [^ra] ^rb"
+)
+
+addFormat(
+	{},
 	"0001iiiiiiiiiiiiiiiiiiiiii110001", -- brk i
 	"brk ^ni" 
 )

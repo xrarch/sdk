@@ -60,7 +60,7 @@ fn private Pad { fd num -- }
 	end
 end
 
-fn private ZeroPad { fd num pad base -- }
+fn private ZeroPad { c fd num pad base -- }
 	auto d
 	0 d!
 
@@ -75,7 +75,7 @@ fn private ZeroPad { fd num pad base -- }
 	end
 
 	while (d@ pad@ <)
-		fd@ '0' FPutc
+		fd@ c@ FPutc
 
 		1 d +=
 	end
@@ -159,7 +159,10 @@ fn VFPrintf { argvt argcn fmt fd -- }
 
 			if (char@ 'd' ==)
 				if (zero@)
-					fd@ q@ pad@ 10 ZeroPad
+					'0' fd@ q@ pad@ 10 ZeroPad
+					0 pad!
+				end elseif (rev@)
+					' ' fd@ q@ pad@ 10 ZeroPad
 					0 pad!
 				end
 
@@ -174,7 +177,10 @@ fn VFPrintf { argvt argcn fmt fd -- }
 				4 a +=
 			end elseif (char@ 'x' ==)
 				if (zero@)
-					fd@ q@ pad@ 16 ZeroPad
+					'0' fd@ q@ pad@ 16 ZeroPad
+					0 pad!
+				end elseif (rev@)
+					' ' fd@ q@ pad@ 16 ZeroPad
 					0 pad!
 				end
 

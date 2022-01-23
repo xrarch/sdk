@@ -72,6 +72,8 @@ function fat.mount(image, offset, noroot)
 		return false
 	end
 
+	local ballochint = 0
+
 	local fatstart = superblock.gv("fatstart")
 	local fatsize = superblock.gv("fatsize")
 	local datastart = superblock.gv("datastart")
@@ -130,11 +132,23 @@ function fat.mount(image, offset, noroot)
 	local function balloc(link)
 		link = link or 0xFFFFFFFF
 
-		for i = 0, img.blocks-1 do
+		for i = ballochint, img.blocks-1 do
 			if getblockstatus(i) == 0 then
+				ballochint = i
 				setblockstatus(i, link)
 				img:writeBlock(i, {[0]=0}) -- zero out block
 				return i
+			end
+		end
+
+		if ballochint ~= 0 then
+			for i = 0, ballochint-1 do
+				if getblockstatus(i) == 0 then
+					ballochint = i
+					setblockstatus(i, link)
+					img:writeBlock(i, {[0]=0}) -- zero out block
+					return i
+				end
 			end
 		end
 

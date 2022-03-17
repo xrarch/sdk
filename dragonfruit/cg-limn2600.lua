@@ -519,11 +519,15 @@ local optable = {
 	end,
 
 	["=="] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "seq ", "seqi")
+		local rd = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "sub ", "subi")
+
+		rd.inverse = true
+
+		return rd
 	end,
 
 	["~="] = function (errtok, op, rootcanmut)
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "sne ", "snei")
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "sub ", "subi")
 	end,
 
 	["<"] = function (errtok, op, rootcanmut)
@@ -591,47 +595,15 @@ local optable = {
 	end,
 
 	["||"] = function (errtok, op, rootcanmut)
-		local rd = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "or  ", "ori ")
+		-- TODO make it not evaluate the second thing if the first thing was true
 
-		if not rd then return false end
-
-		-- doing getmutreg isnt necessary because genarith already did that for us,
-		-- so rd is guaranteed not to be directly an auto
-
-		text("\tsne  "..rd.n..", "..rd.n..", zero")
-
-		return rd
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "or  ", "ori ")
 	end,
 
 	["&&"] = function (errtok, op, rootcanmut)
-		local reg1, reg2, imm = op2(errtok, op.opers[1], op.opers[2], 0xFF)
+		-- TODO make it not evaluate the second thing if the first thing was false
 
-		if not reg1 then return false end
-
-		-- on &&, eval.lua should convert any non-zero immediate into an equivalence test with 0
-		if imm then error("internally inconsistent") end
-
-		if reg1 == curfn.mutreg then
-			rootcanmut = false
-		end
-
-		local rd = getmutreg(rootcanmut)
-
-		if not rd then return false end
-
-		text("\tli   "..rd.n..", 0")
-
-		local out = locallabel()
-
-		text("\tbeq  "..reg1.n..", "..out)
-
-		text("\tsne  "..rd.n..", "..reg2.n..", zero")
-
-		text(out..":")
-
-		freeofp(rd, reg1, reg2)
-
-		return rd
+		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "and ", "andi")
 	end,
 
 	["retvalue"] = function (errtok, op, rootcanmut)

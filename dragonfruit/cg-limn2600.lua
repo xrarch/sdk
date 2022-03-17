@@ -739,7 +739,7 @@ function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, al
 
 				if not rd then return false end
 
-				text("\tseq  "..rd.n..", "..ro.n..", zero")
+				text("\tslti "..rd.n..", "..ro.n..", 1")
 
 				freeofp(rd, ro)
 

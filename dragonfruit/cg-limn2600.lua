@@ -621,11 +621,13 @@ local optable = {
 
 		text("\tbeq  "..rd.n..", "..out)
 
-		local reg2 = cg.expr(op.opers[1])
+		local reg2 = cg.expr(op.opers[1], false, false, false, rootcanmut, false)
 
 		if not reg2 then return false end
 
-		text("\tmov  "..rd.n..", "..reg2.n)
+		if reg2.n ~= rd.n then
+			text("\tmov  "..rd.n..", "..reg2.n)
+		end
 
 		text(out..":")
 

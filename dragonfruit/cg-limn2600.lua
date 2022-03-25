@@ -601,9 +601,37 @@ local optable = {
 	end,
 
 	["&&"] = function (errtok, op, rootcanmut)
-		-- TODO make it not evaluate the second thing if the first thing was false
+		local out = locallabel()
 
-		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "and ", "andi")
+		local rd = getmutreg(rootcanmut)
+
+		if not rd then return false end
+
+		local reg1 = cg.expr(op.opers[2], false, false, false, rootcanmut, false)
+
+		if not reg1 then return false end
+
+		if reg1 == curfn.mutreg then
+			rootcanmut = false
+		end
+
+		if reg1.n ~= rd.n then
+			text("\tmov  "..rd.n..", "..reg1.n)
+		end
+
+		text("\tbeq  "..rd.n..", "..out)
+
+		local reg2 = cg.expr(op.opers[1])
+
+		if not reg2 then return false end
+
+		text("\tmov  "..rd.n..", "..reg2.n)
+
+		text(out..":")
+
+		freeofp(rd, reg1, reg2)
+
+		return rd
 	end,
 
 	["retvalue"] = function (errtok, op, rootcanmut)

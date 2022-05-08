@@ -26,6 +26,8 @@ local textsection
 
 local datasection
 
+local rodatasection
+
 local bsssection
 
 local defs
@@ -54,6 +56,14 @@ end
 
 local function adata(str)
 	datasection = datasection .. str
+end
+
+local function rodata(str)
+	rodatasection = rodatasection .. str .. "\n"
+end
+
+local function arodata(str)
+	rodatasection = rodatasection .. str
 end
 
 local function bss(str)
@@ -91,18 +101,18 @@ local function cstring(str, n)
 
 	local sno = n or label()
 
-	data(sno..":")
-	adata('\t.ds "')
+	rodata(sno..":")
+	arodata('\t.ds "')
 
 	for i = 1, #str do
 		local c = str:sub(i,i)
 		if c == "\n" then
-			adata("\\n")
+			arodata("\\n")
 		else
-			adata(c)
+			arodata(c)
 		end
 	end
-	data('\\0"')
+	rodata('\\0"')
 
 	strings[str] = sno
 
@@ -1492,6 +1502,8 @@ function cg.gen(edefs, public, extern, asms, const)
 
 	datasection = ".section data\n"
 
+	rodatasection = ".section text\n"
+
 	bsssection = ".section bss\n"
 
 	labln = 0
@@ -1570,7 +1582,7 @@ function cg.gen(edefs, public, extern, asms, const)
 		bss(".global "..k)
 	end
 
-	return textsection .. datasection .. bsssection
+	return textsection .. rodatasection .. ".align 4\n" .. datasection .. bsssection
 end
 
 return cg

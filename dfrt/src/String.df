@@ -157,10 +157,10 @@ memcpy:
 
 	xor  t0, a1, a2
 
-	andi  t1, t0, 1
-	beq   t1, .aligned_with_eachother
+	andi t1, t0, 1
+	beq  t1, .aligned_with_eachother
 
-	b     .unaligned
+	b    .unaligned
 
 .zerosize:
 	addi sp, sp, 4

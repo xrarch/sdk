@@ -17,11 +17,9 @@ function format.encode(sections, symbols, isa)
 	end
 
 	so[1] = sections.text
-	so[#so + 1] = sections.data
-	so[#so + 1] = sections.bss
 
 	for k,v in pairs(sections) do
-		if (k ~= "text") and (k ~= "data") and (k ~= "bss") then
+		if k ~= "text" then
 			so[#so + 1] = v
 		end
 	end

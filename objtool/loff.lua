@@ -840,7 +840,11 @@ function loff.new(filename, libname, fragment, pagealignrequired)
 			end
 
 			size = band(size + 4095, 0xFFFFF000)
-			ts.fakesize = band(ts.size + 4095, 0xFFFFF000)
+			if ds.size ~= 0 then
+				ts.fakesize = band(ts.size + 4095, 0xFFFFF000)
+			else
+				ts.fakesize = ts.size
+			end
 			ds.fakesize = ds.size
 		else
 			ts.fakesize = ts.size

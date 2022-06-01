@@ -505,10 +505,12 @@ function parser.block(endtok, defines)
 		return false
 	end
 
-	while t[1] ~= endtok do
+	while (t[1] ~= endtok) or (t[2] == "string") do
 		local ident = t[1]
 
-		if ident == "if" then
+		if t[2] == "string" then
+			b[#b + 1] = node_t("lazy", t, t)
+		elseif ident == "if" then
 			local pq = parser.pif()
 
 			if not pq then return false end

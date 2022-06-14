@@ -47,14 +47,10 @@ isa.registers = {
 
 isa.controlregisters = {
 	["rs"]       = 0,
-	["ecause"]   = 1,
-	["ers"]      = 2,
 	["epc"]      = 3,
 	["evec"]     = 4,
 	["pgtb"]     = 5,
-	["asid"]     = 6,
 	["ebadaddr"] = 7,
-	["cpuid"]    = 8,
 	["fwvec"]    = 9,
 	["k0"]       = 12,
 	["k1"]       = 13,

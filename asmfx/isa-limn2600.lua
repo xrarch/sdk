@@ -47,9 +47,11 @@ isa.registers = {
 
 isa.controlregisters = {
 	["rs"]       = 0,
+	["tblo"]     = 2,
 	["epc"]      = 3,
 	["evec"]     = 4,
 	["pgtb"]     = 5,
+	["tbindex"]  = 6,
 	["ebadaddr"] = 7,
 	["tbvec"]    = 8,
 	["fwvec"]    = 9,

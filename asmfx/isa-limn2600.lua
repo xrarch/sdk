@@ -1093,12 +1093,6 @@ addFormat(
 
 addFormat(
 	{},
-	"11010000000bbbbbaaaaa00000101001", -- ftlb ra rb
-	"ftlb ^ra ^rb"
-)
-
-addFormat(
-	{},
 	"11000000000000000000000000101001", -- hlt
 	"hlt"
 )
@@ -1113,6 +1107,30 @@ addFormat(
 	{},
 	"1010iiiiiiiiiiiiiiiiiiiiii101001", -- fwc i
 	"fwc ^ni"
+)
+
+addFormat(
+	{},
+	"00110000000000000000000000101001", -- tbld
+	"tbld"
+)
+
+addFormat(
+	{},
+	"00100000000000000000000000101001", -- tbrd
+	"tbrd"
+)
+
+addFormat(
+	{},
+	"00010000000000000000000000101001", -- tbfn
+	"tbfn"
+)
+
+addFormat(
+	{},
+	"00000000000000000000000000101001", -- tbwr
+	"tbwr"
 )
 
 return isa

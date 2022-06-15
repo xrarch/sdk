@@ -1111,6 +1111,12 @@ addFormat(
 
 addFormat(
 	{},
+	"1000iiiiiiiiiiiiiiiiiiiiii101001", -- cachei i
+	"cachei ^ni"
+)
+
+addFormat(
+	{},
 	"00110000000000000000000000101001", -- tbld
 	"tbld"
 )

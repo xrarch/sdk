@@ -91,6 +91,8 @@ function preproc(name, srcf, destf)
 	local instring = false
 	local escape = false
 
+	local ifdefstack = {true}
+
 	local line = 1
 
 	destf:write(string.format("#%s %d\n", name, 1))
@@ -180,13 +182,29 @@ function preproc(name, srcf, destf)
 				elseif dir == "undef" then
 					symbols[dirtab[2]] = nil
 				elseif dir == "ifdef" then
-					-- TODO
+					if symbols[dirtab[2]] then
+						ifdefstack[#ifdefstack+1] = true
+					else
+						ifdefstack[#ifdefstack+1] = false
+					end
 				elseif dir == "ifndef" then
-					-- TODO
+					if symbols[dirtab[2]] then
+						ifdefstack[#ifdefstack+1] = false
+					else
+						ifdefstack[#ifdefstack+1] = true
+					end
 				elseif dir == "else" then
-					-- TODO
-				elseif dir == "end" then
-					-- TODO
+					if #ifdefstack == 1 then
+						print(string.format("dragonc_pp: %s:%d: no matching ifdef", name, line))
+					end
+
+					ifdefstack[#ifdefstack] = not ifdefstack[#ifdefstack]
+				elseif dir == "endif" then
+					if #ifdefstack == 1 then
+						print(string.format("dragonc_pp: %s:%d: no matching ifdef", name, line))
+					end
+
+					ifdefstack[#ifdefstack] = nil
 				else
 					print(string.format("dragonc_pp: %s:%d: unknown directive '%s'", name, line, dir))
 					return
@@ -216,7 +234,7 @@ function preproc(name, srcf, destf)
 			else
 				if (not instring) and ((c == "#") and startofline) then
 					directive = true
-				else
+				elseif ifdefstack[#ifdefstack] then
 					if (not escape) and (c == '"') then
 						instring = not instring
 					end

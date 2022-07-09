@@ -145,70 +145,18 @@ function preproc(name, srcf, destf)
 
 				local dir = dirtab[1]
 
-				if dir == "include" then
-					local inc = dirtab[2]
-
-					if (#inc > 2) and (inc:sub(1,1) == '"') and (inc:sub(-1,-1) == '"') then
-						local incpath = inc:sub(2,-2)
-
-						local f
-
-						if incpath:sub(1,5) == "<df>/" then
-							f = io.open(sd.."/../headers/dfrt/"..incpath:sub(6), "r")
-						elseif incpath:sub(1,5) == "<ll>/" then
-							f = io.open(sd.."/../headers/"..incpath:sub(6), "r")
-						elseif incpath:sub(1,6) == "<inc>/" then
-							local rpath = incpath:sub(7)
-
-							for _,path in ipairs(incdir) do
-								f = io.open(path.."/"..rpath)
-
-								if f then break end
-							end
-						else
-							f = io.open(basedir.."/"..incpath)
-						end
-
-						if not f then
-							print(string.format("dragonc_pp: %s:%d: failed to open '%s'", name, line, incpath))
-							return
-						end
-
-						if not preproc(incpath, f, destf) then return false end
-
-						destf:write(string.format("#%s %d\n", name, line))
-					else
-						print(string.format("dragonc_pp: %s:%d: malformed include", name, line))
-						return
-					end
-				elseif dir == "define" then
-					if dirtab[2] then
-						if dirtab[3] then
-							if dirtab[3] ~= "0" then
-								symbols[dirtab[2]] = dirtab[3]
-							else
-								symbols[dirtab[2]] = false
-							end
-						else
-							symbols[dirtab[2]] = true
-						end
-
-						if symbols[dirtab[2]] then
-							destf:write("const "..dirtab[2].." 1")
-						else
-							destf:write("const "..dirtab[2].." 0")
-						end
-					end
-				elseif dir == "undef" then
-					symbols[dirtab[2]] = nil
-				elseif dir == "ifdef" then
-					if symbols[dirtab[2]] then
+				if dir == "ifdef" then
+					if not ifdefstack[#ifdefstack] then
+						ifdefstack[#ifdefstack+1] = false
+					elseif symbols[dirtab[2]] then
 						ifdefstack[#ifdefstack+1] = true
 					else
 						ifdefstack[#ifdefstack+1] = false
 					end
 				elseif dir == "ifndef" then
-					if symbols[dirtab[2]] then
+					if not ifdefstack[#ifdefstack] then
+						ifdefstack[#ifdefstack+1] = false
+					elseif symbols[dirtab[2]] then
 						ifdefstack[#ifdefstack+1] = false
 					else
 						ifdefstack[#ifdefstack+1] = true
@@ -218,16 +166,76 @@ function preproc(name, srcf, destf)
 						print(string.format("dragonc_pp: %s:%d: no matching ifdef", name, line))
 					end
 
-					ifdefstack[#ifdefstack] = not ifdefstack[#ifdefstack]
+					if ifdefstack[#ifdefstack-1] then
+						ifdefstack[#ifdefstack] = not ifdefstack[#ifdefstack]
+					end
 				elseif dir == "endif" then
 					if #ifdefstack == 1 then
 						print(string.format("dragonc_pp: %s:%d: no matching ifdef", name, line))
 					end
 
 					ifdefstack[#ifdefstack] = nil
-				else
-					print(string.format("dragonc_pp: %s:%d: unknown directive '%s'", name, line, dir))
-					return
+				elseif ifdefstack[#ifdefstack] then
+					if dir == "include" then
+						local inc = dirtab[2]
+
+						if (#inc > 2) and (inc:sub(1,1) == '"') and (inc:sub(-1,-1) == '"') then
+							local incpath = inc:sub(2,-2)
+
+							local f
+
+							if incpath:sub(1,5) == "<df>/" then
+								f = io.open(sd.."/../headers/dfrt/"..incpath:sub(6), "r")
+							elseif incpath:sub(1,5) == "<ll>/" then
+								f = io.open(sd.."/../headers/"..incpath:sub(6), "r")
+							elseif incpath:sub(1,6) == "<inc>/" then
+								local rpath = incpath:sub(7)
+
+								for _,path in ipairs(incdir) do
+									f = io.open(path.."/"..rpath)
+
+									if f then break end
+								end
+							else
+								f = io.open(basedir.."/"..incpath)
+							end
+
+							if not f then
+								print(string.format("dragonc_pp: %s:%d: failed to open '%s'", name, line, incpath))
+								return
+							end
+
+							if not preproc(incpath, f, destf) then return false end
+
+							destf:write(string.format("#%s %d\n", name, line))
+						else
+							print(string.format("dragonc_pp: %s:%d: malformed include", name, line))
+							return
+						end
+					elseif dir == "define" then
+						if dirtab[2] then
+							if dirtab[3] then
+								if dirtab[3] ~= "0" then
+									symbols[dirtab[2]] = dirtab[3]
+								else
+									symbols[dirtab[2]] = false
+								end
+							else
+								symbols[dirtab[2]] = true
+							end
+
+							if symbols[dirtab[2]] then
+								destf:write("const "..dirtab[2].." 1")
+							else
+								destf:write("const "..dirtab[2].." 0")
+							end
+						end
+					elseif dir == "undef" then
+						symbols[dirtab[2]] = nil
+					else
+						print(string.format("dragonc_pp: %s:%d: unknown directive '%s'", name, line, dir))
+						return
+					end
 				end
 			end
 

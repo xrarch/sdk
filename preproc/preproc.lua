@@ -37,6 +37,7 @@ end
 
 local incdir = {}
 local narg = {}
+local symbols = {}
 
 for k,v in ipairs(arg) do
 	if v:sub(1,7) == "incdir=" then
@@ -44,7 +45,21 @@ for k,v in ipairs(arg) do
 
 		incdir = explode(":", incs)
 	else
-		narg[#narg + 1] = v
+		local off = string.find(v, "=")
+
+		if off and (off > 1) then
+			local val = v:sub(off+1,-1)
+
+			if val == "" then
+				val = true
+			elseif val == "0" then
+				val = false
+			end
+
+			symbols[v:sub(1,off-1)] = val
+		else
+			narg[#narg + 1] = v
+		end
 	end
 end
 
@@ -55,8 +70,6 @@ if #arg < 2 then
 	printhelp()
 	os.exit(1)
 end
-
-local symbols = {}
 
 local source = arg[1]
 local dest = arg[2]
@@ -127,9 +140,6 @@ function preproc(name, srcf, destf)
 		c1 = false
 
 		if c == "\n" then
-			line = line + 1
-			destf:write("\n")
-
 			if directive then
 				local dirtab = explode(" ", linebuffer)
 
@@ -174,9 +184,19 @@ function preproc(name, srcf, destf)
 				elseif dir == "define" then
 					if dirtab[2] then
 						if dirtab[3] then
-							symbols[dirtab[2]] = dirtab[3]
+							if dirtab[3] ~= "0" then
+								symbols[dirtab[2]] = dirtab[3]
+							else
+								symbols[dirtab[2]] = false
+							end
 						else
 							symbols[dirtab[2]] = true
+						end
+
+						if symbols[dirtab[2]] then
+							destf:write("const "..dirtab[2].." 1")
+						else
+							destf:write("const "..dirtab[2].." 0")
 						end
 					end
 				elseif dir == "undef" then
@@ -210,6 +230,9 @@ function preproc(name, srcf, destf)
 					return
 				end
 			end
+
+			line = line + 1
+			destf:write("\n")
 
 			startofline = true
 			comment = false
@@ -257,6 +280,18 @@ function preproc(name, srcf, destf)
 				startofline = false
 			end
 		end
+	end
+end
+
+for k,v in pairs(symbols) do
+	if v then
+		if tonumber(v) then
+			destf:write("const "..k.." "..v.."\n")
+		else
+			destf:write("const "..k.." 1\n")
+		end
+	else
+		destf:write("const "..k.." 0\n")
 	end
 end
 

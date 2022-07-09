@@ -1,5 +1,23 @@
 local lex = {}
 
+function explode(d,p)
+    local t, ll
+    t={}
+    ll=0
+    if(#p == 1) then return {p} end
+        while true do
+            l=string.find(p,d,ll,true) -- find the next d in the string
+            if l~=nil then -- if "not not" found then..
+                table.insert(t, string.sub(p,ll,l-1)) -- Save it in our array.
+                ll=l+1 -- save just after where we found it for searching next time.
+            else
+                table.insert(t, string.sub(p,ll)) -- Save what's left in our array.
+                break -- Break at end, as it should be, according to the lua manual.
+            end
+        end
+    return t
+end
+
 function lex.extractAll(src, filename, stream, spot)
 	local kc = {
 		["!"] = true,
@@ -23,6 +41,8 @@ function lex.extractAll(src, filename, stream, spot)
 
 	local cpt = 1
 
+	local startofline = true
+
 	local srclen = #src
 
 	local function extractChar(com)
@@ -33,57 +53,38 @@ function lex.extractAll(src, filename, stream, spot)
 		local o = src:sub(cpt,cpt)
 		cpt = cpt + 1
 
+		while com and (o == "#") do
+			local buffer = ""
+
+			while true do
+				o = src:sub(cpt,cpt)
+				cpt = cpt + 1
+
+				if o == "" then
+					return nil
+				end
+
+				if o == "\n" then
+					o = src:sub(cpt,cpt)
+					cpt = cpt + 1
+					break
+				end
+
+				buffer = buffer .. o
+			end
+
+			local bl = explode(" ", buffer)
+
+			filename = bl[1]
+			line = tonumber(bl[2])
+		end
+
 		if o == string.char(0xD) then
 			error("dragonc: lexer: Windows/DOS line endings aren't supported.")
 		end
 
-		while ((com) and ((o == "(") or (o == "/"))) do
-			if (o == "/") and (src:sub(cpt, cpt) == "/") then
-				cpt = cpt + 1
-
-				o = src:sub(cpt, cpt)
-
-				while true do
-					if o == "\n" then
-						line = line + 1
-					end
-
-					o = src:sub(cpt,cpt)
-					cpt = cpt + 1
-
-					if (o == "\n") or (o == "") then
-						break
-					end
-				end
-			elseif (o == "(") and (src:sub(cpt, cpt) == "*") then
-				cpt = cpt + 1
-
-				o = src:sub(cpt, cpt)
-
-				while true do
-					if o == "*" then
-						if src:sub(cpt,cpt) == ")" then
-							cpt = cpt + 1
-
-							o = src:sub(cpt,cpt)
-							cpt = cpt + 1
-
-							break
-						end
-					elseif o == "\n" then
-						line = line + 1
-					end
-
-					o = src:sub(cpt,cpt)
-					cpt = cpt + 1
-
-					if o == "" then
-						break
-					end
-				end
-			else
-				break
-			end
+		if o == "" then
+			o = nil
 		end
 
 		return o
@@ -94,6 +95,7 @@ function lex.extractAll(src, filename, stream, spot)
 
 		while whitespace[c] do
 			if c == "\n" then
+				startofline = true
 				line = line + 1
 			end
 
@@ -197,7 +199,7 @@ function lex.extractAll(src, filename, stream, spot)
 				table.insert(tokens, spot, {n, "number", line, filename})
 				spot = spot + 1
 			else
-				while (not whitespace[c]) and (not kc[c]) and (c) do
+				while (not whitespace[c]) and (not kc[c]) and c do
 					t = t..c
 					c = extractChar()
 				end

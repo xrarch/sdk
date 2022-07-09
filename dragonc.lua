@@ -53,7 +53,8 @@ for i = 1, #narg/2 do
 end
 
 local lua = sd.."lua.sh "
-local dragonc = sd.."dragonfruit/dragonc.lua "..target.." "..incdir.." "
+local preproc = sd.."preproc/preproc.lua "..incdir.." "
+local dragonc = sd.."dragonfruit/dragonc.lua "..target.." "
 local asm = sd.."asmfx/asmfx.lua "..target.." "
 
 if flat then
@@ -77,12 +78,19 @@ end
 for k,v in ipairs(sourcef) do
 	local ed = getdirectory(v)
 
+	local pout = ed..".__out"..getfilename(v)..".pp "
 	local eout = ed..".__out"..getfilename(v)..".s "
 
 	local err
 
 	-- is there a better way to do this? probably.
-	err = os.execute(lua..dragonc..v.." "..eout)
+	err = os.execute(lua..preproc..v.." "..pout)
+
+	if err > 0 then os.exit(1) end
+
+	err = os.execute(lua..dragonc..pout.." "..eout)
+
+	os.execute("rm -f "..pout)
 
 	if err > 0 then os.exit(1) end
 
@@ -90,7 +98,5 @@ for k,v in ipairs(sourcef) do
 
 	if err > 0 then os.exit(1) end
 
-	err = os.execute("rm "..eout)
-
-	if err > 0 then os.exit(1) end
+	os.execute("rm -f "..eout)
 end

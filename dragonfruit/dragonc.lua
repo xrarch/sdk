@@ -58,11 +58,7 @@ local target = "limn2600"
 local narg = {}
 
 for k,v in ipairs(arg) do
-	if v:sub(1,7) == "incdir=" then
-		local incs = v:sub(8)
-
-		incdir = explode(":", incs)
-	elseif v:sub(1,7) == "target=" then
+	if v:sub(1,7) == "target=" then
 		target = v:sub(8)
 	else
 		narg[#narg + 1] = v

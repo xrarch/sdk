@@ -100,62 +100,6 @@ local function define(ident, kind, errtok, scoped, value)
 	return id or true
 end
 
-function parser.directive()
-	local t, ok = lex:expect("tag")
-
-	if not ok then
-		lerror(t, "expected tag, got "..t[2])
-		return false
-	end
-
-	local directive = t[1]
-
-	if directive == "include" then
-		t, ok = lex:expect("string")
-
-		if not ok then
-			lerror(t, "expected string, got "..t[2])
-			return false
-		end
-
-		local incpath = t[1]
-
-		local qd = basedir
-
-		local f
-
-		if incpath:sub(1,5) == "<df>/" then
-			f = io.open(sd.."/../headers/dfrt/"..incpath:sub(6), "r")
-		elseif incpath:sub(1,5) == "<ll>/" then
-			f = io.open(sd.."/../headers/"..incpath:sub(6), "r")
-		elseif incpath:sub(1,6) == "<inc>/" then
-			local rpath = incpath:sub(7)
-
-			for _,path in ipairs(incdir) do
-				f = io.open(path.."/"..rpath)
-
-				if f then break end
-			end
-		else
-			f = io.open(basedir.."/"..incpath)
-		end
-
-		if not f then
-			lerror(t, "couldn't include "..incpath)
-			return false
-		end
-
-		lex:insertCurrent(f:read("*a"), incpath)
-
-		f:close()
-	else
-		lerror(t, "unknown directive "..directive)
-		return false
-	end
-
-	return true
-end
-
 -- parses the form { ... in1 in2 in3 -- out1 out2 out3 }
 -- { in1 ... -- } is not allowed, { ... in1 -- } is.
 function parser.signature(extern, fnptr)
@@ -952,8 +896,6 @@ function parser.parse(lexer, sourcetext, filename, incd, reserve, cg)
 
 		if ident == "" then
 			-- why doesnt lua 5.1 have a continue keyword
-		elseif ident == "#" then
-			if not parser.directive() then return false end
 		elseif (ident == "fn") then
 			if not parser.fn(true) then return false end
 		elseif ident == "extern" then

@@ -1117,8 +1117,8 @@ addFormat(
 
 addFormat(
 	{},
-	"00110000000000000000000000101001", -- tbld
-	"tbld"
+	"0011000000000000aaaaaddddd101001", -- tbld
+	"tbld ^rd ^ra"
 )
 
 addFormat(

@@ -458,6 +458,61 @@ addFormat(
 	"jjjjjjjjjjjjjjjjjjjjjaaaaa101101", -- blt ra, j
 	"blt ^ra ^nj"
 )
+addFormat(
+	{
+		["j"] = {
+			mask=0x3,
+			shift=2,
+			relative=true
+		}
+	},
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa100101", -- bgt ra, j
+	"bgt ^ra ^nj"
+)
+addFormat(
+	{
+		["j"] = {
+			mask=0x3,
+			shift=2,
+			relative=true
+		}
+	},
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa011101", -- bge ra, j
+	"bge ^ra ^nj"
+)
+addFormat(
+	{
+		["j"] = {
+			mask=0x3,
+			shift=2,
+			relative=true
+		}
+	},
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa010101", -- ble ra, j
+	"ble ^ra ^nj"
+)
+addFormat(
+	{
+		["j"] = {
+			mask=0x3,
+			shift=2,
+			relative=true
+		}
+	},
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa001101", -- bpe ra, j
+	"bpe ^ra ^nj"
+)
+addFormat(
+	{
+		["j"] = {
+			mask=0x3,
+			shift=2,
+			relative=true
+		}
+	},
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa000101", -- bpo ra, j
+	"bpo ^ra ^nj"
+)
 
 addFormat(
 	{},

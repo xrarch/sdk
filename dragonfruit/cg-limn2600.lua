@@ -34,7 +34,7 @@ local defs
 
 local curfn
 
-local SAVEMAX = 18
+local SAVEMAX = 17
 
 local TEMPMAX = 5
 

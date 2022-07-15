@@ -7,13 +7,13 @@ end
 -- the stubs are for OSDLL.dll to be able to call into the kernel.
 
 -- the trampolines are for the kernel to get the arguments set up properly.
--- they assume the kernel exception handler placed the trapframe in s18.
+-- they assume the kernel exception handler placed the trapframe in s17.
 
--- supports up to 28 arguments and return values.
+-- supports up to 27 arguments and return values.
 
 local FIRSTREG   = 2
 local FIRSTSAVED = 11
-local LASTREG    = 28
+local LASTREG    = 27
 local ARGCOUNT   = 4
 local FIRSTARG   = 7
 
@@ -28,7 +28,7 @@ local regnames = {
 	"s10", "s11",
 	"s12", "s13",
 	"s14", "s15",
-	"s16", "s17"
+	"s16",
 }
 
 if (#arg < 3) then
@@ -291,9 +291,9 @@ if trampolines then
 			local sysarg = sys.args[argn]
 
 			if regnum < ARGCOUNT+FIRSTREG then
-				trampolines:write(string.format("\tmov  %s, long [s18 + %d] ;%s\n", regnames[regnum+FIRSTARG-FIRSTREG], tfoffset, regnames[tfoffset/4+1]))
+				trampolines:write(string.format("\tmov  %s, long [s17 + %d] ;%s\n", regnames[regnum+FIRSTARG-FIRSTREG], tfoffset, regnames[tfoffset/4+1]))
 			else
-				trampolines:write(string.format("\n\tmov  t0, long [s18 + %d] ;%s\n", tfoffset, regnames[tfoffset/4+1]))
+				trampolines:write(string.format("\n\tmov  t0, long [s17 + %d] ;%s\n", tfoffset, regnames[tfoffset/4+1]))
 				trampolines:write(string.format("\tmov  long [sp + %d], t0\n", saveoffset))
 				saveoffset = saveoffset + 4
 			end
@@ -313,10 +313,10 @@ if trampolines then
 			local sysret = sys.rets[retn]
 
 			if regnum < ARGCOUNT+FIRSTREG then
-				trampolines:write(string.format("\tmov  long [s18 + %d], %s ;%s\n", tfoffset, regnames[regnum+FIRSTARG-FIRSTREG], regnames[tfoffset/4+1]))
+				trampolines:write(string.format("\tmov  long [s17 + %d], %s ;%s\n", tfoffset, regnames[regnum+FIRSTARG-FIRSTREG], regnames[tfoffset/4+1]))
 			else
 				trampolines:write(string.format("\n\tmov  t0, long [sp + %d]\n", saveoffset))
-				trampolines:write(string.format("\tmov  long [s18 + %d], t0 ;%s\n", tfoffset, regnames[tfoffset/4+1]))
+				trampolines:write(string.format("\tmov  long [s17 + %d], t0 ;%s\n", tfoffset, regnames[tfoffset/4+1]))
 				saveoffset = saveoffset + 4
 			end
 

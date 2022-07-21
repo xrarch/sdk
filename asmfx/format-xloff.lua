@@ -35,10 +35,10 @@ local sectionheader_s = struct {
 local symbol_s = struct {
 	{4, "SizeOfRecord"},
 	{4, "NameOffset"},
-	{4, "SectionIndex"},
 	{4, "Value"},
-	{2, "Type"},
-	{2, "Flags"}
+	{2, "SectionIndex"},
+	{1, "Type"},
+	{1, "Flags"}
 }
 
 local import_s = struct {
@@ -51,15 +51,9 @@ local import_s = struct {
 
 local reloc_s = struct {
 	{4, "Offset"},
-	{4, "RelocType"},
 	{4, "SymbolIndex"}
-}
-
-local fixup_s = struct {
-	{4, "Offset"},
-	{4, "RelocType"},
-	{4, "SymbolIndex"},
-	{4, "SectionIndex"}
+	{2, "RelocType"},
+	{2, "SectionIndex"}
 }
 
 return format

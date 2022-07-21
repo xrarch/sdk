@@ -51,7 +51,7 @@ local import_s = struct {
 
 local reloc_s = struct {
 	{4, "Offset"},
-	{4, "SymbolIndex"}
+	{4, "SymbolIndex"},
 	{2, "RelocType"},
 	{2, "SectionIndex"}
 }

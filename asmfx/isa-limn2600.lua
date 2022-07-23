@@ -113,6 +113,9 @@ local RELOC_LIMN2500_LONG = 1
 local RELOC_LIMN2500_ABSJ = 2
 local RELOC_LIMN2500_LA   = 3
 
+local RELOC_LIMN2600_FAR_INT  = 4
+local RELOC_LIMN2600_FAR_LONG = 5
+
 function isa.reloctype(format, relocation)
 	-- returns a relocation type number
 
@@ -129,6 +132,10 @@ function isa.reloctype(format, relocation)
 			return RELOC_LIMN2500_ABSJ
 		elseif operand.bits == 32 then
 			return RELOC_LIMN2500_LA
+		elseif operand.bits == 31 then
+			return RELOC_LIMN2600_FAR_INT
+		elseif operand.bits == 30 then
+			return RELOC_LIMN2600_FAR_LONG
 		else
 			error("weird relocation")
 		end
@@ -1195,6 +1202,52 @@ addFormat(
 	{},
 	"00000000000000000000000000101001", -- tbwr
 	"tbwr"
+)
+
+-- more pseudoinstructions
+
+addFormat(
+	{
+		["i"] = {
+			intswap=true,
+		},
+		["d"] = {
+			repeatbits=2,
+			repeatbitsby=5,
+		}
+	},
+	"iiiiiiiiiiiiiiiidddddddddd111011iiiiiiiiiiiiiiii00000ddddd000100", -- lui rd, zero, i; mov rd, byte [rd + i]
+	"mov ^rd byte [^ni]"
+)
+
+addFormat(
+	{
+		["i"] = {
+			intswap=true,
+			intshift=1,
+		},
+		["d"] = {
+			repeatbits=2,
+			repeatbitsby=5,
+		}
+	},
+	"0iiiiiiiiiiiiiiidddddddddd110011iiiiiiiiiiiiiiii00000ddddd000100", -- lui rd, zero, i; mov rd, int [rd + i]
+	"mov ^rd int [^ni]"
+)
+
+addFormat(
+	{
+		["i"] = {
+			intswap=true,
+			intshift=2,
+		},
+		["d"] = {
+			repeatbits=2,
+			repeatbitsby=5,
+		}
+	},
+	"00iiiiiiiiiiiiiidddddddddd101011iiiiiiiiiiiiiiii00000ddddd000100", -- lui rd, zero, i; mov rd, long [rd + i]
+	"mov ^rd long [^ni]"
 )
 
 return isa

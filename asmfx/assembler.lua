@@ -1206,6 +1206,15 @@ function asm.instr(isa, sections, lines)
 						qt = qt - 1
 					end
 				end
+
+				if oinfo.intshift then
+					-- shift the upper 16 bits right by the given value
+
+					local i1 = band(operands[k], 0xFFFF)
+					local i2 = lshift(rshift(operands[k], 16+oinfo.intshift), 16)
+
+					operands[k] = bor(i1, i2)
+				end
 			end
 
 			local encodestring = format.encodingstring

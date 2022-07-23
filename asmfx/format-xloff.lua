@@ -33,7 +33,6 @@ local sectionheader_s = struct {
 }
 
 local symbol_s = struct {
-	{4, "SizeOfRecord"},
 	{4, "NameOffset"},
 	{4, "Value"},
 	{2, "SectionIndex"},

@@ -112,6 +112,9 @@ local RELOC_LIMN2500_LONG = 1
 local RELOC_LIMN2500_ABSJ = 2
 local RELOC_LIMN2500_LA   = 3
 
+local RELOC_LIMN2600_FAR_INT  = 4
+local RELOC_LIMN2600_FAR_LONG = 5
+
 local function doFixupLimn2500(tab, off, nval, rtype)
 	local old = gv32(tab, off)
 	local new = old
@@ -122,8 +125,21 @@ local function doFixupLimn2500(tab, off, nval, rtype)
 		new = nval
 	elseif rtype == RELOC_LIMN2500_LA then
 		local old2 = gv32(tab, off + 4)
+		local new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
 
-		new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
+		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+
+		sv32(tab, off + 4, new2)
+	elseif rtype == RELOC_LIMN2600_FAR_INT then
+		local old2 = gv32(tab, off + 4)
+		local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 1), 16), band(old2, 0xFFFF))
+
+		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+
+		sv32(tab, off + 4, new2)
+	elseif rtype == RELOC_LIMN2600_FAR_LONG then
+		local old2 = gv32(tab, off + 4)
+		local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 2), 16), band(old2, 0xFFFF))
 
 		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
 

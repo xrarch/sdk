@@ -444,7 +444,7 @@ local function mkload(errtok, src, auto, mnem, mask, rootcanmut, lomask)
 			return false
 		end
 	else
-		rs = cg.expr(src, true, false, true)
+		rs = cg.expr(src, true, false, true, nil, nil, nil, true)
 	end
 
 	if not rs then return false end
@@ -453,12 +453,16 @@ local function mkload(errtok, src, auto, mnem, mask, rootcanmut, lomask)
 
 	if not rd then return false end
 
-	if not add then
-		text("\tmov  "..rd.n..", "..mnem.." ["..rs.n.."]")
-	elseif reg2 then
-		text("\tmov  "..rd.n..", "..mnem.." ["..rs.n.." + "..reg2.n.."]")
-	elseif imm then
-		text("\tmov  "..rd.n..", "..mnem.." ["..rs.n.." + "..tostring(imm).."]")
+	if rs.typ == "imm" then
+		text("\tmov  "..rd.n..", "..mnem.." ["..rs.id.."]")
+	else
+		if not add then
+			text("\tmov  "..rd.n..", "..mnem.." ["..rs.n.."]")
+		elseif reg2 then
+			text("\tmov  "..rd.n..", "..mnem.." ["..rs.n.." + "..reg2.n.."]")
+		elseif imm then
+			text("\tmov  "..rd.n..", "..mnem.." ["..rs.n.." + "..tostring(imm).."]")
+		end
 	end
 
 	freeofp(rd, rs, reg2)
@@ -708,7 +712,7 @@ local optable = {
 	end,
 }
 
-function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, allowinverse, lockref)
+function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, allowinverse, lockref, superallowdirectptr)
 	-- print(node)
 
 	if node.kind == "reg" then
@@ -727,6 +731,10 @@ function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, al
 	if (node.kind == "num") or (node.kind == "ptr") or (node.kind == "table") then
 		if node.ident == "argv" then
 			return curfn.argvoff
+		end
+
+		if superallowdirectptr and ((node.kind == "ptr") or (node.kind == "table")) then
+			return reg_t(node.ident, "imm", node.errtok)
 		end
 
 		if immtoreg or (((node.kind == "ptr") or (node.kind == "table")) and (not allowdirectptr)) then

@@ -1250,4 +1250,50 @@ addFormat(
 	"mov ^rd long [^ni]"
 )
 
+
+
+addFormat(
+	{
+		["i"] = {
+			intswap=true,
+		},
+		["b"] = {
+			repeatbits=1,
+			repeatbitsby=5,
+		}
+	},
+	"iiiiiiiiiiiiiiiiaaaaabbbbb111010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov byte [rb + i], ra
+	"mov byte [^ni] ^ra tmp=^rb"
+)
+
+addFormat(
+	{
+		["i"] = {
+			intswap=true,
+			intshift=1,
+		},
+		["b"] = {
+			repeatbits=1,
+			repeatbitsby=5,
+		}
+	},
+	"0iiiiiiiiiiiiiiiaaaaabbbbb110010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov int [rb + i], ra
+	"mov int [^ni] ^ra tmp=^rb"
+)
+
+addFormat(
+	{
+		["i"] = {
+			intswap=true,
+			intshift=2,
+		},
+		["b"] = {
+			repeatbits=1,
+			repeatbitsby=5,
+		}
+	},
+	"00iiiiiiiiiiiiiiaaaaabbbbb101010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov int [rb + i], ra
+	"mov long [^ni] ^ra tmp=^rb"
+)
+
 return isa

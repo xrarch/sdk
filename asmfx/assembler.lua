@@ -247,7 +247,7 @@ local function match(isa, format, formattok, linetok)
 						return false
 					end
 
-					local max = operandinfo.max or 0
+					local max = operandinfo.max or math.huge
 
 					if operandvalue > max then
 						return false

@@ -733,7 +733,7 @@ function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, al
 			return curfn.argvoff
 		end
 
-		if superallowdirectptr and ((node.kind == "ptr") or (node.kind == "table")) then
+		if superallowdirectptr then
 			return reg_t(node.ident, "imm", node.errtok)
 		end
 
@@ -828,16 +828,20 @@ local function mkstore(errtok, dest, src, auto, mnem, mask, lomask)
 			return false
 		end
 	elseif dest.kind ~= "reg" then
-		rd = cg.expr(dest, auto, true)
+		rd = cg.expr(dest, auto, false, nil, nil, nil, nil, true)
 
 		if not rd then return false end
 
-		muted = shouldmut(dest)
+		if rd.typ ~= "imm" then
+			muted = shouldmut(dest)
 
-		local e
+			local e
 
-		rd, e = loadimmf(rd, 0)
+			rd, e = loadimmf(rd, 0)
+		end
 	end
+
+	local rtmp
 
 	if not rd then return false end
 
@@ -875,22 +879,37 @@ local function mkstore(errtok, dest, src, auto, mnem, mask, lomask)
 			imm2 = rs.id
 		end
 
-		local rn = "0"
 
-		if add then
-			if reg2 then
-				rn = reg2.n
+		if rd.typ == "imm" then
+			rtmp = ralloc(errtok)
+
+			if not rtmp then return false end
+
+			if imm2 then
+				text("\tmov  "..mnem.." ["..rd.id.."], "..tostring(imm2)..", tmp="..rtmp.n)
 			else
-				rn = imm
+				text("\tmov  "..mnem.." ["..rd.id.."], "..rs.n..", tmp="..rtmp.n)
 			end
-		end
 
-		if imm2 then
-			text("\tmov  "..mnem.." ["..rd.n.." + "..rn.."], "..tostring(imm2))
+			freeof(rtmp)
 		else
-			-- tprint(rd)
+			local rn = "0"
 
-			text("\tmov  "..mnem.." ["..rd.n.." + "..rn.."], "..rs.n)
+			if add then
+				if reg2 then
+					rn = reg2.n
+				else
+					rn = imm
+				end
+			end
+
+			if imm2 then
+				text("\tmov  "..mnem.." ["..rd.n.." + "..rn.."], "..tostring(imm2))
+			else
+				-- tprint(rd)
+
+				text("\tmov  "..mnem.." ["..rd.n.." + "..rn.."], "..rs.n)
+			end
 		end
 	end
 

@@ -97,6 +97,20 @@ function isa.relocate(sections)
 				nval = bor(band(nval, 0xFFFF0000), band(oval, 0xFFFF))
 
 				sv32(data, r.offset+4, nval2)
+			elseif operand.bits == 31 then
+				local old2 = gv32(data, r.offset + 4)
+				local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 1), 16), band(old2, 0xFFFF))
+
+				new = bor(band(nval, 0xFFFF0000), band(oval, 0xFFFF))
+
+				sv32(data, r.offset + 4, new2)
+			elseif operand.bits == 30 then
+				local old2 = gv32(data, r.offset + 4)
+				local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 2), 16), band(old2, 0xFFFF))
+
+				new = bor(band(nval, 0xFFFF0000), band(oval, 0xFFFF))
+
+				sv32(data, r.offset + 4, new2)
 			else
 				error("hm")
 				return false
@@ -275,7 +289,9 @@ local function addFormat(operandinfo, encodingstring, formatstring)
 
 			local shift = q.shift or 0
 
-			if q.bits == 32 then
+			if operandinfo[e.field].intshift then
+				q.max = 0xFFFFFFFF
+			elseif q.bits == 32 then
 				q.max = 0xFFFFFFFF
 			else
 				q.max = lshift(lshift(1, q.bits)-1, shift)
@@ -1294,6 +1310,50 @@ addFormat(
 	},
 	"00iiiiiiiiiiiiiiaaaaabbbbb101010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov int [rb + i], ra
 	"mov long [^ni] ^ra tmp=^rb"
+)
+
+addFormat(
+	{
+		["i"] = {
+			intswap=true,
+		},
+		["b"] = {
+			repeatbits=1,
+			repeatbitsby=5,
+		}
+	},
+	"iiiiiiiiiiiiiiiisssssbbbbb011010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov byte [rb + i], ns
+	"mov byte [^ni] ^ns tmp=^rb"
+)
+
+addFormat(
+	{
+		["i"] = {
+			intswap=true,
+			intshift=1,
+		},
+		["b"] = {
+			repeatbits=1,
+			repeatbitsby=5,
+		}
+	},
+	"0iiiiiiiiiiiiiiisssssbbbbb010010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov int [rb + i], ns
+	"mov int [^ni] ^ns tmp=^rb"
+)
+
+addFormat(
+	{
+		["i"] = {
+			intswap=true,
+			intshift=2,
+		},
+		["b"] = {
+			repeatbits=1,
+			repeatbitsby=5,
+		}
+	},
+	"00iiiiiiiiiiiiiisssssbbbbb001010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov int [rb + i], ns
+	"mov long [^ni] ^ns tmp=^rb"
 )
 
 return isa

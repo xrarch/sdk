@@ -89,6 +89,24 @@ xloff.sectionflagnames[2] = "TEXT"
 xloff.sectionflagnames[3] = "MAP"
 xloff.sectionflagnames[4] = "READONLY"
 
+local XLOFFSPECIALVALUE_START = 1
+local XLOFFSPECIALVALUE_SIZE  = 2
+local XLOFFSPECIALVALUE_END   = 3
+
+local XLOFFRELOC_LIMN2500_LONG = 1
+local XLOFFRELOC_LIMN2500_ABSJ = 2
+local XLOFFRELOC_LIMN2500_LA   = 3
+
+local XLOFFRELOC_LIMN2600_FAR_INT  = 4
+local XLOFFRELOC_LIMN2600_FAR_LONG = 5
+
+xloff.relocnames = {}
+xloff.relocnames[XLOFFRELOC_LIMN2500_LONG] = "LONG"
+xloff.relocnames[XLOFFRELOC_LIMN2500_ABSJ] = "ABSJ"
+xloff.relocnames[XLOFFRELOC_LIMN2500_LA] = "LA"
+xloff.relocnames[XLOFFRELOC_LIMN2600_FAR_LONG] = "FARLONG"
+xloff.relocnames[XLOFFRELOC_LIMN2600_FAR_INT] = "FARINT"
+
 function xloff.new(filename)
 	local img = {}
 

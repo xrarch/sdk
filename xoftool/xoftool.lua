@@ -152,6 +152,22 @@ elseif command == "symbols" then
 
         print("")
     end
+elseif command == "relocs" then
+    if not image:load() then os.exit(1) end
+
+    for i = 0, image.sectioncount-1 do
+        local s = image.sectionsbyid[i]
+
+        for j = 1, s.reloccount do
+            local r = s.relocs[j]
+
+            local sym = r.symbol
+
+            if sym then
+                print(string.format("%s: %x ref %s: %s (@%x) (%s)", s.name, r.offset, (sym.section or {["name"]="extern"}).name, (sym.name or "\b"), sym.value, xloff.relocnames[r.type]))
+            end
+        end
+    end
 end
 
 return true

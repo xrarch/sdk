@@ -192,15 +192,19 @@ elseif command == "fixups" then
     for i = 0, image.importcount-1 do
         local s = image.importsbyid[i]
 
+        print(s.name..":")
+
         for j = 1, s.fixupcount do
             local r = s.fixups[j]
 
             local sym = r.symbol
 
             if sym then
-                print(string.format("%s: %x ref %s: %s (@%x) (%s)", r.section.name, r.offset, (sym.section or {["name"]="extern"}).name, (sym.name or "\b"), sym.value, xloff.relocnames[r.type]))
+                print(string.format("  %s: %x ref %s: %s (@%x) (%s)", r.section.name, r.offset, (sym.section or {["name"]="extern"}).name, (sym.name or "\b"), sym.value, xloff.relocnames[r.type]))
             end
         end
+
+        print("")
     end
 else
     usage()

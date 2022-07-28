@@ -445,7 +445,7 @@ function asm.includeiter(lines, base)
 	return true, false
 end
 
-local function label_t(name, bc, ltype, section)
+local function label_t(name, bc, ltype, section, mainlabel)
 	local label = {}
 
 	label.name = name
@@ -454,6 +454,8 @@ local function label_t(name, bc, ltype, section)
 	label.locallabels = {}
 	label.section = section
 	label.erefs = 0
+	label.rrefs = 0
+	label.mainlabel = mainlabel
 
 	return label
 end
@@ -544,7 +546,7 @@ function asm.labels(isa, sections, lines)
 					return false
 				end
 
-				currentlabel.locallabels[lname] = label_t(lname, currentsection.bc, "local", currentsection)
+				currentlabel.locallabels[lname] = label_t(lname, currentsection.bc, "local", currentsection, currentlabel)
 			else
 				local l = labels[lname]
 
@@ -1036,6 +1038,8 @@ function asm.instr(isa, sections, lines)
 							l.erefs = l.erefs + 1
 						end
 
+						l.rrefs = l.rrefs + 1
+
 						sv32(currentsection.data, currentsection.offset, nt)
 
 						currentsection.relocations[#currentsection.relocations + 1] = {
@@ -1173,6 +1177,8 @@ function asm.instr(isa, sections, lines)
 							format=format,
 							field=k
 						}
+
+						l.rrefs = l.rrefs + 1
 
 						local opc
 

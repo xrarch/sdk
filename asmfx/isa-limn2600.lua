@@ -133,7 +133,7 @@ local RELOC_LIMN2600_FAR_LONG = 5
 function isa.reloctype(format, relocation)
 	-- returns a relocation type number
 
-	if format.name == "loff" then
+	if (format.name == "loff") or (format.name == "xloff") then
 		local operand
 
 		if relocation.format then

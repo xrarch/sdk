@@ -240,6 +240,10 @@ function cast(struct, tab, offset)
             s.t[s.s.o[n] + s.o + 1] = b3
             s.t[s.s.o[n] + s.o + 2] = b2
             s.t[s.s.o[n] + s.o + 3] = b1
+        elseif s.s.sz[n] == 2 then
+            local b1,b2 = splitInt16(val)
+            s.t[s.s.o[n] + s.o] = b2
+            s.t[s.s.o[n] + s.o + 1] = b1
         elseif s.s.sz[n] == 1 then
             s.t[s.s.o[n] + s.o] = val
         else

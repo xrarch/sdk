@@ -16,17 +16,23 @@ local sd = getdirectory(arg[0])
 local flat = false
 local incdir = ""
 local target = "target=limn2600"
+local format = "format=loff"
 local preprocargs = " "
+local asmout = false
 
 local narg = {}
 
 for k,v in ipairs(arg) do
 	if v == "-flat" then
 		flat = true
+	elseif v == "-S" then
+		asmout = true
 	elseif v:sub(1,7) == "incdir=" then
 		incdir = v
 	elseif v:sub(1,7) == "target=" then
 		target = v
+	elseif v:sub(1,7) == "format=" then
+		format = v
 	elseif v:find("=") then
 		preprocargs = preprocargs..v.." "
 	else
@@ -58,7 +64,7 @@ end
 local lua = sd.."lua.sh "
 local preproc = sd.."preproc/preproc.lua "..incdir.." "..preprocargs
 local dragonc = sd.."dragonfruit/dragonc.lua "..target.." "
-local asm = sd.."asmfx/asmfx.lua "..target.." "
+local asm = sd.."asmfx/asmfx.lua "..format.." "..target.." "
 
 if flat then
 	asm = asm .. "format=flat "
@@ -82,7 +88,14 @@ for k,v in ipairs(sourcef) do
 	local ed = getdirectory(v)
 
 	local pout = ed..".__out"..getfilename(v)..".pp "
-	local eout = ed..".__out"..getfilename(v)..".s "
+
+	local eout
+
+	if not asmout then
+		eout = ed..".__out"..getfilename(v)..".s "
+	else
+		eout = destf[k]
+	end
 
 	local err
 
@@ -96,6 +109,10 @@ for k,v in ipairs(sourcef) do
 	os.execute("rm -f "..pout)
 
 	if err > 0 then os.exit(1) end
+
+	if asmout then
+		return
+	end
 
 	err = os.execute(lua..asm..eout..destf[k])
 

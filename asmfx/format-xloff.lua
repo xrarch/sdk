@@ -34,7 +34,7 @@ local sectionheader_s = struct {
 local symbol_s = struct {
 	{4, "NameOffset"},
 	{4, "Value"},
-	{2, "SectionIndexOrExternOrdinal"},
+	{2, "SectionIndex"},
 	{1, "Type"},
 	{1, "Flags"}
 }
@@ -202,7 +202,7 @@ function format.encode(sections, symbols, isa, sectionsbyid)
 
 		sym.sv("NameOffset", nameoff)
 		sym.sv("Value", symbol.bc)
-		sym.sv("SectionIndexOrExternOrdinal", sid)
+		sym.sv("SectionIndex", sid)
 		sym.sv("Type", typid)
 		sym.sv("Flags", 0)
 

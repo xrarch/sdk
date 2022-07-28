@@ -32,7 +32,7 @@ local sectionheader_s = struct {
 local symbol_s = struct {
 	{4, "NameOffset"},
 	{4, "Value"},
-	{2, "SectionIndexOrExternOrdinal"},
+	{2, "SectionIndex"},
 	{1, "Type"},
 	{1, "Flags"}
 }
@@ -74,6 +74,12 @@ local symbolnames = {
 	["extern"]  = XLOFFSYMTYPE_EXTERN,
 	["special"] = XLOFFSYMTYPE_SPECIAL,
 }
+
+xloff.symtypenames = {}
+xloff.symtypenames[XLOFFSYMTYPE_GLOBAL] = "global"
+xloff.symtypenames[XLOFFSYMTYPE_LOCAL] = "local"
+xloff.symtypenames[XLOFFSYMTYPE_EXTERN] = "extern"
+xloff.symtypenames[XLOFFSYMTYPE_SPECIAL] = "special"
 
 xloff.sectionflagnames = {}
 
@@ -202,10 +208,8 @@ function xloff.new(filename)
 			symbol.type = symbolc.gv("Type")
 			symbol.flags = symbolc.gv("Flags")
 
-			if symbol.type == XLOFFSYMTYPE_EXTERN then
-				symbol.ordinal = symbolc.gv("SectionIndexOrExternOrdinal")
-			else
-				symbol.sectionindex = symbolc.gv("SectionIndexOrExternOrdinal")
+			if symbol.type ~= XLOFFSYMTYPE_EXTERN then
+				symbol.sectionindex = symbolc.gv("SectionIndex")
 			end
 
 			if symbol.sectionindex then

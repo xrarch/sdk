@@ -110,7 +110,8 @@ if command == "info" then
 
         print(s.name..":")
 
-        print(string.format([[  %-8s %d bytes
+        print(string.format(
+[[  %-8s %d bytes
   %-8s 0x%x
   %-8s 0x%x
   %-8s %s]],
@@ -118,6 +119,36 @@ if command == "info" then
 "Address", s.vaddr,
 "Offset", s.filoffset,
 "Flags", sectionflagstring))
+
+        print("")
+    end
+elseif command == "symbols" then
+    if not image:load() then os.exit(1) end
+
+    for i = 0, image.symbolcount-1 do
+        local symbol = image.symbolsbyid[i]
+
+        local name = symbol.name or "UNNAMED"
+
+        local section = symbol.section
+
+        if section then
+            section = section.name
+        else
+            section = "EXTERNAL"
+        end
+
+        print(string.format(
+[[  %-8s %s
+  %-8s %s
+  %-8s %s
+  %-8s 0x%x
+  %-8s %d]],
+"Name", name,
+"Section", section,
+"Type", xloff.symtypenames[symbol.type] or "UNKNOWN",
+"Value", symbol.value,
+"Flags", symbol.flags))
 
         print("")
     end

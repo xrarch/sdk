@@ -80,10 +80,11 @@ local image = xloff.new(imagename)
 if command == "info" then
     if not image:load() then os.exit(1) end
 
-    print(string.format("linked at: %s", os.date("%c", image.timestamp)))
-    print(string.format("architecture: %s", image.arch.name))
+    print(string.format("DateStamp     %s", os.date("%c", image.timestamp)))
+    print(string.format("Architecture  %s", image.arch.name))
+    print(string.format("Head Length   %d bytes", image.headlength))
     if image.entrysymbol then
-        print(string.format("entry point: %s @ $%X", image.entrysymbol.name, image.entrysymbol.value))
+        print(string.format("Entrypoint    %s @ $%X", image.entrysymbol.name, image.entrysymbol.value))
     end
 
     print("\nSections:")

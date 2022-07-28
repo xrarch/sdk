@@ -168,6 +168,40 @@ elseif command == "relocs" then
             end
         end
     end
+elseif command == "externs" then
+    if not image:load() then os.exit(1) end
+
+    for k,v in pairs(image.externsbyname) do
+        if v.import then
+            print(string.format("%s -> %s", v.name, v.import.name))
+        else
+            print(string.format("%s", v.name))
+        end
+    end
+elseif command == "imports" then
+    if not image:load() then os.exit(1) end
+
+    for i = 0, image.importcount-1 do
+        local import = image.importsbyid[i]
+
+        print(string.format("%d: %s [%s]", i, import.name, os.date("%c", import.timestamp)))
+    end
+elseif command == "fixups" then
+    if not image:load() then os.exit(1) end
+
+    for i = 0, image.importcount-1 do
+        local s = image.importsbyid[i]
+
+        for j = 1, s.fixupcount do
+            local r = s.fixups[j]
+
+            local sym = r.symbol
+
+            if sym then
+                print(string.format("%s: %x ref %s: %s (@%x) (%s)", r.section.name, r.offset, (sym.section or {["name"]="extern"}).name, (sym.name or "\b"), sym.value, xloff.relocnames[r.type]))
+            end
+        end
+    end
 end
 
 return true

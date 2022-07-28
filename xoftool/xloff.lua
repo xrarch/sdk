@@ -176,6 +176,9 @@ function xloff.new(filename)
 
 		self.stringtable = hdr.gv("StringTableOffset")
 
+		self.externsbyname = {}
+		self.globalsbyname = {}
+
 		self.sectionsbyname = {}
 		self.sectionsbyid = {}
 
@@ -205,6 +208,30 @@ function xloff.new(filename)
 			sectionheader = sectionheader + sectionheader_s.size()
 		end
 
+		self.importsbyname = {}
+		self.importsbyid = {}
+
+		self.importtable = hdr.gv("ImportTableOffset")
+		self.importcount = hdr.gv("ImportCount")
+
+		local importstr = self.importtable
+
+		for i = 0, self.importcount-1 do
+			local importc = cast(import_s, self.bin, importstr)
+
+			local import = {}
+
+			import.name = self:getString(importc.gv("NameOffset"))
+			import.timestamp = importc.gv("ExpectedTimestamp")
+			import.fixuptable = importc.gv("FixupTableOffset")
+			import.fixupcount = importc.gv("FixupCount")
+
+			self.importsbyid[i] = import
+			self.importsbyname[import.name] = import
+
+			importstr = importstr + import_s.size()
+		end
+
 		self.symbolsbyname = {}
 		self.symbolsbyid = {}
 
@@ -228,6 +255,12 @@ function xloff.new(filename)
 
 			if symbol.type ~= XLOFFSYMTYPE_EXTERN then
 				symbol.sectionindex = symbolc.gv("SectionIndex")
+			else
+				symbol.importindex = symbolc.gv("SectionIndex")
+
+				if symbol.importindex ~= 0xFFFF then
+					symbol.import = self.importsbyid[symbol.importindex]
+				end
 			end
 
 			if symbol.sectionindex then
@@ -240,35 +273,17 @@ function xloff.new(filename)
 				self.symbolsbyname[symbol.name] = symbol
 			end
 
+			if symbol.type == XLOFFSYMTYPE_EXTERN then
+				self.externsbyname[symbol.name] = symbol
+			elseif symbol.type == XLOFFSYMTYPE_GLOBAL then
+				self.globalsbyname[symbol.name] = symbol
+			end
+
 			symbolstr = symbolstr + symbol_s.size()
 		end
 
 		if self.entrysymbolindex ~= 0xFFFFFFFF then
 			self.entrysymbol = self.sectionsbyid[self.entrysymbolindex]
-		end
-
-		self.importsbyname = {}
-		self.importsbyid = {}
-
-		self.importtable = hdr.gv("ImportTableOffset")
-		self.importcount = hdr.gv("ImportCount")
-
-		local importstr = self.importtable
-
-		for i = 0, self.importcount-1 do
-			local importc = cast(import_s, self.bin, importstr)
-
-			local import = {}
-
-			import.name = self:getString(importc.gv("NameOffset"))
-			import.timestamp = importc.gv("ExpectedTimestamp")
-			import.fixuptable = importc.gv("FixupTableOffset")
-			import.fixupcount = importc.gv("FixupCount")
-
-			self.importsbyid[i] = import
-			self.importsbyname[import.name] = import
-
-			importstr = importstr + import_s.size()
 		end
 
 		-- load relocations

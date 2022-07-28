@@ -491,7 +491,7 @@ local entry
 local structname
 local structoff = 0
 
-function asm.labels(isa, sections, lines)
+function asm.labels(isa, sections, lines, sectionsbyid)
 	local currentsection
 
 	local currentlabel
@@ -578,6 +578,7 @@ function asm.labels(isa, sections, lines)
 				else
 					currentsection = section_t(sname)
 					sections[sname] = currentsection
+					sectionsbyid[#sectionsbyid+1] = currentsection
 				end
 			elseif t1 == ".define" then
 				-- define a constant label
@@ -949,7 +950,7 @@ function asm.labels(isa, sections, lines)
 	return true
 end
 
-function asm.instr(isa, sections, lines)
+function asm.instr(isa, sections, lines, sectionsbyid)
 	local currentsection
 
 	local currentlabel
@@ -1268,6 +1269,7 @@ function asm.assemble(codestring, filename, isa, encoder)
 	local lines = {}
 
 	local sections = {}
+	local sectionsbyid = {}
 
 	base = getdirectory(filename)
 
@@ -1295,11 +1297,11 @@ function asm.assemble(codestring, filename, isa, encoder)
 
 	constants["__DATE"] = os.date()
 
-	if not asm.labels(isa, sections, lines) then return false end
+	if not asm.labels(isa, sections, lines, sectionsbyid) then return false end
 
-	if not asm.instr(isa, sections, lines) then return false end
+	if not asm.instr(isa, sections, lines, sectionsbyid) then return false end
 
-	return sections, labels
+	return sections, labels, sectionsbyid
 end
 
 return asm

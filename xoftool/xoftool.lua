@@ -27,17 +27,16 @@ local function explode(d,p)
     return t
 end
 
-local loff = dofile(sd.."xloff.lua")
+dofile(sd.."misc.lua")
 
-local dimg = arg[1]
+local xloff = dofile(sd.."xloff.lua")
 
 local function usage()
 	print("== xoftool.lua ==")
 	print("utility to manipulate eXtended LIMN Object File Format (XLOFF) images")
 	print("usage: xoftool.lua [command] [args] ...")
 	print([[commands:
-  info     [image]: show general info about the file
-  sections [image]: dump section information
+  info     [image]: dump general info about the file
   symbols  [image]: dump symbols
   relocs   [image]: dump relocation tables
   externs  [image]: dump external symbols
@@ -54,9 +53,73 @@ local function usage()
 ]])
 end
 
-if #arg < 1 then
+local narg = {}
+
+local switches = {}
+
+for k,v in ipairs(arg) do
+    if v:sub(1,1) == "-" then
+        switches[#switches + 1] = v
+    else
+        narg[#narg + 1] = v
+    end
+end
+
+arg = narg
+
+if #arg < 2 then
 	usage()
 	os.exit(1)
+end
+
+local command = arg[1]
+local imagename = arg[2]
+
+local image = xloff.new(imagename)
+
+if command == "info" then
+    if not image:load() then os.exit(1) end
+
+    print(string.format("linked at: %s", os.date("%c", image.timestamp)))
+    print(string.format("architecture: %s", image.arch.name))
+    if image.entrysymbol then
+        print(string.format("entry point: %s @ $%X", image.entrysymbol.name, image.entrysymbol.value))
+    end
+
+    print("\nSections:")
+
+    for i = 0, image.sectioncount-1 do
+        local s = image.sectionsbyid[i]
+
+        local sectionflags = s.flags
+
+        local sectionflagstring = ""
+
+        for j = 31, 0, -1 do
+            if band(rshift(sectionflags, j), 1) == 1 then
+                if xloff.sectionflagnames[j] then
+                    if sectionflagstring ~= "" then
+                        sectionflagstring = sectionflagstring .. " | "
+                    end
+
+                    sectionflagstring = sectionflagstring .. xloff.sectionflagnames[j]
+                end
+            end
+        end
+
+        print(s.name..":")
+
+        print(string.format([[  %-8s %d bytes
+  %-8s 0x%x
+  %-8s 0x%x
+  %-8s %s]],
+"Size", s.size,
+"Address", s.vaddr,
+"Offset", s.filoffset,
+"Flags", sectionflagstring))
+
+        print("")
+    end
 end
 
 return true

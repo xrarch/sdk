@@ -34,7 +34,7 @@ local sectionheader_s = struct {
 local symbol_s = struct {
 	{4, "NameOffset"},
 	{4, "Value"},
-	{2, "SectionIndex"},
+	{2, "SectionIndexOrExternOrdinal"},
 	{1, "Type"},
 	{1, "Flags"}
 }
@@ -78,7 +78,7 @@ local symbolnames = {
 	["special"] = XLOFFSYMTYPE_SPECIAL,
 }
 
-function format.encode(sections, symbols, isa)
+function format.encode(sections, symbols, isa, sectionsbyid)
 	local arch = isas[isa.name]
 
 	if not arch then
@@ -122,7 +122,7 @@ function format.encode(sections, symbols, isa)
 		return off
 	end
 
-	for k,v in pairs(sections) do
+	for k,v in ipairs(sectionsbyid) do
 		v.id = sectioncount
 		isectiontable[sectioncount] = v
 
@@ -130,16 +130,18 @@ function format.encode(sections, symbols, isa)
 
 		local flags = 0
 
-		if k:sub(1,2) == "ro" then
+		local name = v.name
+
+		if name:sub(1,2) == "ro" then
 			flags = bor(flags, XLOFFSECTIONFLAG_READONLY)
 		end
 
-		if k:sub(-4,-1) == "text" then
+		if name:sub(-4,-1) == "text" then
 			flags = bor(flags, XLOFFSECTIONFLAG_TEXT)
 			flags = bor(flags, XLOFFSECTIONFLAG_MAP)
-		elseif k:sub(-4,-1) == "data" then
+		elseif name:sub(-4,-1) == "data" then
 			flags = bor(flags, XLOFFSECTIONFLAG_MAP)
-		elseif k:sub(-5,-1) == "debug" then
+		elseif name:sub(-5,-1) == "debug" then
 			flags = bor(flags, XLOFFSECTIONFLAG_DEBUG)
 		elseif v.bss then
 			flags = bor(flags, XLOFFSECTIONFLAG_BSS)
@@ -163,7 +165,7 @@ function format.encode(sections, symbols, isa)
 			v.bc = v.bc + 1
 		end
 
-		v.nameoff = addString(v.name)
+		v.nameoff = addString(name)
 	end
 
 	local symtab = {}
@@ -200,7 +202,7 @@ function format.encode(sections, symbols, isa)
 
 		sym.sv("NameOffset", nameoff)
 		sym.sv("Value", symbol.bc)
-		sym.sv("SectionIndex", sid)
+		sym.sv("SectionIndexOrExternOrdinal", sid)
 		sym.sv("Type", typid)
 		sym.sv("Flags", 0)
 
@@ -302,7 +304,12 @@ function format.encode(sections, symbols, isa)
 
 		local shdr = section.sheader
 
-		shdr.sv("DataOffset", filoff)
+		if section.bss then
+			shdr.sv("DataOffset", 0)
+		else
+			shdr.sv("DataOffset", filoff)
+		end
+
 		shdr.sv("DataSize", section.bc)
 
 		if not section.bss then

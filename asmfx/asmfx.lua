@@ -61,14 +61,14 @@ for i = 1, #arg/2 do
 		os.exit(1)
 	end
 
-	local sections, symbols = asm.assemble(srcf:read("*a"), source, isa, encoder)
+	local sections, symbols, sectionsbyid = asm.assemble(srcf:read("*a"), source, isa, encoder)
 
 	if not sections then
 		print("asm: couldn't assemble "..source.."!")
 		os.exit(1)
 	end
 
-	local binary = encoder.encode(sections, symbols, isa)
+	local binary = encoder.encode(sections, symbols, isa, sectionsbyid)
 
 	if not binary then
 		print("asm: couldn't encode "..source.."!")

@@ -202,6 +202,9 @@ elseif command == "fixups" then
             end
         end
     end
+else
+    usage()
+    os.exit(1)
 end
 
 return true

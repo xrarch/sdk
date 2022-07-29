@@ -57,6 +57,8 @@ archinfo[1] = {}
 archinfo[1].name = "limn2600"
 archinfo[1].align = 4
 
+local XLOFFFLAG_ALIGN4K = 1
+
 local XLOFFSYMTYPE_GLOBAL  = 1
 local XLOFFSYMTYPE_LOCAL   = 2
 local XLOFFSYMTYPE_EXTERN  = 3
@@ -175,6 +177,10 @@ function xloff.new(filename)
 		self.headlength = hdr.gv("HeadLength")
 
 		self.stringtable = hdr.gv("StringTableOffset")
+
+		if band(self.flags, XLOFFFLAG_ALIGN4K) ~= 0 then
+			self.pagealignrequired = 4096
+		end
 
 		self.externsbyname = {}
 		self.globalsbyname = {}
@@ -451,6 +457,12 @@ function xloff.new(filename)
 
 			section.nameoff = addString(section.name)
 
+			section.headerc.sv("RelocTableOffset", 0)
+			section.headerc.sv("RelocCount", 0)
+			section.headerc.sv("VirtualAddress", section.vaddr)
+			section.headerc.sv("NameOffset", section.nameoff)
+			section.headerc.sv("Flags", section.flags)
+
 			secheadertaboff = secheadertaboff + sectionheader_s.size()
 			secheadertabindex = secheadertabindex + 1
 		end
@@ -476,6 +488,11 @@ function xloff.new(filename)
 			import.reloctableoff = 0
 			import.reloctableindex = 0
 
+			import.importc.sv("NameOffset", import.nameoff)
+			import.importc.sv("ExpectedTimestamp", import.timestamp)
+			import.importc.sv("FixupTableOffset", 0)
+			import.importc.sv("FixupCount", 0)
+
 			return off
 		end
 
@@ -487,6 +504,7 @@ function xloff.new(filename)
 			local off = symtabindex
 
 			symbol.id = symtabindex
+			symbol.added = true
 
 			local nameoff = 0xFFFFFFFF
 
@@ -523,7 +541,13 @@ function xloff.new(filename)
 		end
 
 		for i = 0, img.symbolcount-1 do
-			if not addSymbol(img.symbolsbyid[i]) then return false end
+			local sym = img.symbolsbyid[i]
+
+			if (sym.type ~= XLOFFSYMTYPE_LOCAL) or (not self.lstrip) then
+				if (sym.type ~= XLOFFSYMTYPE_GLOBAL) or (not self.gstrip) then
+					if not addSymbol(img.symbolsbyid[i]) then return false end
+				end
+			end
 		end
 
 		-- we won't be adding anymore strings so make sure to align the string table to 32 bits.
@@ -550,6 +574,7 @@ function xloff.new(filename)
 
 			if symbol then
 				reloc.sv("SymbolIndex", symbol.id)
+				symbol.rrefs = symbol.rrefs + 1
 			else
 				reloc.sv("SymbolIndex", -1)
 			end
@@ -565,41 +590,42 @@ function xloff.new(filename)
 
 		-- add all the internal relocations
 
-		for i = 0, self.sectioncount-1 do
-			local section = self.sectionsbyid[i]
+		if not self.istrip then
+			for i = 0, self.sectioncount-1 do
+				local section = self.sectionsbyid[i]
 
-			for i,r in ipairs(section.relocs) do
-				if not addRelocation(section, r.symbol, r.offset, r.type, 0xFFFF) then return false end
+				for i,r in ipairs(section.relocs) do
+					if (not r.symbol) or (r.symbol.added) then
+						if not addRelocation(section, r.symbol, r.offset, r.type, 0xFFFF) then return false end
+					end
+				end
+
+				local shdr = section.headerc
+
+				shdr.sv("RelocTableOffset", filoff)
+				shdr.sv("RelocCount", section.reloctableindex)
+
+				filoff = filoff + section.reloctableoff
 			end
-
-			local shdr = section.headerc
-
-			shdr.sv("RelocTableOffset", filoff)
-			shdr.sv("RelocCount", section.reloctableindex)
-			shdr.sv("VirtualAddress", section.vaddr)
-			shdr.sv("NameOffset", section.nameoff)
-			shdr.sv("Flags", section.flags)
-
-			filoff = filoff + section.reloctableoff
 		end
 
 		-- add all the import fixups and finalize import table entries
 
-		for i = 0, self.importcount-1 do
-			local import = self.importsbyid[i]
+		if not self.fstrip then
+			for i = 0, self.importcount-1 do
+				local import = self.importsbyid[i]
 
-			for i,r in ipairs(import.fixups) do
-				if not addRelocation(import, r.symbol, r.offset, r.type, r.section.id) then return false end
+				for i,r in ipairs(import.fixups) do
+					if not addRelocation(import, r.symbol, r.offset, r.type, r.section.id) then return false end
+				end
+
+				local shdr = import.importc
+
+				shdr.sv("FixupTableOffset", filoff)
+				shdr.sv("FixupCount", import.reloctableindex)
+
+				filoff = filoff + import.reloctableoff
 			end
-
-			local shdr = import.importc
-
-			shdr.sv("NameOffset", import.nameoff)
-			shdr.sv("ExpectedTimestamp", import.timestamp)
-			shdr.sv("FixupTableOffset", filoff)
-			shdr.sv("FixupCount", import.reloctableindex)
-
-			filoff = filoff + import.reloctableoff
 		end
 
 		-- finalize the section headers
@@ -660,6 +686,12 @@ function xloff.new(filename)
 			header.sv("EntrySymbol", 0xFFFFFFFF)
 		end
 
+		if self.pagealignrequired == 4096 then
+			self.flags = bor(self.flags, XLOFFFLAG_ALIGN4K)
+		else
+			self.flags = band(self.flags, bnot(XLOFFFLAG_ALIGN4K))
+		end
+
 		header.sv("Flags", self.flags)
 
 		header.sv("Timestamp", self.timestamp)
@@ -707,7 +739,16 @@ function xloff.new(filename)
 			end
 		end
 
-		print(binary)
+		local file = io.open(self.filename, "wb")
+
+		if not file then
+			print("xoftool: can't open " .. self.filename .. " for writing")
+			return false
+		end
+
+		file:write(binary)
+
+		file:close()
 	end
 
 	return img

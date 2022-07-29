@@ -43,13 +43,15 @@ local function usage()
   imports  [image]: dump imported DLLs
   fixups   [image]: dump fixup tables for imported DLLs
   move     [image] [move expression]: move an XLOFF file in memory
-  rstrip   [image]: strip internal relocations and local symbols
-  gstrip   [image]: strip global symbols
+  lstrip   [image]: strip local symbols
+  istrip   [image]: strip internal relocations
+  gstrip   [image]: strip global symbols 
   fstrip   [image]: strip import fixups
-  strip    [image]: perform actions of all of rstrip, gstrip, and fstrip
+  dystrip  [image]: perform actions of all of lstrip, istrip, and fstrip
+  strip    [image]: perform actions of all of lstrip, istrip, gstrip, and fstrip
   binary   (-nobss) [image] [base address] (bss address): flatten an XLOFF file; will expand BSS section in file unless address is provided.
+  symtab   [image] [output] (text offset): generate a symbol table
   link     (-f) [output] [xloff1 xloff2 ... ]: link 2 or more XLOFF files
-  symtab   [output] [image] (text offset): generate a symbol table
 ]])
 end
 
@@ -83,6 +85,13 @@ if command == "info" then
     print(string.format("DateStamp     %s", os.date("%c", image.timestamp)))
     print(string.format("Architecture  %s", image.arch.name))
     print(string.format("Head Length   %d bytes", image.headlength))
+
+    if image.pagealignrequired then
+        print(string.format("Alignment     %d bytes", image.pagealignrequired))
+    else
+        print("Alignment     No restrictions")
+    end
+
     if image.entrysymbol then
         print(string.format("Entrypoint    %s @ $%X", image.entrysymbol.name, image.entrysymbol.value))
     end
@@ -206,6 +215,48 @@ elseif command == "fixups" then
 
         print("")
     end
+elseif command == "lstrip" then
+    if not image:load() then os.exit(1) end
+
+    image.lstrip = true
+
+    if not image:write() then os.exit(1) end
+elseif command == "istrip" then
+    if not image:load() then os.exit(1) end
+
+    image.istrip = true
+    image.lstrip = true
+
+    if not image:write() then os.exit(1) end
+elseif command == "gstrip" then
+    if not image:load() then os.exit(1) end
+
+    image.gstrip = true
+
+    if not image:write() then os.exit(1) end
+elseif command == "fstrip" then
+    if not image:load() then os.exit(1) end
+
+    image.fstrip = true
+
+    if not image:write() then os.exit(1) end
+elseif command == "dystrip" then
+    if not image:load() then os.exit(1) end
+
+    image.lstrip = true
+    image.istrip = true
+    image.fstrip = true
+
+    if not image:write() then os.exit(1) end
+elseif command == "strip" then
+    if not image:load() then os.exit(1) end
+
+    image.lstrip = true
+    image.istrip = true
+    image.fstrip = true
+    image.gstrip = true
+
+    if not image:write() then os.exit(1) end
 else
     usage()
     os.exit(1)

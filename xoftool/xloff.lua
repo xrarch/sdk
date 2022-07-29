@@ -76,9 +76,9 @@ local symbolnames = {
 }
 
 xloff.symtypenames = {}
-xloff.symtypenames[XLOFFSYMTYPE_GLOBAL] = "global"
-xloff.symtypenames[XLOFFSYMTYPE_LOCAL] = "local"
-xloff.symtypenames[XLOFFSYMTYPE_EXTERN] = "extern"
+xloff.symtypenames[XLOFFSYMTYPE_GLOBAL]  = "global"
+xloff.symtypenames[XLOFFSYMTYPE_LOCAL]   = "local"
+xloff.symtypenames[XLOFFSYMTYPE_EXTERN]  = "extern"
 xloff.symtypenames[XLOFFSYMTYPE_SPECIAL] = "special"
 
 xloff.sectionflagnames = {}
@@ -101,11 +101,11 @@ local XLOFFRELOC_LIMN2600_FAR_INT  = 4
 local XLOFFRELOC_LIMN2600_FAR_LONG = 5
 
 xloff.relocnames = {}
-xloff.relocnames[XLOFFRELOC_LIMN2500_LONG] = "LONG"
-xloff.relocnames[XLOFFRELOC_LIMN2500_ABSJ] = "ABSJ"
-xloff.relocnames[XLOFFRELOC_LIMN2500_LA] = "LA"
+xloff.relocnames[XLOFFRELOC_LIMN2500_LONG]     = "LONG"
+xloff.relocnames[XLOFFRELOC_LIMN2500_ABSJ]     = "ABSJ"
+xloff.relocnames[XLOFFRELOC_LIMN2500_LA]       = "LA"
 xloff.relocnames[XLOFFRELOC_LIMN2600_FAR_LONG] = "FARLONG"
-xloff.relocnames[XLOFFRELOC_LIMN2600_FAR_INT] = "FARINT"
+xloff.relocnames[XLOFFRELOC_LIMN2600_FAR_INT]  = "FARINT"
 
 function xloff.new(filename)
 	local img = {}
@@ -204,6 +204,14 @@ function xloff.new(filename)
 
 			self.sectionsbyid[i] = section
 			self.sectionsbyname[section.name] = section
+
+			if band(section.flags, XLOFFSECTIONFLAG_BSS) == 0 then
+				section.data = {}
+
+				for i = 0, section.size-1 do
+					section.data[i] = self.bin[section.filoffset+i]
+				end
+			end
 
 			sectionheader = sectionheader + sectionheader_s.size()
 		end
@@ -351,6 +359,355 @@ function xloff.new(filename)
 		end
 
 		return true
+	end
+
+	function img:needsalignment(sid)
+		for i = sid+1, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+
+			if (band(section.flags, XLOFFSECTIONFLAG_BSS) == 0) and (section.size > 0) then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	function img:write()
+		-- trashes the structures. should be re-load()-ed if you wanna keep
+		-- using it.
+
+		-- encoding an executable in lua: believe it or not this used to be even more gross.
+	
+		-- basically what's going on here is that we iterate through all the relevant structures,
+		-- sometimes multiple times, and update their IDs and whatnot to reflect where they'll
+		-- end up in the on-file tables. Then we do a final pass to actually manufacture and
+		-- write the binary.
+
+		local binary = ""
+
+		local headertab = {}
+
+		local header = cast(xloffheader_s, headertab)
+
+		local function addTab(tab, size)
+			if size == 0 then return end
+
+			for i = 0, size-1 do
+				binary = binary .. string.char(tab[i])
+			end
+		end
+
+		local stringtab = {}
+		local stringtaboff = 0
+
+		local function addString(str)
+			local off = stringtaboff
+
+			for i = 1, #str do
+				stringtab[stringtaboff] = string.byte(str:sub(i,i))
+				stringtaboff = stringtaboff + 1
+			end
+
+			stringtab[stringtaboff] = 0
+			stringtaboff = stringtaboff + 1
+
+			return off
+		end
+
+		local secheadertab = {}
+		local secheadertaboff = 0
+		local secheadertabindex = 0
+
+		for i = 0, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+			section.id = i
+
+			section.headerc = cast(sectionheader_s, secheadertab, secheadertaboff)
+
+			if self:needsalignment(i) then
+				if img.pagealignrequired then
+					while band(section.size, img.pagealignrequired-1) ~= 0 do
+						if band(section.flags, XLOFFSECTIONFLAG_BSS) == 0 then
+							section.data[section.size] = 0
+						end
+
+						section.size = section.size + 1
+					end
+				else
+					while band(section.size, 3) ~= 0 do
+						if band(section.flags, XLOFFSECTIONFLAG_BSS) == 0 then
+							section.data[section.size] = 0
+						end
+
+						section.size = section.size + 1
+					end
+				end
+			end
+
+			section.reloctable = {}
+			section.reloctableoff = 0
+			section.reloctableindex = 0
+
+			section.nameoff = addString(section.name)
+
+			secheadertaboff = secheadertaboff + sectionheader_s.size()
+			secheadertabindex = secheadertabindex + 1
+		end
+
+		local importtab = {}
+		local importtaboff = 0
+		local importtabindex = 0
+
+		for i = 0, self.importcount-1 do
+			local off = importtabindex
+
+			local import = self.importsbyid[i]
+			import.id = i
+
+			import.importc = cast(import_s, importtab, importtaboff)
+
+			import.nameoff = addString(import.name)
+
+			importtabindex = importtabindex + 1
+			importtaboff = importtaboff + import_s.size()
+
+			import.reloctable = {}
+			import.reloctableoff = 0
+			import.reloctableindex = 0
+
+			return off
+		end
+
+		local symtab = {}
+		local symtaboff = 0
+		local symtabindex = 0
+
+		local function addSymbol(symbol)
+			local off = symtabindex
+
+			symbol.id = symtabindex
+
+			local nameoff = 0xFFFFFFFF
+
+			if symbol.name then
+				if (symbol.type ~= "local") and (symbol.type ~= "special") then
+					nameoff = addString(symbol.name)
+				end
+			end
+
+			local sym = cast(symbol_s, symtab, symtaboff)
+
+			local sid
+
+			if symbol.type ~= XLOFFSYMTYPE_EXTERN then
+				sid = symbol.section.id
+			else
+				if symbol.import then
+					sid = symbol.import.id
+				else
+					sid = 0xFFFF
+				end
+			end
+
+			sym.sv("NameOffset", nameoff)
+			sym.sv("Value", symbol.value)
+			sym.sv("SectionIndex", sid)
+			sym.sv("Type", symbol.type)
+			sym.sv("Flags", 0)
+
+			symtabindex = symtabindex + 1
+			symtaboff = symtaboff + symbol_s.size()
+
+			return off
+		end
+
+		for i = 0, img.symbolcount-1 do
+			if not addSymbol(img.symbolsbyid[i]) then return false end
+		end
+
+		-- we won't be adding anymore strings so make sure to align the string table to 32 bits.
+
+		while band(stringtaboff, 3) ~= 0 do
+			stringtab[stringtaboff] = 0
+			stringtaboff = stringtaboff + 1
+		end
+
+		local filoff = xloffheader_s.size()
+		local symtabfiloff = filoff
+
+		filoff = filoff + symtaboff
+		local stringtabfiloff = filoff
+
+		filoff = filoff + stringtaboff
+
+		local function addRelocation(section, symbol, offset, rtype, sectionindex)
+			local off = section.reloctableindex
+
+			local reloc = cast(reloc_s, section.reloctable, section.reloctableoff)
+
+			reloc.sv("Offset", offset)
+
+			if symbol then
+				reloc.sv("SymbolIndex", symbol.id)
+			else
+				reloc.sv("SymbolIndex", -1)
+			end
+
+			reloc.sv("RelocType", rtype)
+			reloc.sv("SectionIndex", sectionindex)
+
+			section.reloctableindex = section.reloctableindex + 1
+			section.reloctableoff = section.reloctableoff + reloc_s.size()
+
+			return off
+		end
+
+		-- add all the internal relocations
+
+		for i = 0, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+
+			for i,r in ipairs(section.relocs) do
+				if not addRelocation(section, r.symbol, r.offset, r.type, 0xFFFF) then return false end
+			end
+
+			local shdr = section.headerc
+
+			shdr.sv("RelocTableOffset", filoff)
+			shdr.sv("RelocCount", section.reloctableindex)
+			shdr.sv("VirtualAddress", section.vaddr)
+			shdr.sv("NameOffset", section.nameoff)
+			shdr.sv("Flags", section.flags)
+
+			filoff = filoff + section.reloctableoff
+		end
+
+		-- add all the import fixups and finalize import table entries
+
+		for i = 0, self.importcount-1 do
+			local import = self.importsbyid[i]
+
+			for i,r in ipairs(import.fixups) do
+				if not addRelocation(import, r.symbol, r.offset, r.type, r.section.id) then return false end
+			end
+
+			local shdr = import.importc
+
+			shdr.sv("NameOffset", import.nameoff)
+			shdr.sv("ExpectedTimestamp", import.timestamp)
+			shdr.sv("FixupTableOffset", filoff)
+			shdr.sv("FixupCount", import.reloctableindex)
+
+			filoff = filoff + import.reloctableoff
+		end
+
+		-- finalize the section headers
+
+		local importfiloff = filoff
+		filoff = filoff + import_s.size()*self.importcount
+
+		local sectionhdrfiloff = filoff
+		filoff = filoff + sectionheader_s.size()*self.sectioncount
+
+		local headlength = filoff
+
+		local alignamt = 0
+
+		if self.pagealignrequired then
+			alignamt = self.pagealignrequired-band(headlength, (self.pagealignrequired-1))
+			headlength = headlength + alignamt
+			filoff = filoff + alignamt
+		end
+
+		for i = 0, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+
+			local shdr = section.headerc
+
+			if band(section.flags, XLOFFSECTIONFLAG_BSS) ~= 0 then
+				shdr.sv("DataOffset", 0)
+			else
+				shdr.sv("DataOffset", filoff)
+			end
+
+			shdr.sv("DataSize", section.size)
+
+			if band(section.flags, XLOFFSECTIONFLAG_BSS) == 0 then
+				filoff = filoff + section.size
+			end
+		end
+
+		-- construct header
+
+		for i = 0, xloffheader_s.size()-1 do
+			headertab[i] = 0
+		end
+
+		header.sv("Magic", XLOFFMAGIC)
+
+		header.sv("SymbolTableOffset", symtabfiloff)
+		header.sv("SymbolCount", symtabindex)
+
+		header.sv("StringTableOffset", stringtabfiloff)
+		header.sv("StringTableSize", stringtaboff)
+
+		header.sv("TargetArchitecture", self.archid)
+
+		if self.entrysymbol then
+			header.sv("EntrySymbol", self.entrysymbol.id)
+		else
+			header.sv("EntrySymbol", 0xFFFFFFFF)
+		end
+
+		header.sv("Flags", self.flags)
+
+		header.sv("Timestamp", self.timestamp)
+
+		header.sv("SectionTableOffset", sectionhdrfiloff)
+		header.sv("SectionCount", self.sectioncount)
+
+		header.sv("ImportTableOffset", importfiloff)
+		header.sv("ImportCount", self.importcount)
+
+		header.sv("HeadLength", headlength)
+
+		-- write everything out
+
+		addTab(headertab, xloffheader_s.size())
+		addTab(symtab, symtaboff)
+		addTab(stringtab, stringtaboff)
+
+		for i = 0, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+
+			addTab(section.reloctable, section.reloctableoff)
+		end
+
+		for i = 0, self.importcount-1 do
+			local import = self.importsbyid[i]
+
+			addTab(import.reloctable, import.reloctableoff)
+		end
+
+		addTab(importtab, importtaboff)
+		addTab(secheadertab, secheadertaboff)
+
+		-- align the header up to a page
+
+		for i = 1, alignamt do
+			binary = binary..string.char(0)
+		end
+
+		for i = 0, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+
+			if band(section.flags, XLOFFSECTIONFLAG_BSS) == 0 then
+				addTab(section.data, section.size)
+			end
+		end
+
+		print(binary)
 	end
 
 	return img

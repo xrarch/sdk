@@ -469,6 +469,7 @@ local function section_t(name)
 
 	section.relocations = {}
 
+	section.rrefs = 0
 	section.size = 0
 
 	section.bc = 0
@@ -1031,6 +1032,7 @@ function asm.instr(isa, sections, lines, sectionsbyid)
 
 						if l.section then
 							nt = l.bc + l.section.origin
+							l.section.rrefs = l.section.rrefs + 1
 						else
 							nt = 0
 						end
@@ -1185,6 +1187,7 @@ function asm.instr(isa, sections, lines, sectionsbyid)
 
 						if l.section then
 							opc = l.bc + l.section.origin
+							l.section.rrefs = l.section.rrefs + 1
 						else
 							opc = 0
 						end

@@ -42,6 +42,7 @@ local symbol_s = struct {
 local import_s = struct {
 	{4, "NameOffset"},
 	{4, "ExpectedTimestamp"},
+	{4, "ExpectedBase"},
 	{4, "FixupTableOffset"},
 	{4, "FixupCount"}
 }
@@ -262,7 +263,7 @@ function format.encode(sections, symbols, isa, sectionsbyid)
 		reloc.sv("Offset", offset)
 		reloc.sv("SymbolIndex", symbol.index)
 		reloc.sv("RelocType", rtype)
-		reloc.sv("SectionIndex", -1)
+		reloc.sv("SectionIndex", section.id)
 
 		section.reloctableindex = section.reloctableindex + 1
 		section.reloctableoff = section.reloctableoff + reloc_s.size()

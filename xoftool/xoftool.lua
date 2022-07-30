@@ -59,10 +59,13 @@ local narg = {}
 
 local switches = {}
 
+local es = 0
+
 for k,v in ipairs(arg) do
-    if v:sub(1,1) == "-" then
+    if (es < 2) and (v:sub(1,1) == "-") then
         switches[#switches + 1] = v
     else
+        es = es + 1
         narg[#narg + 1] = v
     end
 end
@@ -338,14 +341,31 @@ elseif command == "move" then
 
     if not image:write() then os.exit(1) end
 elseif command == "link" then
-    local fragment = (switches[1] == "-f")
+    local nostubs
+    local fragment
+
+    for k,v in ipairs(switches) do
+        if v == "-f" then
+            fragment = true
+        elseif v == "-nostubs" then
+            nostubs = true
+        end
+    end
+
+    image.nostubs = nostubs
 
     local linked = {}
+
+    local dynamic = false
 
     for i = 3, #arg do
         local imgname = arg[i]
 
-        if linked[imgname] then
+        if imgname == "-d" then
+            dynamic = true
+        elseif imgname == "-s" then
+            dynamic = false
+        elseif linked[imgname] then
             print("xoftool: warning: ignoring duplicate object "..arg[i])
         else
             linked[imgname] = true
@@ -356,7 +376,7 @@ elseif command == "link" then
 
             local comp = explode(":", imgname)
 
-            local libname = imgname
+            local libname
 
             if comp[2] then
                 libname = comp[1]
@@ -367,9 +387,9 @@ elseif command == "link" then
 
             if not lnkobj:load() then os.exit(1) end
 
-            lnkobj.libname = libname
+            if libname then lnkobj.libname = libname end
 
-            if not image:link(lnkobj) then os.exit(1) end
+            if not image:link(lnkobj, dynamic) then os.exit(1) end
         end
     end
 

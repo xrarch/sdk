@@ -1,5 +1,17 @@
 lshift, rshift, tohex, arshift, band, bxor, bor, bnot, bror, brol = bit.lshift, bit.rshift, bit.tohex, bit.arshift, bit.band, bit.bxor, bit.bor, bit.bnot, bit.ror, bit.rol
 
+function getfilename(p)
+    local qp = 1
+
+    for i = 1, #p do
+        if p:sub(i,i) == "/" then
+            qp = i + 1
+        end
+    end
+
+    return p:sub(qp)
+end
+
 function bnor(a,b)
     return bnot(bor(a,b))
 end

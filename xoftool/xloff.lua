@@ -40,6 +40,7 @@ local symbol_s = struct {
 local import_s = struct {
 	{4, "NameOffset"},
 	{4, "ExpectedTimestamp"},
+	{4, "ExpectedBase"},
 	{4, "FixupTableOffset"},
 	{4, "FixupCount"}
 }
@@ -69,39 +70,56 @@ archinfo[1].align = 4
 archinfo[1].id = 1
 
 archinfo[1].dofixup = function (tab, off, nval, rtype)
-local old = gv32(tab, off)
-local new = old
+	local old = gv32(tab, off)
+	local new = old
 
-if rtype == XLOFFRELOC_LIMN2500_ABSJ then
-	new = bor(band(old, 0x7), lshift(band(rshift(nval, 2), 0x1FFFFFFF), 3))
-elseif rtype == XLOFFRELOC_LIMN2500_LONG then
-	new = nval
-elseif rtype == XLOFFRELOC_LIMN2500_LA then
-	local old2 = gv32(tab, off + 4)
-	local new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
+	if rtype == XLOFFRELOC_LIMN2500_ABSJ then
+		new = bor(band(old, 0x7), lshift(band(rshift(nval, 2), 0x1FFFFFFF), 3))
+	elseif rtype == XLOFFRELOC_LIMN2500_LONG then
+		new = nval
+	elseif rtype == XLOFFRELOC_LIMN2500_LA then
+		local old2 = gv32(tab, off + 4)
+		local new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
 
-	new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
 
-	sv32(tab, off + 4, new2)
-elseif rtype == XLOFFRELOC_LIMN2600_FAR_INT then
-	local old2 = gv32(tab, off + 4)
-	local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 1), 16), band(old2, 0xFFFF))
+		sv32(tab, off + 4, new2)
+	elseif rtype == XLOFFRELOC_LIMN2600_FAR_INT then
+		local old2 = gv32(tab, off + 4)
+		local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 1), 16), band(old2, 0xFFFF))
 
-	new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
 
-	sv32(tab, off + 4, new2)
-elseif rtype == XLOFFRELOC_LIMN2600_FAR_LONG then
-	local old2 = gv32(tab, off + 4)
-	local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 2), 16), band(old2, 0xFFFF))
+		sv32(tab, off + 4, new2)
+	elseif rtype == XLOFFRELOC_LIMN2600_FAR_LONG then
+		local old2 = gv32(tab, off + 4)
+		local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 2), 16), band(old2, 0xFFFF))
 
-	new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+		new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
 
-	sv32(tab, off + 4, new2)
-else
-	error("unknown relocation type "..rtype)
+		sv32(tab, off + 4, new2)
+	else
+		error("unknown relocation type "..rtype)
+	end
+
+	sv32(tab, off, new)
 end
 
-sv32(tab, off, new)
+archinfo[1].dostub = function (section, ptr)
+	-- create a call stub template at the end of the given section.
+	-- make sure to grow it.
+
+	local stublocation = section.size
+	section.size = section.size + 4
+
+	sv32(section.data, stublocation, bor(lshift(rshift(ptr, 2), 3), 6))
+
+	return stublocation, 4, XLOFFRELOC_LIMN2500_ABSJ
+end
+
+archinfo[1].shouldredirect = function (section, fixup)
+	-- determine if a fixup should be redirected to a call stub.
+	return fixup.type == XLOFFRELOC_LIMN2500_ABSJ
 end
 
 local XLOFFFLAG_ALIGN4K = 1
@@ -110,6 +128,7 @@ local XLOFFSYMTYPE_GLOBAL  = 1
 local XLOFFSYMTYPE_LOCAL   = 2
 local XLOFFSYMTYPE_EXTERN  = 3
 local XLOFFSYMTYPE_SPECIAL = 4
+local XLOFFSYMTYPE_DEXTERN = 5
 
 local XLOFFSECTIONFLAG_BSS   = 1
 local XLOFFSECTIONFLAG_DEBUG = 2
@@ -122,6 +141,7 @@ local symbolnames = {
 	["local"]   = XLOFFSYMTYPE_LOCAL,
 	["extern"]  = XLOFFSYMTYPE_EXTERN,
 	["special"] = XLOFFSYMTYPE_SPECIAL,
+	["dextern"] = XLOFFSYMTYPE_DEXTERN,
 }
 
 xloff.symtypenames = {}
@@ -129,6 +149,7 @@ xloff.symtypenames[XLOFFSYMTYPE_GLOBAL]  = "global"
 xloff.symtypenames[XLOFFSYMTYPE_LOCAL]   = "local"
 xloff.symtypenames[XLOFFSYMTYPE_EXTERN]  = "extern"
 xloff.symtypenames[XLOFFSYMTYPE_SPECIAL] = "special"
+xloff.symtypenames[XLOFFSYMTYPE_DEXTERN]  = "dextern"
 
 xloff.sectionflagnames = {}
 
@@ -153,7 +174,7 @@ function xloff.new(filename)
 	local img = {}
 
 	img.filename = filename
-	img.libname = filename
+	img.libname = getfilename(filename)
 
 	img.bin = {}
 
@@ -292,6 +313,7 @@ function xloff.new(filename)
 
 			import.name = self:getString(importc.gv("NameOffset"))
 			import.timestamp = importc.gv("ExpectedTimestamp")
+			import.expectedbase = importc.gv("ExpectedBase")
 			import.fixuptable = importc.gv("FixupTableOffset")
 			import.fixupcount = importc.gv("FixupCount")
 
@@ -324,14 +346,11 @@ function xloff.new(filename)
 			symbol.type = symbolc.gv("Type")
 			symbol.flags = symbolc.gv("Flags")
 
-			if symbol.type ~= XLOFFSYMTYPE_EXTERN then
+			if (symbol.type ~= XLOFFSYMTYPE_EXTERN) and (symbol.type ~= XLOFFSYMTYPE_DEXTERN) then
 				symbol.sectionindex = symbolc.gv("SectionIndex")
-			else
+			elseif symbol.type == XLOFFSYMTYPE_DEXTERN then
 				symbol.importindex = symbolc.gv("SectionIndex")
-
-				if symbol.importindex ~= 0xFFFF then
-					symbol.import = self.importsbyid[symbol.importindex]
-				end
+				symbol.import = self.importsbyid[symbol.importindex]
 			end
 
 			if symbol.sectionindex then
@@ -572,10 +591,9 @@ function xloff.new(filename)
 
 			import.importc.sv("NameOffset", import.nameoff)
 			import.importc.sv("ExpectedTimestamp", import.timestamp)
+			import.importc.sv("ExpectedBase", import.expectedbase)
 			import.importc.sv("FixupTableOffset", 0)
 			import.importc.sv("FixupCount", 0)
-
-			return off
 		end
 
 		local symtab = {}
@@ -600,14 +618,12 @@ function xloff.new(filename)
 
 			local sid
 
-			if symbol.type ~= XLOFFSYMTYPE_EXTERN then
+			if (symbol.type ~= XLOFFSYMTYPE_EXTERN) and (symbol.type ~= XLOFFSYMTYPE_DEXTERN) then
 				sid = symbol.section.id
+			elseif (symbol.type == XLOFFSYMTYPE_DEXTERN) then
+				sid = symbol.import.id
 			else
-				if symbol.import then
-					sid = symbol.import.id
-				else
-					sid = 0xFFFF
-				end
+				sid = 0xFFFF
 			end
 
 			sym.sv("NameOffset", nameoff)
@@ -627,7 +643,9 @@ function xloff.new(filename)
 
 			if (sym.type ~= XLOFFSYMTYPE_LOCAL) or (not self.lstrip) then
 				if (sym.type ~= XLOFFSYMTYPE_GLOBAL) or (not self.gstrip) or (sym == self.entrysymbol) then
-					if not addSymbol(img.symbolsbyid[i]) then return false end
+					if ((sym.type ~= XLOFFSYMTYPE_EXTERN) and (sym.type ~= XLOFFSYMTYPE_DEXTERN)) or (not self.fstrip) then
+						if not addSymbol(img.symbolsbyid[i]) then return false end
+					end
 				end
 			end
 		end
@@ -676,8 +694,8 @@ function xloff.new(filename)
 				local section = self.sectionsbyid[i]
 
 				for i,r in ipairs(section.relocs) do
-					if (not r.symbol) or (r.symbol.added) then
-						if not addRelocation(section, r.symbol, r.offset, r.type, 0xFFFF) then return false end
+					if (not r.dyresolved) and ((not r.symbol) or (r.symbol.added)) then
+						if not addRelocation(section, r.symbol, r.offset, r.type, r.section.id) then return false end
 					end
 				end
 
@@ -909,7 +927,7 @@ function xloff.new(filename)
 		return true
 	end
 
-	function img:reloc(section)
+	function img:reloc(section, movefixups)
 		-- relocate a section to its base virtual address
 
 		for k,v in ipairs(section.relocs) do
@@ -920,32 +938,54 @@ function xloff.new(filename)
 				v.symbol = v.symbol.forward
 			end
 
+			if (sym.stubsym) and (self.arch.shouldredirect(section, v)) then
+				sym = sym.stubsym
+
+				v.symbol = sym
+			end
+
 			if sym then
-				local nval
+				if sym.import and (not v.dyresolved) and movefixups then
+					-- this is a DLL fixup and hasn't already been moved,
+					-- so move it to the fixup table for that import.
 
-				local wsection = sym.section
+					local fixup = {}
 
-				if wsection and wsection.forward then
-					wsection = wsection.forward
-				end
+					fixup.symbol = v.symbol
+					fixup.offset = v.offset
+					fixup.type = v.type
+					fixup.section = v.section
 
-				if sym.type == 4 then
-					if sym.value == 1 then
-						nval = wsection.vaddr
-					elseif sym.value == 2 then
-						nval = wsection.size
-					elseif sym.value == 3 then
-						nval = wsection.vaddr + wsection.size
-					end
-				elseif wsection then
-					nval = sym.value + wsection.vaddr
+					sym.import.fixups[#sym.import.fixups+1] = fixup
+
+					v.dyresolved = true
 				else
-					nval = sym.value
+					local nval
+
+					local wsection = sym.section
+
+					if wsection and wsection.forward then
+						wsection = wsection.forward
+					end
+
+					if sym.type == 4 then
+						if sym.value == 1 then
+							nval = wsection.vaddr
+						elseif sym.value == 2 then
+							nval = wsection.size
+						elseif sym.value == 3 then
+							nval = wsection.vaddr + wsection.size
+						end
+					elseif wsection then
+						nval = sym.value + wsection.vaddr
+					else
+						nval = sym.value
+					end
+
+					-- print(string.format("%s %s $%x %d", v.symbol.name, v.file, v.offset, v.type))
+
+					self.arch.dofixup(section.data, v.offset, nval, v.type)
 				end
-
-				-- print(string.format("%s %s $%x %d", v.symbol.name, v.file, v.offset, v.type))
-
-				self.arch.dofixup(section.data, v.offset, nval, v.type)
 			end
 		end
 
@@ -954,109 +994,220 @@ function xloff.new(filename)
 
 	function img:relocate()
 		-- should be run after img:link() has been used to link all of the
-		-- object files together. for each section, iterate its internal
-		-- relocations and perform them.
+		-- object files together.
+
+		-- for each section, iterate its internal relocations and perform them.
 
 		for i = 0, self.sectioncount-1 do
 			local section = self.sectionsbyid[i]
 
-			if not self:reloc(section) then return false end
+			if not self:reloc(section, true) then return false end
+		end
+
+		-- finally, perform all external fixups.
+
+		for i = 0, self.importcount-1 do
+			local import = self.importsbyid[i]
+
+			for k,v in ipairs(import.fixups) do
+				self.arch.dofixup(v.section.data, v.offset, v.symbol.value, v.type)
+			end
 		end
 
 		return true
 	end
 
-	function img:link(withimg)
+	function img:gettextsection()
+		-- return first section with TEXT flag
+
+		for i = 0, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+
+			if band(section.flags, XLOFFSECTIONFLAG_TEXT) ~= 0 then
+				return section
+			end
+		end
+
+		return false
+	end
+
+	function img:import(withimg)
+		-- check to see if this DLL has already been imported
+
+		if self.importsbyname[withimg.libname] then
+			return true
+		end
+
+		local text = self:gettextsection()
+
+		-- create an import table entry. then go through all our externs and
+		-- try to associate them with a global symbol found in the DLL.
+		-- then go through all of our internal relocations and lift any that
+		-- refer to this DLL into its table of fixups. if stubbing is enabled,
+		-- create jump stubs for each of the imported symbols.
+
+		local import = {}
+
+		import.name = withimg.libname
+		import.timestamp = withimg.timestamp
+		import.expectedbase = withimg.sectionsbyid[0].vaddr
+		import.fixups = {}
+		import.fixupcount = 0
+
+		self.importsbyname[withimg.libname] = import
+		self.importsbyid[self.importcount] = import
+		self.importcount = self.importcount + 1
+
+		for k,sym in pairs(self.symbolsbyname) do
+			if sym.type == XLOFFSYMTYPE_EXTERN then
+				local lookup = withimg.symbolsbyname[sym.name]
+
+				if lookup and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
+					sym.type = XLOFFSYMTYPE_DEXTERN
+					sym.import = import
+					sym.value = lookup.value + lookup.section.vaddr
+					sym.flags = lookup.flags
+
+					lookup.forward = sym
+
+					if not self.nostubs then
+						-- create a call stub at the end of our text section.
+						-- this is a tactic to reduce COWs when performing
+						-- fixups for a DLL that wasn't loaded at its
+						-- preferred location.
+
+						local stublocation, stubsize, reloctype = self.arch.dostub(text, 0)
+
+						-- create a local symbol for the call stub.
+
+						local stubsym = {}
+
+						stubsym.file = self.filename
+
+						stubsym.type = XLOFFSYMTYPE_LOCAL
+						stubsym.section = text
+						stubsym.value = stublocation
+						stubsym.flags = 0
+
+						self.sortablesymbols[#self.sortablesymbols+1] = stubsym
+						self.symbolcount = self.symbolcount + 1
+
+						sym.stubsym = stubsym
+
+						-- create an internal relocation for the call stub.
+
+						local reloc = {}
+
+						reloc.symbol = sym
+						reloc.offset = stublocation
+						reloc.type = reloctype
+						reloc.file = self.filename
+						reloc.section = text
+
+						text.relocs[#text.relocs+1] = reloc
+					end
+				end
+			end
+		end
+
+		return true
+	end
+
+	function img:link(withimg, dynamic)
 		if self.arch == archinfo[0] then
 			self.arch = withimg.arch
 		end
 
 		self.timestamp = os.time(os.date("!*t"))
 
-		-- merge the sections and their relocation tables.
-		-- then merge the symbol tables, making sure to discard extraneous externs and resolve those who find a match.
-		-- doesn't relocate, that's done by img:relocate(), which also snaps foreign relocations into place to refer to
-		-- our symbols.
+		if not dynamic then
+			-- merge the sections and their relocation tables.
+			-- then merge the symbol tables, making sure to discard extraneous externs and resolve those who find a match.
+			-- doesn't relocate, that's done by img:relocate(), which also snaps foreign relocations into place to refer to
+			-- our symbols.
 
-		for i = 0, withimg.sectioncount-1 do
-			local section = withimg.sectionsbyid[i]
+			for i = 0, withimg.sectioncount-1 do
+				local section = withimg.sectionsbyid[i]
 
-			if not img:mergesection(section) then return false end
-		end
-
-		for i = 0, withimg.symbolcount-1 do
-			local sym = withimg.symbolsbyid[i]
-
-			local lookup
-
-			if sym.name then
-				lookup = self.symbolsbyname[sym.name]
+				if not img:mergesection(section) then return false end
 			end
 
-			if lookup then
-				if (sym.type == XLOFFSYMTYPE_GLOBAL) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
-					-- overwrite our extern symbol with their global symbol
+			for i = 0, withimg.symbolcount-1 do
+				local sym = withimg.symbolsbyid[i]
 
-					lookup.file = sym.file
-
-					lookup.type = XLOFFSYMTYPE_GLOBAL
-					lookup.section = sym.section.forward
-					lookup.value = sym.value + sym.section.offsetinfile
-					lookup.flags = sym.flags
-					lookup.name = sym.name
-				elseif (sym.type == XLOFFSYMTYPE_GLOBAL) and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
-					-- collision! error
-					print(string.format("xoftool: symbol conflict: '%s' is defined in both:\n %s\n %s", sym.name, sym.file, lookup.file))
-					return false
-				elseif (sym.type == XLOFFSYMTYPE_EXTERN) and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
-					-- resolved, forward theirs to ours
-				elseif (sym.type == XLOFFSYMTYPE_EXTERN) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
-					-- resolved, forward theirs to ours
-				elseif (sym.type == XLOFFSYMTYPE_SPECIAL) and (lookup.type == XLOFFSYMTYPE_SPECIAL) then
-					-- resolved, forward theirs to ours
-				else
-					-- weird situation! error
-					error(string.format("weird situation: %d %d", sym.type, lookup.type))
-				end
-			else
-				-- copy, make sure to capture the filename for error messages.
-
-				lookup = {}
-
-				lookup.file = sym.file
-				lookup.type = sym.type
-				lookup.name = sym.name
-
-				if sym.section then
-					lookup.section = sym.section.forward
-				end
-
-				lookup.flags = sym.flags
-
-				if sym.type == XLOFFSYMTYPE_SPECIAL then
-					lookup.value = sym.value
-				elseif sym.section then
-					lookup.value = sym.value + sym.section.offsetinfile
-				else
-					lookup.value = sym.value
-				end
+				local lookup
 
 				if sym.name then
-					self.symbolsbyname[sym.name] = lookup
+					lookup = self.symbolsbyname[sym.name]
 				end
 
-				self.sortablesymbols[#self.sortablesymbols+1] = lookup
-				self.symbolcount = self.symbolcount + 1
+				if lookup then
+					if (sym.type == XLOFFSYMTYPE_GLOBAL) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
+						-- overwrite our extern symbol with their global symbol
+
+						lookup.file = sym.filename
+
+						lookup.type = XLOFFSYMTYPE_GLOBAL
+						lookup.section = sym.section.forward
+						lookup.value = sym.value + sym.section.offsetinfile
+						lookup.flags = sym.flags
+						lookup.name = sym.name
+					elseif (sym.type == XLOFFSYMTYPE_GLOBAL) and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
+						-- collision! error
+						print(string.format("xoftool: symbol conflict: '%s' is defined in both:\n %s\n %s", sym.name, sym.file, lookup.file))
+						return false
+					elseif (sym.type == XLOFFSYMTYPE_EXTERN) and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
+						-- resolved, forward theirs to ours
+					elseif (sym.type == XLOFFSYMTYPE_EXTERN) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
+						-- resolved, forward theirs to ours
+					elseif (sym.type == XLOFFSYMTYPE_SPECIAL) and (lookup.type == XLOFFSYMTYPE_SPECIAL) then
+						-- resolved, forward theirs to ours
+					else
+						-- weird situation! error
+						error(string.format("weird situation: %d %d", sym.type, lookup.type))
+					end
+				else
+					-- copy, make sure to capture the filename for error messages.
+
+					lookup = {}
+
+					lookup.file = sym.filename
+					lookup.type = sym.type
+					lookup.name = sym.name
+
+					if sym.section then
+						lookup.section = sym.section.forward
+					end
+
+					lookup.flags = sym.flags
+
+					if sym.type == XLOFFSYMTYPE_SPECIAL then
+						lookup.value = sym.value
+					elseif sym.section then
+						lookup.value = sym.value + sym.section.offsetinfile
+					else
+						lookup.value = sym.value
+					end
+
+					if sym.name then
+						self.symbolsbyname[sym.name] = lookup
+					end
+
+					self.sortablesymbols[#self.sortablesymbols+1] = lookup
+					self.symbolcount = self.symbolcount + 1
+				end
+
+				sym.forward = lookup
 			end
 
-			sym.forward = lookup
-		end
-
-		if self.entrysymbol and withimg.entrysymbol then
-			print(string.format("xoftool: conflicting entry symbols: '%s' and '%s'", self.entrysymbol.name, withimg.entrysymbol.name))
-			return false
-		elseif (not self.entrysymbol) and (withimg.entrysymbol) then
-			self.entrysymbol = withimg.entrysymbol.forward
+			if self.entrysymbol and withimg.entrysymbol then
+				print(string.format("xoftool: conflicting entry symbols: '%s' and '%s'", self.entrysymbol.name, withimg.entrysymbol.name))
+				return false
+			elseif (not self.entrysymbol) and (withimg.entrysymbol) then
+				self.entrysymbol = withimg.entrysymbol.forward
+			end
+		else
+			return self:import(withimg)
 		end
 
 		return true
@@ -1086,11 +1237,8 @@ function xloff.new(filename)
 		for i = 0, self.symbolcount-1 do
 			local sym = self.symbolsbyid[i]
 
-			if not sym.import then
-				if sym.type == XLOFFSYMTYPE_EXTERN then
-					print(sym.forward)
-					unr[#unr + 1] = sym
-				end
+			if sym.type == XLOFFSYMTYPE_EXTERN then
+				unr[#unr + 1] = sym
 			end
 		end
 

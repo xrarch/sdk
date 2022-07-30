@@ -49,7 +49,7 @@ local function usage()
   fstrip   [image]: strip import fixups
   dystrip  [image]: perform actions of all of lstrip, istrip, and fstrip
   strip    [image]: perform actions of all of lstrip, istrip, gstrip, and fstrip
-  binary   (-nobss) [image] [base address] (bss address): flatten an XLOFF file; will expand BSS section in file unless address is provided.
+  binary   (-nobss) [image]: flatten an XLOFF file
   symtab   [image] [output] (text offset): generate a symbol table
   link     (-f) [output] [xloff1 xloff2 ... ]: link 2 or more XLOFF files
 ]])
@@ -257,6 +257,144 @@ elseif command == "strip" then
     image.gstrip = true
 
     if not image:write() then os.exit(1) end
+elseif command == "binary" then
+    local nobss = (switches[1] == "-nobss")
+   
+    if #arg ~= 2 then
+        usage()
+        os.exit(1)
+    end
+
+    if not image:load() then os.exit(1) end
+    if not image:binary(nobss) then os.exit(1) end
+elseif command == "move" then
+    if not image:load() then os.exit(1) end
+
+    if arg[3] == "aisix" then
+        arg[3] = "text=0x1000,data=0x40000000,bss=data+data_size+align"
+    elseif arg[3] == "mintiadll" then
+        image.pagealignrequired = 4096
+        arg[3] = arg[4]
+    elseif arg[3] == "mintia" then
+        image.pagealignrequired = 4096
+        arg[3] = "text=0x100000,data=text+text_size+align,bss=data+data_size+align"
+    end
+
+    local expr = explode(",", arg[3])
+
+    for k,v in ipairs(expr) do
+        local exp = explode("=", v)
+
+        local s = exp[1]
+
+        local section = image.sectionsbyname[s]
+
+        if not section then
+            print("xoftool: not a section: '"..s.."'")
+            os.exit(1)
+        end
+
+        local x = exp[2]
+
+        local addends = explode("+", x)
+
+        local r = 0
+
+        for k,v in ipairs(addends) do
+            if v:sub(-5,-1) == "_size" then
+                local asection = image.sectionsbyname[v:sub(1,-6)]
+
+                if not asection then
+                    print("xoftool: not a section: '"..v:sub(1,-6).."'")
+                    os.exit(1)
+                end
+
+                r = r + asection.size
+            elseif v == "align" then
+                if (r % 4096) ~= 0 then
+                    r = r + 4096
+                    r = r - (r % 4096)
+                end
+            elseif tonumber(v) then
+                r = r + tonumber(v)
+            else
+                local asection = image.sectionsbyname[v]
+
+                if not asection then
+                    print("xoftool: I don't know what "..v.." means")
+                    os.exit(1)
+                end
+
+                r = r + asection.vaddr
+            end
+        end
+
+        section.vaddr = r
+    end
+
+    image.timestamp = os.time(os.date("!*t"))
+
+    if not image:relocate() then os.exit(1) end
+
+    if not image:write() then os.exit(1) end
+elseif command == "link" then
+    local fragment = (switches[1] == "-f")
+
+    local linked = {}
+
+    for i = 3, #arg do
+        local imgname = arg[i]
+
+        if linked[imgname] then
+            print("xoftool: warning: ignoring duplicate object "..arg[i])
+        else
+            linked[imgname] = true
+
+            if imgname:sub(1,2) == "L/" then
+                imgname = sd.."../lib/"..imgname:sub(3)
+            end
+
+            local comp = explode(":", imgname)
+
+            local libname = imgname
+
+            if comp[2] then
+                libname = comp[1]
+                imgname = comp[2]
+            end
+
+            local lnkobj = xloff.new(imgname)
+
+            if not lnkobj:load() then os.exit(1) end
+
+            lnkobj.libname = libname
+
+            if not image:link(lnkobj) then os.exit(1) end
+        end
+    end
+
+    image:sortsymbols()
+
+    if not fragment then
+        if not image:checkunresolved() then os.exit(1) end
+    end
+
+    if not image:relocate() then os.exit(1) end
+
+    if not image:write() then os.exit(1) end
+elseif command == "symtab" then
+    if not image:load() then os.exit(1) end
+
+    if not arg[3] then
+        usage()
+        os.exit(1)
+    end
+
+    local textoff = tonumber(arg[4]) or 0
+
+    local symtabfile = arg[3]
+
+    if not image:gensymtab(symtabfile, textoff) then os.exit(1) end
 else
     usage()
     os.exit(1)

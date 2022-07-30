@@ -51,11 +51,58 @@ local reloc_s = struct {
 	{2, "SectionIndex"}
 }
 
+local XLOFFRELOC_LIMN2500_LONG     = 1
+local XLOFFRELOC_LIMN2500_ABSJ     = 2
+local XLOFFRELOC_LIMN2500_LA       = 3
+local XLOFFRELOC_LIMN2600_FAR_INT  = 4
+local XLOFFRELOC_LIMN2600_FAR_LONG = 5
+
 local archinfo = {}
+
+archinfo[0] = {}
+archinfo[0].name = "UNKNOWN"
+archinfo[0].id = 0
 
 archinfo[1] = {}
 archinfo[1].name = "limn2600"
 archinfo[1].align = 4
+archinfo[1].id = 1
+
+archinfo[1].dofixup = function (tab, off, nval, rtype)
+local old = gv32(tab, off)
+local new = old
+
+if rtype == XLOFFRELOC_LIMN2500_ABSJ then
+	new = bor(band(old, 0x7), lshift(band(rshift(nval, 2), 0x1FFFFFFF), 3))
+elseif rtype == XLOFFRELOC_LIMN2500_LONG then
+	new = nval
+elseif rtype == XLOFFRELOC_LIMN2500_LA then
+	local old2 = gv32(tab, off + 4)
+	local new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
+
+	new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+
+	sv32(tab, off + 4, new2)
+elseif rtype == XLOFFRELOC_LIMN2600_FAR_INT then
+	local old2 = gv32(tab, off + 4)
+	local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 1), 16), band(old2, 0xFFFF))
+
+	new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+
+	sv32(tab, off + 4, new2)
+elseif rtype == XLOFFRELOC_LIMN2600_FAR_LONG then
+	local old2 = gv32(tab, off + 4)
+	local new2 = bor(lshift(rshift(band(nval, 0xFFFF), 2), 16), band(old2, 0xFFFF))
+
+	new = bor(band(nval, 0xFFFF0000), band(old, 0xFFFF))
+
+	sv32(tab, off + 4, new2)
+else
+	error("unknown relocation type "..rtype)
+end
+
+sv32(tab, off, new)
+end
 
 local XLOFFFLAG_ALIGN4K = 1
 
@@ -95,13 +142,6 @@ local XLOFFSPECIALVALUE_START = 1
 local XLOFFSPECIALVALUE_SIZE  = 2
 local XLOFFSPECIALVALUE_END   = 3
 
-local XLOFFRELOC_LIMN2500_LONG = 1
-local XLOFFRELOC_LIMN2500_ABSJ = 2
-local XLOFFRELOC_LIMN2500_LA   = 3
-
-local XLOFFRELOC_LIMN2600_FAR_INT  = 4
-local XLOFFRELOC_LIMN2600_FAR_LONG = 5
-
 xloff.relocnames = {}
 xloff.relocnames[XLOFFRELOC_LIMN2500_LONG]     = "LONG"
 xloff.relocnames[XLOFFRELOC_LIMN2500_ABSJ]     = "ABSJ"
@@ -116,6 +156,22 @@ function xloff.new(filename)
 	img.libname = filename
 
 	img.bin = {}
+
+	img.sectionsbyid = {}
+	img.sectionsbyname = {}
+	img.symbolsbyid = {}
+	img.symbolsbyname = {}
+	img.importsbyid = {}
+	img.importsbyname = {}
+	img.symbolcount = 0
+	img.sectioncount = 0
+	img.importcount = 0
+	img.flags = 0
+	img.timestamp = 0
+
+	img.sortablesymbols = {}
+
+	img.arch = archinfo[0]
 
 	function img:getString(offset)
 		local off = self.stringtable + offset
@@ -182,9 +238,6 @@ function xloff.new(filename)
 			self.pagealignrequired = 4096
 		end
 
-		self.externsbyname = {}
-		self.globalsbyname = {}
-
 		self.sectionsbyname = {}
 		self.sectionsbyid = {}
 
@@ -197,6 +250,8 @@ function xloff.new(filename)
 			local shdr = cast(sectionheader_s, self.bin, sectionheader)
 
 			local section = {}
+
+			section.file = self.filename
 
 			section.name = self:getString(shdr.gv("NameOffset"))
 			section.filoffset = shdr.gv("DataOffset")
@@ -263,6 +318,8 @@ function xloff.new(filename)
 				symbol.name = self:getString(symbolc.gv("NameOffset"))
 			end
 
+			symbol.file = self.filename
+
 			symbol.value = symbolc.gv("Value")
 			symbol.type = symbolc.gv("Type")
 			symbol.flags = symbolc.gv("Flags")
@@ -287,17 +344,11 @@ function xloff.new(filename)
 				self.symbolsbyname[symbol.name] = symbol
 			end
 
-			if symbol.type == XLOFFSYMTYPE_EXTERN then
-				self.externsbyname[symbol.name] = symbol
-			elseif symbol.type == XLOFFSYMTYPE_GLOBAL then
-				self.globalsbyname[symbol.name] = symbol
-			end
-
 			symbolstr = symbolstr + symbol_s.size()
 		end
 
 		if self.entrysymbolindex ~= 0xFFFFFFFF then
-			self.entrysymbol = self.sectionsbyid[self.entrysymbolindex]
+			self.entrysymbol = self.symbolsbyid[self.entrysymbolindex]
 		end
 
 		-- load relocations
@@ -379,12 +430,39 @@ function xloff.new(filename)
 		return false
 	end
 
+	function img:binary(nobss)
+		local file = io.open(self.filename, "wb")
+
+		if not file then
+			print("xoftool: can't open " .. self.filename .. " for writing")
+			return false
+		end
+
+		for i = 0, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+
+			if band(section.flags, XLOFFSECTIONFLAG_BSS) == 0 then
+				for j = 0, section.size-1 do
+					file:write(string.char(section.data[j]))
+				end
+			elseif not nobss then
+				for j = 0, section.size-1 do
+					file:write(string.char(0))
+				end
+			end
+		end
+
+		file:close()
+
+		return true
+	end
+
 	function img:write()
 		-- trashes the structures. should be re-load()-ed if you wanna keep
 		-- using it.
 
 		-- encoding an executable in lua: believe it or not this used to be even more gross.
-	
+
 		-- basically what's going on here is that we iterate through all the relevant structures,
 		-- sometimes multiple times, and update their IDs and whatnot to reflect where they'll
 		-- end up in the on-file tables. Then we do a final pass to actually manufacture and
@@ -397,11 +475,15 @@ function xloff.new(filename)
 		local header = cast(xloffheader_s, headertab)
 
 		local function addTab(tab, size)
-			if size == 0 then return end
+			if size == 0 then return "" end
+
+			local nstr = ""
 
 			for i = 0, size-1 do
-				binary = binary .. string.char(tab[i])
+				nstr = nstr .. string.char(tab[i])
 			end
+
+			return nstr
 		end
 
 		local stringtab = {}
@@ -544,7 +626,7 @@ function xloff.new(filename)
 			local sym = img.symbolsbyid[i]
 
 			if (sym.type ~= XLOFFSYMTYPE_LOCAL) or (not self.lstrip) then
-				if (sym.type ~= XLOFFSYMTYPE_GLOBAL) or (not self.gstrip) then
+				if (sym.type ~= XLOFFSYMTYPE_GLOBAL) or (not self.gstrip) or (sym == self.entrysymbol) then
 					if not addSymbol(img.symbolsbyid[i]) then return false end
 				end
 			end
@@ -574,7 +656,6 @@ function xloff.new(filename)
 
 			if symbol then
 				reloc.sv("SymbolIndex", symbol.id)
-				symbol.rrefs = symbol.rrefs + 1
 			else
 				reloc.sv("SymbolIndex", -1)
 			end
@@ -678,7 +759,7 @@ function xloff.new(filename)
 		header.sv("StringTableOffset", stringtabfiloff)
 		header.sv("StringTableSize", stringtaboff)
 
-		header.sv("TargetArchitecture", self.archid)
+		header.sv("TargetArchitecture", self.arch.id)
 
 		if self.entrysymbol then
 			header.sv("EntrySymbol", self.entrysymbol.id)
@@ -706,37 +787,29 @@ function xloff.new(filename)
 
 		-- write everything out
 
-		addTab(headertab, xloffheader_s.size())
-		addTab(symtab, symtaboff)
-		addTab(stringtab, stringtaboff)
+		binary = binary .. addTab(headertab, xloffheader_s.size())
+		binary = binary .. addTab(symtab, symtaboff)
+		binary = binary .. addTab(stringtab, stringtaboff)
 
 		for i = 0, self.sectioncount-1 do
 			local section = self.sectionsbyid[i]
 
-			addTab(section.reloctable, section.reloctableoff)
+			binary = binary .. addTab(section.reloctable, section.reloctableoff)
 		end
 
 		for i = 0, self.importcount-1 do
 			local import = self.importsbyid[i]
 
-			addTab(import.reloctable, import.reloctableoff)
+			binary = binary .. addTab(import.reloctable, import.reloctableoff)
 		end
 
-		addTab(importtab, importtaboff)
-		addTab(secheadertab, secheadertaboff)
+		binary = binary .. addTab(importtab, importtaboff)
+		binary = binary .. addTab(secheadertab, secheadertaboff)
 
 		-- align the header up to a page
 
 		for i = 1, alignamt do
 			binary = binary..string.char(0)
-		end
-
-		for i = 0, self.sectioncount-1 do
-			local section = self.sectionsbyid[i]
-
-			if band(section.flags, XLOFFSECTIONFLAG_BSS) == 0 then
-				addTab(section.data, section.size)
-			end
 		end
 
 		local file = io.open(self.filename, "wb")
@@ -748,7 +821,336 @@ function xloff.new(filename)
 
 		file:write(binary)
 
+		for i = 0, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+
+			if band(section.flags, XLOFFSECTIONFLAG_BSS) == 0 then
+				for j = 0, section.size-1 do
+					file:write(string.char(section.data[j]))
+				end
+			end
+		end
+
 		file:close()
+
+		return true
+	end
+
+	function img:mergesection(section)
+		-- merge a foreign section into this image.
+		-- first we have to match it with a section we already have, meaning
+		-- the name and the flags are identical. then we can merge those.
+		-- if we don't have a matching section, just copy it over directly.
+
+		local oursection
+		local found = false
+
+		for i = 0, self.sectioncount-1 do
+			oursection = self.sectionsbyid[i]
+
+			if oursection.name == section.name then
+				if oursection.flags ~= section.flags then
+					print("xoftool: "..section.file..": flag mismatch in section '"..section.name.."'")
+					return false
+				end
+
+				found = true
+
+				break
+			end
+		end
+
+		if not found then
+			-- create a new empty section
+
+			oursection = {}
+
+			oursection.name = section.name
+			oursection.flags = section.flags
+			oursection.vaddr = section.vaddr
+			oursection.size = 0
+			oursection.data = {}
+			oursection.relocs = {}
+
+			self.sectionsbyname[section.name] = oursection
+			self.sectionsbyid[self.sectioncount] = oursection
+
+			self.sectioncount = self.sectioncount + 1
+		end
+
+		section.forward = oursection
+		section.offsetinfile = oursection.size
+
+		-- merge relocation list
+
+		for k,v in ipairs(section.relocs) do
+			local reloc = {}
+
+			oursection.relocs[#oursection.relocs+1] = reloc
+
+			reloc.symbol = v.symbol
+			reloc.type = v.type
+			reloc.section = oursection
+			reloc.offset = v.offset + oursection.size
+		end
+
+		-- merge data
+
+		local osz = oursection.size
+
+		if band(section.flags, XLOFFSECTIONFLAG_BSS) == 0 then
+			for i = 0, section.size-1 do
+				oursection.data[osz+i] = section.data[i]
+			end
+		end
+
+		oursection.size = oursection.size + section.size
+
+		return true
+	end
+
+	function img:reloc(section)
+		-- relocate a section to its base virtual address
+
+		for k,v in ipairs(section.relocs) do
+			local sym = v.symbol
+
+			if v.symbol.forward then
+				sym = v.symbol.forward
+				v.symbol = v.symbol.forward
+			end
+
+			if sym then
+				local nval
+
+				local wsection = sym.section
+
+				if wsection and wsection.forward then
+					wsection = wsection.forward
+				end
+
+				if sym.type == 4 then
+					if sym.value == 1 then
+						nval = wsection.vaddr
+					elseif sym.value == 2 then
+						nval = wsection.size
+					elseif sym.value == 3 then
+						nval = wsection.vaddr + wsection.size
+					end
+				elseif wsection then
+					nval = sym.value + wsection.vaddr
+				else
+					nval = sym.value
+				end
+
+				-- print(string.format("%s %s $%x %d", v.symbol.name, v.file, v.offset, v.type))
+
+				self.arch.dofixup(section.data, v.offset, nval, v.type)
+			end
+		end
+
+		return true
+	end
+
+	function img:relocate()
+		-- should be run after img:link() has been used to link all of the
+		-- object files together. for each section, iterate its internal
+		-- relocations and perform them.
+
+		for i = 0, self.sectioncount-1 do
+			local section = self.sectionsbyid[i]
+
+			if not self:reloc(section) then return false end
+		end
+
+		return true
+	end
+
+	function img:link(withimg)
+		if self.arch == archinfo[0] then
+			self.arch = withimg.arch
+		end
+
+		self.timestamp = os.time(os.date("!*t"))
+
+		-- merge the sections and their relocation tables.
+		-- then merge the symbol tables, making sure to discard extraneous externs and resolve those who find a match.
+		-- doesn't relocate, that's done by img:relocate(), which also snaps foreign relocations into place to refer to
+		-- our symbols.
+
+		for i = 0, withimg.sectioncount-1 do
+			local section = withimg.sectionsbyid[i]
+
+			if not img:mergesection(section) then return false end
+		end
+
+		for i = 0, withimg.symbolcount-1 do
+			local sym = withimg.symbolsbyid[i]
+
+			local lookup
+
+			if sym.name then
+				lookup = self.symbolsbyname[sym.name]
+			end
+
+			if lookup then
+				if (sym.type == XLOFFSYMTYPE_GLOBAL) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
+					-- overwrite our extern symbol with their global symbol
+
+					lookup.file = sym.file
+
+					lookup.type = XLOFFSYMTYPE_GLOBAL
+					lookup.section = sym.section.forward
+					lookup.value = sym.value + sym.section.offsetinfile
+					lookup.flags = sym.flags
+					lookup.name = sym.name
+				elseif (sym.type == XLOFFSYMTYPE_GLOBAL) and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
+					-- collision! error
+					print(string.format("xoftool: symbol conflict: '%s' is defined in both:\n %s\n %s", sym.name, sym.file, lookup.file))
+					return false
+				elseif (sym.type == XLOFFSYMTYPE_EXTERN) and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
+					-- resolved, forward theirs to ours
+				elseif (sym.type == XLOFFSYMTYPE_EXTERN) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
+					-- resolved, forward theirs to ours
+				elseif (sym.type == XLOFFSYMTYPE_SPECIAL) and (lookup.type == XLOFFSYMTYPE_SPECIAL) then
+					-- resolved, forward theirs to ours
+				else
+					-- weird situation! error
+					error(string.format("weird situation: %d %d", sym.type, lookup.type))
+				end
+			else
+				-- copy, make sure to capture the filename for error messages.
+
+				lookup = {}
+
+				lookup.file = sym.file
+				lookup.type = sym.type
+				lookup.name = sym.name
+
+				if sym.section then
+					lookup.section = sym.section.forward
+				end
+
+				lookup.flags = sym.flags
+
+				if sym.type == XLOFFSYMTYPE_SPECIAL then
+					lookup.value = sym.value
+				elseif sym.section then
+					lookup.value = sym.value + sym.section.offsetinfile
+				else
+					lookup.value = sym.value
+				end
+
+				if sym.name then
+					self.symbolsbyname[sym.name] = lookup
+				end
+
+				self.sortablesymbols[#self.sortablesymbols+1] = lookup
+				self.symbolcount = self.symbolcount + 1
+			end
+
+			sym.forward = lookup
+		end
+
+		if self.entrysymbol and withimg.entrysymbol then
+			print(string.format("xoftool: conflicting entry symbols: '%s' and '%s'", self.entrysymbol.name, withimg.entrysymbol.name))
+			return false
+		elseif (not self.entrysymbol) and (withimg.entrysymbol) then
+			self.entrysymbol = withimg.entrysymbol.forward
+		end
+
+		return true
+	end
+
+	function img:sortsymbols()
+		-- should be called after a link is complete.
+
+		table.sort(self.sortablesymbols, function (s1,s2)
+			local s1t = s1.section
+			local s2t = s2.section
+
+			if not s1t then return false end
+			if not s2t then return true end
+
+			return (s1.value + s1t.vaddr) < (s2.value + s2t.vaddr)
+		end)
+
+		for i = 1, #self.sortablesymbols do
+			self.symbolsbyid[i-1] = self.sortablesymbols[i]
+		end
+	end
+
+	function img:checkunresolved()
+		local unr = {}
+
+		for i = 0, self.symbolcount-1 do
+			local sym = self.symbolsbyid[i]
+
+			if not sym.import then
+				if sym.type == XLOFFSYMTYPE_EXTERN then
+					print(sym.forward)
+					unr[#unr + 1] = sym
+				end
+			end
+		end
+
+		if #unr > 0 then
+			print("xoftool: error: unresolved symbols:")
+
+			for k,v in ipairs(unr) do
+				print(string.format("  %s: %s", v.file, v.name))
+			end
+
+			return false
+		end
+
+		return true
+	end
+
+	function img:gensymtab(symtabfile, textoff)
+		local symtab = io.open(symtabfile, "w")
+
+		if not symtab then
+			print("xoftool: couldn't open "..tostring(arg[2]).." for writing")
+			return false
+		end
+
+		symtab:write(".section data\n\nSymbolTable:\n.global SymbolTable\n")
+
+		local syms = 0
+
+		local names = ""
+
+		local donesym = {}
+
+		for i = 0, self.symbolcount-1 do
+			local sym = self.symbolsbyid[i]
+
+			local section = sym.section
+
+			if (sym.type == XLOFFSYMTYPE_GLOBAL) and (band(section.flags, XLOFFSECTIONFLAG_TEXT) ~= 0) and (not donesym[sym.name]) then
+				symtab:write("\t.dl __SYMNAM"..tostring(i).."\n")
+				symtab:write("\t.dl "..tostring(sym.value + section.vaddr + textoff).."\n")
+
+				names = names.."__SYMNAM"..tostring(i)..":\n\t.ds "..sym.name.."\n\t.db 0x0\n"
+
+				syms = syms + 1
+
+				symtab:write("\n")
+
+				donesym[sym.name] = true
+			end
+		end
+
+		symtab:write("SymbolCount:\n.global SymbolCount\n\t.dl "..tostring(syms).."\n\n")
+
+		symtab:write(names)
+
+		symtab:write("\n.align 4\n")
+
+		symtab:close()
+
+		return true
 	end
 
 	return img

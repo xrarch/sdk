@@ -16,7 +16,7 @@ local sd = getdirectory(arg[0])
 local flat = false
 local incdir = ""
 local target = "target=limn2600"
-local format = "format=loff"
+local format = "format=xloff"
 local preprocargs = " "
 local asmout = false
 

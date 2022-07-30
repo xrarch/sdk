@@ -24,7 +24,7 @@ end
 
 local target = "limn2600"
 
-local format = "loff"
+local format = "xloff"
 
 for k,v in pairs(arg) do
 	if v:sub(1,7) == "target=" then

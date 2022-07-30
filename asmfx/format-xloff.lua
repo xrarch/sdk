@@ -178,7 +178,7 @@ function format.encode(sections, symbols, isa, sectionsbyid)
 		local nameoff = 0xFFFFFFFF
 
 		if symbol.name then
-			if (symbol.type ~= "local") and (symbol.type ~= "special") then
+			if (symbol.type ~= "local") then
 				nameoff = addString(symbol.name)
 			end
 		end

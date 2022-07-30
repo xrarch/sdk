@@ -353,6 +353,7 @@ elseif command == "link" then
     end
 
     image.nostubs = nostubs
+    image.fragment = fragment
 
     local linked = {}
 

@@ -122,7 +122,8 @@ archinfo[1].shouldredirect = function (section, fixup)
 	return fixup.type == XLOFFRELOC_LIMN2500_ABSJ
 end
 
-local XLOFFFLAG_ALIGN4K = 1
+local XLOFFFLAG_ALIGN4K  = 1
+local XLOFFFLAG_FRAGMENT = 2
 
 local XLOFFSYMTYPE_GLOBAL  = 1
 local XLOFFSYMTYPE_LOCAL   = 2
@@ -789,6 +790,12 @@ function xloff.new(filename)
 			self.flags = bor(self.flags, XLOFFFLAG_ALIGN4K)
 		else
 			self.flags = band(self.flags, bnot(XLOFFFLAG_ALIGN4K))
+		end
+
+		if self.fragment then
+			self.flags = bor(self.flags, XLOFFFLAG_FRAGMENT)
+		else
+			self.flags = band(self.flags, bnot(XLOFFFLAG_FRAGMENT))
 		end
 
 		header.sv("Flags", self.flags)

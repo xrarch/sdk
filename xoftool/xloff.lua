@@ -975,12 +975,12 @@ function xloff.new(filename)
 						wsection = wsection.forward
 					end
 
-					if sym.type == 4 then
-						if sym.value == 1 then
+					if sym.type == XLOFFSYMTYPE_SPECIAL then
+						if sym.value == XLOFFSPECIALVALUE_START then
 							nval = wsection.vaddr
-						elseif sym.value == 2 then
+						elseif sym.value == XLOFFSPECIALVALUE_SIZE then
 							nval = wsection.size
-						elseif sym.value == 3 then
+						elseif sym.value == XLOFFSPECIALVALUE_END then
 							nval = wsection.vaddr + wsection.size
 						end
 					elseif wsection then

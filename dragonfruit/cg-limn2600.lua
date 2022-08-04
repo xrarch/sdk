@@ -25,9 +25,9 @@ cg.wordsize = 4
 local textsections = {}
 local textsectionsi = {}
 
-local datasection
+local rodatasections = {}
 
-local rodatasection
+local datasection
 
 local bsssection
 
@@ -60,11 +60,27 @@ local function adata(str)
 end
 
 local function rodata(str)
-	rodatasection = rodatasection .. str .. "\n"
+	local section
+
+	if curfn then
+		section = curfn.section
+	else
+		section = "text"
+	end
+
+	rodatasections[section] = rodatasections[section] .. str .. "\n"
 end
 
 local function arodata(str)
-	rodatasection = rodatasection .. str
+	local section
+
+	if curfn then
+		section = curfn.section
+	else
+		section = "text"
+	end
+
+	rodatasections[section] = rodatasections[section] .. str
 end
 
 local function bss(str)
@@ -1347,6 +1363,7 @@ function cg.func(func)
 
 	if not textsections[curfn.section] then
 		textsections[curfn.section] = ".section "..curfn.section.."\n"
+		rodatasections[curfn.section] = ""
 		textsectionsi[#textsectionsi+1] = curfn.section
 	end
 
@@ -1523,6 +1540,8 @@ function cg.func(func)
 	text("\taddi sp, sp, "..tostring(frametop))
 	text("\tret")
 
+	curfn = nil
+
 	return true
 end
 
@@ -1532,11 +1551,10 @@ function cg.gen(edefs, public, extern, asms, const)
 	defs = edefs
 
 	textsections["text"] = ".section text\n"
+	rodatasections["text"] = ""
 	textsectionsi[1] = "text"
 
 	datasection = ".section data\n"
-
-	rodatasection = ".section text\n"
 
 	bsssection = ".section bss\n"
 
@@ -1621,10 +1639,10 @@ function cg.gen(edefs, public, extern, asms, const)
 	local texts = ""
 
 	for k,v in ipairs(textsectionsi) do
-		texts = texts .. textsections[v]
+		texts = texts .. textsections[v] .. rodatasections[v] .. ".align 4\n"
 	end
 
-	return defsection .. texts .. rodatasection .. ".align 4\n" .. datasection .. bsssection
+	return defsection .. texts .. datasection .. bsssection
 end
 
 return cg

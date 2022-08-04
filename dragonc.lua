@@ -102,7 +102,10 @@ for k,v in ipairs(sourcef) do
 	-- is there a better way to do this? probably.
 	err = os.execute(lua..preproc..v.." "..pout)
 
-	if err > 0 then os.exit(1) end
+	if err > 0 then
+		os.execute("rm -f "..pout)
+		os.exit(1)
+	end
 
 	err = os.execute(lua..dragonc..pout.." "..eout)
 

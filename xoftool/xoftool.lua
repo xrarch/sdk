@@ -339,6 +339,8 @@ elseif command == "move" then
 
     if not image:relocate() then os.exit(1) end
 
+    image:sortsymbols()
+
     if not image:write() then os.exit(1) end
 elseif command == "link" then
     local nostubs

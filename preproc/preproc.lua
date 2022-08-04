@@ -23,6 +23,10 @@ function explode(d,p)
     ll=0
     if(#p == 1) then return {p} end
         while true do
+			while p:sub(1,1) == d do
+				p = p:sub(2)
+			end
+
             l=string.find(p,d,ll,true) -- find the next d in the string
             if l~=nil then -- if "not not" found then..
                 table.insert(t, string.sub(p,ll,l-1)) -- Save it in our array.
@@ -32,6 +36,7 @@ function explode(d,p)
                 break -- Break at end, as it should be, according to the lua manual.
             end
         end
+
     return t
 end
 
@@ -164,6 +169,7 @@ function preproc(name, srcf, destf)
 				elseif dir == "else" then
 					if #ifdefstack == 1 then
 						print(string.format("dragonc_pp: %s:%d: no matching ifdef", name, line))
+						return false
 					end
 
 					if ifdefstack[#ifdefstack-1] then
@@ -172,6 +178,7 @@ function preproc(name, srcf, destf)
 				elseif dir == "endif" then
 					if #ifdefstack == 1 then
 						print(string.format("dragonc_pp: %s:%d: no matching ifdef", name, line))
+						return false
 					end
 
 					ifdefstack[#ifdefstack] = nil
@@ -182,22 +189,32 @@ function preproc(name, srcf, destf)
 						if (#inc > 2) and (inc:sub(1,1) == '"') and (inc:sub(-1,-1) == '"') then
 							local incpath = inc:sub(2,-2)
 
+							local realpath
+
 							local f
 
 							if incpath:sub(1,5) == "<df>/" then
-								f = io.open(sd.."/../headers/dfrt/"..incpath:sub(6), "r")
+								realpath = sd.."/../headers/dfrt/"..incpath:sub(6)
+								f = io.open(realpath, "r")
 							elseif incpath:sub(1,5) == "<ll>/" then
-								f = io.open(sd.."/../headers/"..incpath:sub(6), "r")
+								realpath = sd.."/../headers/"..incpath:sub(6)
+								f = io.open(realpath, "r")
 							elseif incpath:sub(1,6) == "<inc>/" then
+								realpath = sd.."/../headers/"..incpath:sub(6)
+
 								local rpath = incpath:sub(7)
 
 								for _,path in ipairs(incdir) do
-									f = io.open(path.."/"..rpath)
+									realpath = path.."/"..rpath
+
+									f = io.open(realpath)
 
 									if f then break end
 								end
 							else
-								f = io.open(basedir.."/"..incpath)
+								realpath = basedir.."/"..incpath
+
+								f = io.open(realpath)
 							end
 
 							if not f then
@@ -205,7 +222,7 @@ function preproc(name, srcf, destf)
 								return
 							end
 
-							if not preproc(incpath, f, destf) then return false end
+							if not preproc(realpath, f, destf) then return false end
 
 							destf:write(string.format("#%s %d\n", name, line))
 						else

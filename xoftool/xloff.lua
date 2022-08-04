@@ -124,6 +124,9 @@ end
 
 local XLOFFFLAG_ALIGN4K  = 1
 local XLOFFFLAG_FRAGMENT = 2
+local XLOFFFLAG_ISTRIP   = 4  -- can't be internally relocated
+local XLOFFFLAG_GSTRIP   = 8  -- can't be dynamically linked against
+local XLOFFFLAG_FSTRIP   = 16 -- can't be fixed up
 
 local XLOFFSYMTYPE_GLOBAL  = 1
 local XLOFFSYMTYPE_LOCAL   = 2
@@ -260,6 +263,22 @@ function xloff.new(filename)
 			self.pagealignrequired = 4096
 		end
 
+		if band(self.flags, XLOFFFLAG_FRAGMENT) ~= 0 then
+			self.fragment = true
+		end
+
+		if band(self.flags, XLOFFFLAG_ISTRIP) ~= 0 then
+			self.istrip = true
+		end
+
+		if band(self.flags, XLOFFFLAG_GSTRIP) ~= 0 then
+			self.gstrip = true
+		end
+
+		if band(self.flags, XLOFFFLAG_FSTRIP) ~= 0 then
+			self.fstrip = true
+		end
+
 		self.sectionsbyname = {}
 		self.sectionsbyid = {}
 
@@ -363,6 +382,8 @@ function xloff.new(filename)
 			if symbol.name then
 				self.symbolsbyname[symbol.name] = symbol
 			end
+
+			self.sortablesymbols[#self.sortablesymbols+1] = symbol
 
 			symbolstr = symbolstr + symbol_s.size()
 		end
@@ -798,6 +819,18 @@ function xloff.new(filename)
 			self.flags = band(self.flags, bnot(XLOFFFLAG_FRAGMENT))
 		end
 
+		if self.istrip or self.lstrip then
+			self.flags = bor(self.flags, XLOFFFLAG_ISTRIP)
+		end
+
+		if self.gstrip then
+			self.flags = bor(self.flags, XLOFFFLAG_GSTRIP)
+		end
+
+		if self.fstrip then
+			self.flags = bor(self.flags, XLOFFFLAG_FSTRIP)
+		end
+
 		header.sv("Flags", self.flags)
 
 		header.sv("Timestamp", self.timestamp)
@@ -1101,7 +1134,7 @@ function xloff.new(filename)
 
 						sym.stubsym = stubsym
 
-						-- create an internal relocation for the call stub.
+						-- create a fixup for the call stub.
 
 						local reloc = {}
 
@@ -1111,7 +1144,7 @@ function xloff.new(filename)
 						reloc.file = self.filename
 						reloc.section = text
 
-						text.relocs[#text.relocs+1] = reloc
+						import.fixups[#import.fixups+1] = reloc
 					end
 				end
 			end

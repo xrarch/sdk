@@ -22,7 +22,8 @@ local cg = {}
 cg.ptrsize = 4
 cg.wordsize = 4
 
-local textsection
+local textsections = {}
+local textsectionsi = {}
 
 local datasection
 
@@ -43,11 +44,11 @@ local wpushdown = {}
 local wcpushdown = {}
 
 local function text(str)
-	textsection = textsection .. str .. "\n"
+	textsections[curfn.section] = textsections[curfn.section] .. str .. "\n"
 end
 
 local function atext(str)
-	textsection = textsection .. str
+	textsections[curfn.section] = textsections[curfn.section] .. str
 end
 
 local function data(str)
@@ -1344,6 +1345,11 @@ function cg.func(func)
 
 	func.labln = 0
 
+	if not textsections[curfn.section] then
+		textsections[curfn.section] = ".section "..curfn.section.."\n"
+		textsectionsi[#textsectionsi+1] = curfn.section
+	end
+
 	local exret = 0
 
 	local exarg = 0
@@ -1397,16 +1403,16 @@ function cg.func(func)
 		end
 	end
 
-	local otext = textsection
+	local otext = textsections[curfn.section]
 
-	textsection = ""
+	textsections[curfn.section] = ""
 
 	-- compile root block
 	if not cg.block(func.block) then return false end
 
 	-- switch text
-	local fntext = textsection
-	textsection = otext
+	local fntext = textsections[curfn.section]
+	textsections[curfn.section] = otext
 
 	if func.allocated > 0xFFFF then
 		lerror(func.errtok, "stack alloc exceeded 64KB")
@@ -1479,7 +1485,7 @@ function cg.func(func)
 	end
 
 	-- append fn text
-	textsection = textsection .. fntext
+	textsections[curfn.section] = textsections[curfn.section] .. fntext
 
 	-- generate epilogue
 
@@ -1525,7 +1531,8 @@ function cg.gen(edefs, public, extern, asms, const)
 
 	defs = edefs
 
-	textsection = ".section text\n"
+	textsections["text"] = ".section text\n"
+	textsectionsi[1] = "text"
 
 	datasection = ".section data\n"
 
@@ -1533,17 +1540,19 @@ function cg.gen(edefs, public, extern, asms, const)
 
 	bsssection = ".section bss\n"
 
+	local defsection = ""
+
 	labln = 0
 
 	--tprint(defs)
 
 	for k,v in pairs(extern) do
-		text(".extern "..k)
+		defsection = defsection .. ".extern "..k.."\n"
 	end
 
 	for k,v in pairs(const) do
 		if not extern[k] then
-			text(".define "..k.." "..tostring(v))
+			defsection = defsection .. ".define "..k.." "..tostring(v).."\n"
 		end
 	end
 
@@ -1602,14 +1611,20 @@ function cg.gen(edefs, public, extern, asms, const)
 	end
 
 	for i = 1, #asms do
-		text(asms[i])
+		textsections["text"] = textsections["text"] .. asms[i] .. "\n"
 	end
 
 	for k,v in pairs(public) do
 		bss(".global "..k)
 	end
 
-	return textsection .. rodatasection .. ".align 4\n" .. datasection .. bsssection
+	local texts = ""
+
+	for k,v in ipairs(textsectionsi) do
+		texts = texts .. textsections[v]
+	end
+
+	return defsection .. texts .. rodatasection .. ".align 4\n" .. datasection .. bsssection
 end
 
 return cg

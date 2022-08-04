@@ -290,49 +290,60 @@ elseif command == "move" then
 
         local s = exp[1]
 
-        local section = image.sectionsbyname[s]
+        if s == "base" then
+            local base = tonumber(exp[2])
 
-        if not section then
-            print("xoftool: not a section: '"..s.."'")
-            os.exit(1)
-        end
+            for i = 0, image.sectioncount-1 do
+                local section = image.sectionsbyid[i]
 
-        local x = exp[2]
-
-        local addends = explode("+", x)
-
-        local r = 0
-
-        for k,v in ipairs(addends) do
-            if v:sub(-5,-1) == "_size" then
-                local asection = image.sectionsbyname[v:sub(1,-6)]
-
-                if not asection then
-                    print("xoftool: not a section: '"..v:sub(1,-6).."'")
-                    os.exit(1)
-                end
-
-                r = r + asection.size
-            elseif v == "align" then
-                if (r % 4096) ~= 0 then
-                    r = r + 4096
-                    r = r - (r % 4096)
-                end
-            elseif tonumber(v) then
-                r = r + tonumber(v)
-            else
-                local asection = image.sectionsbyname[v]
-
-                if not asection then
-                    print("xoftool: I don't know what "..v.." means")
-                    os.exit(1)
-                end
-
-                r = r + asection.vaddr
+                section.vaddr = base
+                base = base + band(section.size+4095, bnot(4095))
             end
-        end
+        else
+            local section = image.sectionsbyname[s]
 
-        section.vaddr = r
+            if not section then
+                print("xoftool: not a section: '"..s.."'")
+                os.exit(1)
+            end
+
+            local x = exp[2]
+
+            local addends = explode("+", x)
+
+            local r = 0
+
+            for k,v in ipairs(addends) do
+                if v:sub(-5,-1) == "_size" then
+                    local asection = image.sectionsbyname[v:sub(1,-6)]
+
+                    if not asection then
+                        print("xoftool: not a section: '"..v:sub(1,-6).."'")
+                        os.exit(1)
+                    end
+
+                    r = r + asection.size
+                elseif v == "align" then
+                    if (r % 4096) ~= 0 then
+                        r = r + 4096
+                        r = r - (r % 4096)
+                    end
+                elseif tonumber(v) then
+                    r = r + tonumber(v)
+                else
+                    local asection = image.sectionsbyname[v]
+
+                    if not asection then
+                        print("xoftool: I don't know what "..v.." means")
+                        os.exit(1)
+                    end
+
+                    r = r + asection.vaddr
+                end
+            end
+
+            section.vaddr = r
+        end
     end
 
     image.timestamp = os.time(os.date("!*t"))

@@ -468,6 +468,15 @@ function parser.block(endtok, defines)
 			b[#b + 1] = pq
 		elseif ident == "auto" then
 			if not parser.auto() then return false end
+		elseif ident == "fnsection" then
+			local t, ok = lex:expect("string")
+
+			if not ok then
+				lerror(t, "expected string, got "..t[2])
+				return false
+			end
+
+			currentfn.section = t[1]
 		elseif ident == "pointerof" then
 			local pq = parser.pointerof()
 
@@ -574,6 +583,8 @@ function parser.fn(defonly)
 	ast.def = mydef
 	ast.autos = myautos
 	ast.idef = myidef
+
+	ast.section = "text"
 
 	ast.wdepth = 0
 

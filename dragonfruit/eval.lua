@@ -1341,23 +1341,15 @@ function eval.eval(symdeftab, public, extern, structs, asms)
 			local fn = {}
 
 			fn.name = v.ident
-
 			fn.kind = "fn"
-
 			fn.symb = v.value.def
-
 			fn.isymb = v.value.idef
-
 			fn.fin = v.value.fin
-
 			fn.out = v.value.out
-
 			fn.varin = v.value.varin
-
 			fn.public = v.value.public
-
+			fn.section = v.value.section
 			fn.calls = {}
-
 			fn.allocated = 0
 
 			currentfn = fn

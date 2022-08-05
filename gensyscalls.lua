@@ -161,7 +161,7 @@ end
 
 if trampolines then
 	trampolines:write("; AUTOMATICALLY GENERATED -- DO NOT EDIT\n\n")
-	trampolines:write(".section text\n\n")
+	trampolines:write(".section PAGE$text\n\n")
 end
 
 if stubs then

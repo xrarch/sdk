@@ -68,7 +68,7 @@ local function rodata(str)
 		section = "text"
 	end
 
-	rodatasections[section] = rodatasections[section] .. str .. "\n"
+	rodatasections["text"] = rodatasections["text"] .. str .. "\n"
 end
 
 local function arodata(str)
@@ -80,7 +80,7 @@ local function arodata(str)
 		section = "text"
 	end
 
-	rodatasections[section] = rodatasections[section] .. str
+	rodatasections["text"] = rodatasections["text"] .. str
 end
 
 local function bss(str)

@@ -52,6 +52,13 @@ local reloc_s = struct {
 	{2, "SectionIndex"}
 }
 
+local XLOFFRELOC_FOX32_LONG = 1
+local XLOFFRELOC_FOX32_SRC  = 2
+local XLOFFRELOC_FOX32_DEST = 3
+local XLOFFRELOC_FOX32_JMP  = 4
+local XLOFFRELOC_FOX32_MDST = 5
+local XLOFFRELOC_FOX32_LDST = 6
+
 local XLOFFRELOC_LIMN2500_LONG     = 1
 local XLOFFRELOC_LIMN2500_ABSJ     = 2
 local XLOFFRELOC_LIMN2500_LA       = 3
@@ -68,6 +75,13 @@ archinfo[1] = {}
 archinfo[1].name = "limn2600"
 archinfo[1].align = 4
 archinfo[1].id = 1
+
+archinfo[1].relocnames = {}
+archinfo[1].relocnames[XLOFFRELOC_LIMN2500_LONG]     = "LONG"
+archinfo[1].relocnames[XLOFFRELOC_LIMN2500_ABSJ]     = "ABSJ"
+archinfo[1].relocnames[XLOFFRELOC_LIMN2500_LA]       = "LA"
+archinfo[1].relocnames[XLOFFRELOC_LIMN2600_FAR_LONG] = "FARLONG"
+archinfo[1].relocnames[XLOFFRELOC_LIMN2600_FAR_INT]  = "FARINT"
 
 archinfo[1].dofixup = function (tab, off, nval, rtype)
 	local old = gv32(tab, off)
@@ -122,6 +136,55 @@ archinfo[1].shouldredirect = function (section, fixup)
 	return fixup.type == XLOFFRELOC_LIMN2500_ABSJ
 end
 
+archinfo[2] = {}
+archinfo[2].name = "fox32"
+archinfo[2].align = 1
+archinfo[2].id = 2
+
+archinfo[2].relocnames = {}
+archinfo[2].relocnames[XLOFFRELOC_FOX32_LONG] = "LONG"
+archinfo[2].relocnames[XLOFFRELOC_FOX32_SRC]  = "SRC"
+archinfo[2].relocnames[XLOFFRELOC_FOX32_DEST] = "DEST"
+archinfo[2].relocnames[XLOFFRELOC_FOX32_JMP]  = "JMP"
+archinfo[2].relocnames[XLOFFRELOC_FOX32_MDST] = "MDST"
+archinfo[2].relocnames[XLOFFRELOC_FOX32_LDST] = "LDST"
+
+archinfo[2].dofixup = function (tab, off, nval, rtype)
+	if rtype == XLOFFRELOC_FOX32_LONG then
+		-- nothing
+	elseif rtype == XLOFFRELOC_FOX32_SRC then
+		off = off + 2
+	elseif rtype == XLOFFRELOC_FOX32_DEST then
+		off = off + 3
+	elseif rtype == XLOFFRELOC_FOX32_MDST then
+		off = off + 4
+	elseif rtype == XLOFFRELOC_FOX32_LDST then
+		off = off + 6
+	else
+		error("unknown relocation type "..rtype)
+	end
+
+	sv32(tab, off, nval)
+end
+
+archinfo[2].dostub = function (section, ptr)
+	-- create a call stub template at the end of the given section.
+	-- make sure to grow it.
+
+	local stublocation = section.size
+	section.size = section.size + 6
+
+	sv16(section.data, stublocation, 0x8802)
+	sv32(section.data, stublocation+2, ptr)
+
+	return stublocation, 6, XLOFFRELOC_FOX32_JMP
+end
+
+archinfo[2].shouldredirect = function (section, fixup)
+	-- determine if a fixup should be redirected to a call stub.
+	return fixup.type == XLOFFRELOC_FOX32_JMP
+end
+
 local XLOFFFLAG_ALIGN4K  = 1
 local XLOFFFLAG_FRAGMENT = 2
 local XLOFFFLAG_ISTRIP   = 4  -- can't be internally relocated
@@ -166,13 +229,6 @@ xloff.sectionflagnames[4] = "READONLY"
 local XLOFFSPECIALVALUE_START = 1
 local XLOFFSPECIALVALUE_SIZE  = 2
 local XLOFFSPECIALVALUE_END   = 3
-
-xloff.relocnames = {}
-xloff.relocnames[XLOFFRELOC_LIMN2500_LONG]     = "LONG"
-xloff.relocnames[XLOFFRELOC_LIMN2500_ABSJ]     = "ABSJ"
-xloff.relocnames[XLOFFRELOC_LIMN2500_LA]       = "LA"
-xloff.relocnames[XLOFFRELOC_LIMN2600_FAR_LONG] = "FARLONG"
-xloff.relocnames[XLOFFRELOC_LIMN2600_FAR_INT]  = "FARINT"
 
 function xloff.new(filename)
 	local img = {}

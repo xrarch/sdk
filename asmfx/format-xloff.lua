@@ -58,6 +58,10 @@ local isas = {
 	["limn2600"] = {
 		archid = 1,
 		align = 4,
+	},
+	["fox32"] = {
+		archid = 2,
+		align = 1,
 	}
 }
 

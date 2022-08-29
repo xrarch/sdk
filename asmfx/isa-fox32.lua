@@ -378,7 +378,9 @@ local instructions = {
 	{
 		"rjmp",
 		0x09,
-		1
+		1,
+		false,
+		true
 	},
 	{
 		"push",
@@ -439,7 +441,9 @@ local instructions = {
 	{
 		"rcall",
 		0x19,
-		1
+		1,
+		false,
+		true
 	},
 	{
 		"pop",
@@ -510,7 +514,9 @@ local instructions = {
 	{
 		"rloop",
 		0x29,
-		1
+		1,
+		false,
+		true
 	},
 	{
 		"ret",
@@ -545,7 +551,9 @@ local instructions = {
 	{
 		"rta",
 		0x39,
-		2
+		2,
+		false,
+		true
 	},
 	{
 		"reti",
@@ -605,6 +613,16 @@ function addFoxFormats(instr)
 	local opcode = instr[2]
 	local opcount = instr[3]
 
+	local opinfo = {}
+
+	if instr[5] then
+		opinfo = {
+			["s"] = {
+				relative=true,
+			}
+		}
+	end
+
 	for k,v in pairs(conditions) do
 		local formatstr
 
@@ -628,7 +646,7 @@ function addFoxFormats(instr)
 
 			if opcount == 0 then
 				addFormat(
-					{},
+					opinfo,
 					makeFoxOpcode(opcode, v2, v, 0, 0),
 					f2,
 					instr[4]
@@ -638,6 +656,8 @@ function addFoxFormats(instr)
 					local opfmt = v3[1]
 					local opid = v3[2]
 					local opreg = v3[3]
+
+					local opinf
 
 					local fbittage
 
@@ -650,7 +670,7 @@ function addFoxFormats(instr)
 					end
 
 					addFormat(
-						{},
+						opinfo,
 						repeatbit("s", fbittage)..makeFoxOpcode(opcode, v2, v, 0, opid),
 						f2.." "..opfmt
 					)
@@ -686,10 +706,10 @@ function addFoxFormats(instr)
 							dbittage = 32
 						end
 
+						opinfo.TT = sbittage
+
 						addFormat(
-							{
-								["TT"] = sbittage
-							},
+							opinfo,
 							repeatbit("d", dbittage)..repeatbit("s", sbittage)..makeFoxOpcode(opcode, v2, v, did, sid),
 							f2.." "..dfmt.." "..sfmt
 						)

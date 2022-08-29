@@ -3,5 +3,5 @@
 headers/rtaisix
 headers/OSDLL
 
-lib/rtaisix
-lib/OSDLL
+lib/*/rtaisix
+lib/*/OSDLL

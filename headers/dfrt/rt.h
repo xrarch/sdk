@@ -66,8 +66,6 @@ extern Getc { -- c }
 
 extern iserr { v -- err }
 
-extern addoverflow { n1 n2 -- overflow res }
-
 extern bitget { v bit -- bitout }
 
 extern bitset { v bit -- valout }

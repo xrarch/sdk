@@ -385,6 +385,8 @@ elseif command == "link" then
             linked[imgname] = true
 
             if imgname:sub(1,2) == "L/" then
+                imgname = sd.."../lib/"..image.arch.name.."/"..imgname:sub(3)
+            elseif imgname:sub(1,3) == "LX/" then
                 imgname = sd.."../lib/"..imgname:sub(3)
             end
 

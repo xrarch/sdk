@@ -3,7 +3,7 @@
 fn abs { v -- absv }
 	v@ absv!
 
-	if (v@ 0 s<)
+	if (v@ z<)
 		0 v@ - absv!
 	end
 end
@@ -17,52 +17,5 @@ fn min { n1 n2 -- minv }
 end
 
 fn iserr { n -- err }
-	n@ 0 s< err!
+	n@ z< err!
 end
-
-fn addoverflow { n1 n2 -- overflow res }
-	n1@ n2@ + res!
-
-	0 overflow!
-
-	if (n1@ 0 s>=)
-		if (n2@ 0x7FFFFFFF n1@ - s>)
-			1 overflow!
-		end
-	end else
-		if (n2@ 0x80000000 n1@ - s<)
-			1 overflow!
-		end
-	end
-end
-
-asm "
-
-;a0 - bit
-;a1 - v
-bitget:
-.global bitget
-	rsh  a0, a1, a0
-	andi a0, a0, 1
-	ret
-
-;a0 - bit
-;a1 - v
-bitset:
-.global bitset
-	li   t0, 1
-	lsh  t0, t0, a0
-	or   a0, a1, t0
-	ret
-
-;a0 - bit
-;a1 - v
-bitclear:
-.global bitclear
-	li   t0, 1
-	lsh  t0, t0, a0
-	nor  t0, t0, t0
-	and  a0, a1, t0
-	ret
-
-"

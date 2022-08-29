@@ -61,7 +61,7 @@ for k,v in ipairs(arg) do
 				val = false
 			end
 
-			symbols[v:sub(1,off-1)] = val
+			symbols[string.upper(v:sub(1,off-1))] = val
 		else
 			narg[#narg + 1] = v
 		end

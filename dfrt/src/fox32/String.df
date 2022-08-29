@@ -1,0 +1,115 @@
+#include "<inc>/const.h"
+#include "<inc>/rt.h"
+
+fn memset { ptr size word -- }
+	while (size@ 4 >=)
+		word@ ptr@!
+
+		4 size -=
+		4 ptr +=
+	end
+
+	while (size@)
+		word@ ptr@ sb
+
+		1 size -=
+		1 ptr +=
+	end
+end
+
+fn memcpy { dest src size -- }
+	while (size@ 4 >=)
+		src@@ dest@!
+
+		4 src +=
+		4 dest +=
+		4 size -=
+	end
+
+	while (size@)
+		src@ gb dest@ sb
+
+		1 size -=
+		1 src +=
+		1 dest +=
+	end
+end
+
+fn memmove { dest src size -- }
+	if (src@ dest@ <)
+		size@ src +=
+		size@ dest +=
+
+		while (size@ 4 >=)
+			4 src -=
+			4 dest -=
+
+			src@@ dest@!
+
+			4 size -=
+		end
+
+		while (size@)
+			1 src -=
+			1 dest -=
+
+			src@ gb dest@ sb
+
+			1 size -=
+		end
+	end else
+		while (size@ 4 >=)
+			src@@ dest@!
+
+			4 src +=
+			4 dest +=
+			4 size -=
+		end
+
+		while (size@)
+			src@ gb dest@ sb
+
+			1 size -=
+			1 src +=
+			1 dest +=
+		end
+	end
+end
+
+fn strcmp { str1 str2 -- eq }
+	while (str1@ gb str2@ gb ==)
+		if (str1@ gb ~~)
+			1 eq!
+			return
+		end
+
+		1 str1 +=
+		1 str2 +=
+	end
+
+	0 eq!
+end
+
+fn strcpy { dest src -- }
+	while (src@ gb 0 ~=)
+		src@ gb dest@ sb
+
+		1 dest +=
+		1 src +=
+	end
+
+	0 dest@ sb
+end
+
+fn strncpy { dest src max -- }
+	dest@ max@ + max!
+
+	while (src@ gb 0 ~= dest@ max@ < &&)
+		src@ gb dest@ sb
+
+		1 dest +=
+		1 src +=
+	end
+
+	0 dest@ sb
+end

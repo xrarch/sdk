@@ -593,11 +593,11 @@ local optable = {
 	end,
 
 	["s<"] = function (errtok, op, rootcanmut)
-		lerror(node.errtok, "s< not supported by fox32 backend")
+		lerror(errtok, "s< not supported by fox32 backend")
 		return false
 	end,
 	["s>"] = function (errtok, op, rootcanmut)
-		lerror(node.errtok, "s> not supported by fox32 backend")
+		lerror(errtok, "s> not supported by fox32 backend")
 		return false
 	end,
 
@@ -661,11 +661,11 @@ local optable = {
 	end,
 
 	["s<="] = function (errtok, op, rootcanmut) -- same thing as not-greater
-		lerror(node.errtok, "s<= not supported by fox32 backend")
+		lerror(errtok, "s<= not supported by fox32 backend")
 		return false
 	end,
 	["s>="] = function (errtok, op, rootcanmut) -- same thing as not-less
-		lerror(node.errtok, "s>= not supported by fox32 backend")
+		lerror(errtok, "s>= not supported by fox32 backend")
 		return false
 	end,
 
@@ -1091,13 +1091,13 @@ local muttable = {
 	end,
 
 	["break"] = function (errtok, op)
-		text("\ttrjmp "..wpushdown[#wpushdown])
+		text("\trjmp "..wpushdown[#wpushdown])
 
 		return true
 	end,
 
 	["continue"] = function (errtok, op)
-		text("\ttrjmp "..wcpushdown[#wcpushdown])
+		text("\trjmp "..wcpushdown[#wcpushdown])
 
 		return true
 	end,

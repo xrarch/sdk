@@ -1241,7 +1241,7 @@ function xloff.new(filename)
 					if (sym.type == XLOFFSYMTYPE_GLOBAL) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
 						-- overwrite our extern symbol with their global symbol
 
-						lookup.file = sym.filename
+						lookup.file = sym.file
 
 						lookup.type = XLOFFSYMTYPE_GLOBAL
 						lookup.section = sym.section.forward
@@ -1267,7 +1267,7 @@ function xloff.new(filename)
 
 					lookup = {}
 
-					lookup.file = sym.filename
+					lookup.file = sym.file
 					lookup.type = sym.type
 					lookup.name = sym.name
 

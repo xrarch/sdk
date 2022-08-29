@@ -41,7 +41,7 @@ fn private Puti { n fd -- len }
 	auto c
 	0 c!
 
-	if (n@ 0 s<)
+	if (n@ z<)
 		fd@ '-' FPutc
 		1 c!
 	end

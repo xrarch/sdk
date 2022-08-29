@@ -1,9 +1,11 @@
-TARGET := limn2600
+ifndef TARGET
+	TARGET := limn2600
+endif
 
-DFILES := $(shell find ./src -type f -name "*.df")
-SFILES := $(shell find ./src/$(TARGET)/ -type f -name "*.s")
-OBJ    := $(DFILES:.df=.o)
-SOBJ   := $(SFILES:.s=.o)
+DFILES := $(wildcard ./src/*.df ./src/$(TARGET)/*.df)
+SFILES := $(wildcard ./src/$(TARGET)/*.s)
+OBJ    := $(DFILES:.df=.$(TARGET).o)
+SOBJ   := $(SFILES:.s=.$(TARGET).o)
 
 DC  =  ../dragonc.sh
 AS  =  ../asm.sh
@@ -15,10 +17,10 @@ obj/$(TARGET)/dfrt.f.o: $(OBJ) $(SOBJ)
 	mkdir -p obj/$(TARGET)
 	$(LD) -f obj/$(TARGET)/dfrt.f.o $(OBJ) $(SOBJ)
 
-%.o: %.df
+%.$(TARGET).o: %.df
 	$(DC) target=$(TARGET) $< $@ incdir=./headers/
 
-%.o: %.s
+%.$(TARGET).o: %.s
 	$(AS) target=$(TARGET) $< $@
 
 cleanup:

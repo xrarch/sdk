@@ -447,6 +447,25 @@ eval.immop = {
 
 		return
 	end,
+	["z<"] = function (s, tok)
+		local op1 = s.pop(tok)
+		if not op1 then return false end
+
+		if (op1.kind == "num") then
+			local n = 0
+
+			if op2.ident < 0 then
+				n = 1
+			end
+
+			s.push(stacknode_t("num", n, tok))
+			return
+		end
+
+		s.push(stacknode_t("op", nil, tok, "z<", op1))
+
+		return
+	end,
 	["s>"] = function (s, tok)
 		local op1 = s.pop(tok)
 		if not op1 then return false end

@@ -250,6 +250,7 @@ local function match(isa, format, formattok, linetok)
 					local max = operandinfo.max or math.huge
 
 					if operandvalue > max then
+						print(operandinfo.bits)
 						return false
 					end
 				end

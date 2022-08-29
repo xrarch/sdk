@@ -41,12 +41,11 @@ isa.registers = {
 	["s16"]  = 27,
 	["s17"]  = 28,
 
-	["s18"]  = 29,
-	["s19"]  = 29,
+	["at"]   = 29,
 	
 	["tp"]   = 30,
 	["r31"]  = 31,
-	["rsp"]  = 32,
+	["sp"]  = 32,
 }
 
 isa.controlregisters = {
@@ -613,16 +612,6 @@ function addFoxFormats(instr)
 	local opcode = instr[2]
 	local opcount = instr[3]
 
-	local opinfo = {}
-
-	if instr[5] then
-		opinfo = {
-			["s"] = {
-				relative=true,
-			}
-		}
-	end
-
 	for k,v in pairs(conditions) do
 		local formatstr
 
@@ -645,6 +634,16 @@ function addFoxFormats(instr)
 			end
 
 			if opcount == 0 then
+				local opinfo = {}
+
+				if instr[5] then
+					opinfo = {
+						["s"] = {
+							relative=true,
+						}
+					}
+				end
+
 				addFormat(
 					opinfo,
 					makeFoxOpcode(opcode, v2, v, 0, 0),
@@ -667,6 +666,16 @@ function addFoxFormats(instr)
 						fbittage = bittage
 					elseif opreg == 2 then
 						fbittage = 32
+					end
+
+					local opinfo = {}
+
+					if instr[5] then
+						opinfo = {
+							["s"] = {
+								relative=true,
+							}
+						}
 					end
 
 					addFormat(
@@ -704,6 +713,16 @@ function addFoxFormats(instr)
 							dbittage = bittage
 						elseif dreg == 2 then
 							dbittage = 32
+						end
+
+						local opinfo = {}
+
+						if instr[5] then
+							opinfo = {
+								["s"] = {
+									relative=true,
+								}
+							}
 						end
 
 						opinfo.TT = sbittage

@@ -383,7 +383,7 @@ local function genarith(errtok, oper1, oper2, rootcanmut, mnem, noncommutative)
 
 	if not reg1 then return false end
 
-	local rd = getmutreg(rootcanmut, reg1, reg2)
+	local rd = ralloc(nil, false, false, true)
 
 	if not rd then return false end
 
@@ -1105,6 +1105,14 @@ local muttable = {
 	["call"] = function (errtok, op)
 		if not flushincirco() then return false end
 
+		local extraargs = 0
+
+		local extraret = 0
+
+		if #op.rets > 4 then
+			extraret = #op.rets - 4
+		end
+
 		local an
 
 		if op.fn.varin then
@@ -1112,6 +1120,16 @@ local muttable = {
 			an = 1
 		else
 			an = 0
+		end
+
+		if #op.fin > 4 then
+			extraargs = #op.fin - 4 + an
+		end
+
+		local savareasize = math.max(extraargs+#op.argv, extraret)*4
+
+		if savareasize-((extraargs+#op.argv)*4) > 0 then
+			text("\tsub sp, "..savareasize-((extraargs+#op.argv)*4))
 		end
 
 		for i = 1, #op.fin do
@@ -1160,7 +1178,7 @@ local muttable = {
 			end
 		end
 
-		for i = 1, #op.argv do
+		for i = #op.argv, 1, -1 do
 			local fa = op.argv[i]
 
 			local r = cg.expr(fa.node, false, false, false)
@@ -1228,6 +1246,10 @@ local muttable = {
 			else
 				text("\tpop at")
 			end
+		end
+
+		if savareasize-(extraret*4) > 0 then
+			text("\tadd sp, "..savareasize-(extraret*4))
 		end
 
 		return true
@@ -1378,45 +1400,10 @@ function cg.func(func)
 		textsectionsi[#textsectionsi+1] = curfn.section
 	end
 
-	local exret = 0
-
-	local exarg = 0
-
-	-- analyze stuff to determine stack frame parameters.
-	-- these need to be known ahead of time, I guess
-
-	local savelink = false
-
-	for i = 1, #func.calls do
-		local cgc = func.calls[i]
-
-		exarg = math.max(exarg, cgc.argvs)
-
-		if cgc.args > 4 then -- the limn2500 ABI gives us 4 registers to use for arguments
-			exarg = math.max(exarg, cgc.args - 4)
-		end
-
-		if cgc.os > 4 then -- the limn2500 ABI gives us 4 registers to use for outputs
-			exret = math.max(exret, cgc.os - 4)
-		end
-
-		savelink = true
-	end
-
-	local savareaoff = math.max(exret, exarg) * 4 + 4
-
 	if func.varin then
 		func.argvoff = ralloc(func.errtok, true, true)
 
 		if not func.argvoff then
-			return false
-		end
-	end
-
-	if func.allocated > 0 then
-		func.allocoff = ralloc(func.errtok, true, true)
-
-		if not func.allocoff then
 			return false
 		end
 	end
@@ -1442,26 +1429,17 @@ function cg.func(func)
 	local fntext = textsections[curfn.section]
 	textsections[curfn.section] = otext
 
-	if func.allocated > 0xFFFF then
-		lerror(func.errtok, "stack alloc exceeded 64KB")
-		return false
-	end
-
-	-- generate prologue
-	local frametop = savareaoff + (func.savedn * 4)
-
-	func.allocstart = frametop
-
-	frametop = frametop + func.allocated
-
 	text(func.name..":")
 	if func.public then
 		text(".global "..func.name)
 	end
 
+	local saved = 0
+
 	for i = 0, SAVEMAX do
 		if func.saved[i] then
 			text("\tpush s"..tostring(i))
+			saved = saved + 1
 		end
 	end
 
@@ -1471,7 +1449,8 @@ function cg.func(func)
 		ac = 1
 	end
 
-	local reached = false
+	local popped = 0
+	local savedsz = 0
 
 	for i = #func.fin, 1, -1 do
 		local s = func.symb[func.fin[i]]
@@ -1481,23 +1460,23 @@ function cg.func(func)
 		text("\tmov "..s.reg.n..", a"..tostring(ac))
 		ac = ac + 1
 
-		if (ac == 4) and (#func.fin > 4) then
-			text("\tadd sp, "..frametop)
-			reached = 0
+		if (ac == 4) and (i ~= 1) then
+			savedsz = saved*4+4
 
-			for j = 1, #func.fin-4 do
+			text("\tadd sp, "..savedsz)
+			popped = 0
+
+			for j = 1, i-1 do
 				s = func.symb[func.fin[j]]
 
 				text("\tpop "..s.reg.n)
-				reached = reached + 4
+				popped = popped + 1
 			end
+
+			savedsz = savedsz + popped*4
 
 			break
 		end
-	end
-
-	if reached then
-		text("\tsub sp, "..frametop+reached)
 	end
 
 	local ac = 0
@@ -1506,17 +1485,14 @@ function cg.func(func)
 		local argcs = func.symb["argc"]
 
 		text("\tmov "..argcs.reg.n..", a0")
-	end
-
-	if func.varin then
 		text("\tmov "..func.argvoff.n..", sp")
-		text("\tadd "..func.argvoff.n..", "..tostring(frametop + (reached or 0)))
+
+		if savedsz == 0 then
+			text("\tadd "..func.argvoff.n..", "..saved*4+4)
+		end
 	end
 
-	if func.allocated > 0 then
-		text("\tmov "..func.allocoff.n..", sp")
-		text("\tadd "..func.allocoff.n..", "..func.allocstart)
-	end
+	text("\tsub sp, " .. savedsz + func.allocated)
 
 	-- append fn text
 	textsections[curfn.section] = textsections[curfn.section] .. fntext
@@ -1527,7 +1503,7 @@ function cg.func(func)
 
 	local vc = 0
 
-	reached = false
+	local reached = false
 
 	for i = 1, #func.out do
 		local s = func.symb[func.out[i]]
@@ -1536,22 +1512,20 @@ function cg.func(func)
 			text("\tmov a"..tostring(vc)..", "..s.reg.n)
 			vc = vc + 1
 
-			if vc == 4 then
-				text("\tadd sp, "..frametop+(#func.out-4)*4)
+			if (vc == 4) and (#func.out > 4) then
+				text("\tadd sp, ".. savedsz + func.allocated + (#func.out-4)*4 + 4)
 
-				reached = 0
+				reached = true
 			end
 		else
 			s = func.symb[func.out[#func.out-i+4+1]]
 
 			text("\tpush "..s.reg.n)
-
-			reached = reached + 4
 		end
 	end
 
 	if reached then
-		text("\tsub sp, "..frametop)
+		text("\tsub sp, ".. savedsz)
 	end
 
 	for i = SAVEMAX, 0, -1 do

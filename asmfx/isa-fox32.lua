@@ -52,6 +52,17 @@ isa.controlregisters = {
 
 }
 
+isa.conditions = {}
+
+isa.conditions.ifz = 1
+isa.conditions.ifnz = 2
+isa.conditions.ifc = 3
+isa.conditions.iflt = 3
+isa.conditions.ifnc = 4
+isa.conditions.ifgteq = 4
+isa.conditions.ifgt = 5
+isa.conditions.iflteq = 6
+
 local RELOC_FOX32_LONG = 1
 local RELOC_FOX32_SRC  = 2
 local RELOC_FOX32_DEST = 3
@@ -117,7 +128,10 @@ function isa.reloctype(format, relocation)
 	end
 end
 
+local total = 0
+
 local function addFormat(operandinfo, encodingstring, formatstring, jmp)
+	total = total + 1
 	local format = {}
 
 	local tokens = {}
@@ -301,24 +315,12 @@ function makeFoxOpcode(opcode, size, condition, dest, src)
 	-- generate condition byte
 
 	bitstr = bitstr .. "0"
-	bitstr = bitstr .. numtobin(condition, 3)
+	bitstr = bitstr .. "ccc"
 	bitstr = bitstr .. numtobin(dest, 2)
 	bitstr = bitstr .. numtobin(src, 2)
 
 	return bitstr
 end
-
-local conditions = {}
-
-conditions.always = 0
-conditions.ifz = 1
-conditions.ifnz = 2
-conditions.ifc = 3
-conditions.iflt = 3
-conditions.ifnc = 4
-conditions.ifgteq = 4
-conditions.ifgt = 5
-conditions.iflteq = 6
 
 local sizes = {}
 
@@ -612,15 +614,18 @@ function addFoxFormats(instr)
 	local opcode = instr[2]
 	local opcount = instr[3]
 
-	for k,v in pairs(conditions) do
-		local formatstr
+	local formatstr = name
 
-		if k == "always" then
-			formatstr = name
-		else
-			formatstr = k.." "..name
-		end
+	if opcount == 0 then
+		local opinfo = {}
 
+		addFormat(
+			opinfo,
+			makeFoxOpcode(opcode, 2, 0, 0, 0),
+			formatstr,
+			instr[4]
+		)
+	else
 		for k2,v2 in pairs(sizes) do
 			local bittage
 			local f2
@@ -633,24 +638,7 @@ function addFoxFormats(instr)
 				bittage = 32
 			end
 
-			if opcount == 0 then
-				local opinfo = {}
-
-				if instr[5] then
-					opinfo = {
-						["s"] = {
-							relative=true,
-						}
-					}
-				end
-
-				addFormat(
-					opinfo,
-					makeFoxOpcode(opcode, v2, v, 0, 0),
-					f2,
-					instr[4]
-				)
-			elseif opcount == 1 then
+			if opcount == 1 then
 				for k3,v3 in ipairs(optypess) do
 					local opfmt = v3[1]
 					local opid = v3[2]
@@ -680,7 +668,7 @@ function addFoxFormats(instr)
 
 					addFormat(
 						opinfo,
-						repeatbit("s", fbittage)..makeFoxOpcode(opcode, v2, v, 0, opid),
+						repeatbit("s", fbittage)..makeFoxOpcode(opcode, v2, 0, 0, opid),
 						f2.." "..opfmt
 					)
 				end
@@ -729,7 +717,7 @@ function addFoxFormats(instr)
 
 						addFormat(
 							opinfo,
-							repeatbit("d", dbittage)..repeatbit("s", sbittage)..makeFoxOpcode(opcode, v2, v, did, sid),
+							repeatbit("d", dbittage)..repeatbit("s", sbittage)..makeFoxOpcode(opcode, v2, 0, did, sid),
 							f2.." "..dfmt.." "..sfmt
 						)
 					end

@@ -276,13 +276,30 @@ function asm.match(isa, line)
 
 	local formats = isa.formats
 
+	local lbias = 0
+
+	local coperand
+
+	if isa.conditions and isa.conditions[line.tokens[1]] then
+		coperand = isa.conditions[line.tokens[1]]
+		lbias = 1
+	elseif isa.conditions then
+		coperand = 0
+	end
+
 	for i = 1, #formats do
 		local format = formats[i]
 
+		local found = true
+
 		local operands = {}
 
+		if coperand then
+			operands["c"] = coperand
+		end
+
 		for j = 1, #format.tokens do
-			local field, value = match(isa, format, format.tokens[j], line.tokens[j])
+			local field, value, rept = match(isa, format, format.tokens[j], line.tokens[j+lbias])
 
 			if not field then
 				operands = nil

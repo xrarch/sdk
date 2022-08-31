@@ -1492,7 +1492,9 @@ function cg.func(func)
 		end
 	end
 
-	text("\tsub sp, " .. savedsz + func.allocated)
+	if savedsz + func.allocated > 0 then
+		text("\tsub sp, " .. savedsz + func.allocated)
+	end
 
 	-- append fn text
 	textsections[curfn.section] = textsections[curfn.section] .. fntext
@@ -1524,7 +1526,7 @@ function cg.func(func)
 		end
 	end
 
-	if reached then
+	if reached and (savedsz > 0) then
 		text("\tsub sp, ".. savedsz)
 	end
 

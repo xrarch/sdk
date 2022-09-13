@@ -731,7 +731,7 @@ local optable = {
 	["alloc"] = function (errtok, op, rootcanmut)
 		local offset = op.opers[1]
 
-		return genarith(errtok, curfn.allocoff, offset, rootcanmut, "add ")
+		return genarith(errtok, reg_t("sp", "sp", errtok), offset, rootcanmut, "add ")
 	end,
 
 	["index"] = function (errtok, op, rootcanmut)
@@ -1528,6 +1528,10 @@ function cg.func(func)
 
 	if reached and (savedsz > 0) then
 		text("\tsub sp, ".. savedsz)
+	end
+
+	if func.allocated > 0 then
+		text("\tadd sp, "..func.allocated)
 	end
 
 	for i = SAVEMAX, 0, -1 do

@@ -74,6 +74,8 @@ local function writefile(fs, destpath, srcpath, update, mode, force, suffix)
 		if not force then
 			print("fstool: couldn't open "..srcpath)
 			os.exit(1)
+		elseif created and mode then
+			node.chmod(mode)
 		end
 	else
 		if not created then

@@ -37,31 +37,31 @@ if (#arg < 3) then
 	return
 end
 
-local sysheader = io.open(arg[1], "r")
+local sysheader = io.open(arg[2], "r")
 
 if not sysheader then
-	print("failed to open "..arg[1])
+	print("failed to open "..arg[2])
 	return
 end
 
 local stubs
 
-if arg[2] ~= "NO" then
-	stubs = io.open(arg[2], "w")
+if arg[3] ~= "NO" then
+	stubs = io.open(arg[3], "w")
 
 	if not stubs then
-		print("failed to open "..arg[2])
+		print("failed to open "..arg[3])
 		return
 	end
 end
 
 local trampolines
 
-if arg[3] ~= "NO" then
-	trampolines = io.open(arg[3], "w")
+if arg[4] ~= "NO" then
+	trampolines = io.open(arg[4], "w")
 
 	if not trampolines then
-		print("failed to open "..arg[3])
+		print("failed to open "..arg[4])
 		return
 	end
 end

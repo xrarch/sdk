@@ -16,15 +16,15 @@ local function usage()
 	print("utility to manipulate aisixfat images")
 	print("usage: fstool.lua [image] [command] [args] ...")
 	print([[commands:
-  f: format
-  i: dump superblock info
-  wd [dest] [src]: write files to directory dest as specified in file src
-  w [dest] [src]: write file from src to dest
-  ud [dest] [src]: same as wd but only if the src file was modified later than dest file
-  u [dest] [src]: same as w but only if the src file was modified later than dest file
-  r [path]: read contents of file at path
-  ls [path]: list contents of directory at path
-  d [path]: delete file at path
+  f:    format
+  i:    dump superblock info
+  wd    [dest] [src]: write files to directory dest as specified in file src
+  w     [dest] [src]: write file from src to dest
+  ud    [dest] [src]: same as wd but only if the src file was modified later than dest file
+  u     [dest] [src]: same as w but only if the src file was modified later than dest file
+  r     [path]: read contents of file at path
+  ls    [path]: list contents of directory at path
+  d     [path]: delete file at path
   chmod [path] [bits]: change permissions bits
   chown [path] [uid]: change owner
 ]])
@@ -57,7 +57,9 @@ end
 
 local cmd = arg[2]
 
-local function writefile(fs, destpath, srcpath, update, mode)
+local function writefile(fs, destpath, srcpath, update, mode, force, suffix)
+	if not suffix then suffix = "" end
+
 	local node, errmsg, _1, _2, created = fs:path(destpath, true)
 	if not node then
 		print("fstool: "..errmsg)
@@ -67,10 +69,12 @@ local function writefile(fs, destpath, srcpath, update, mode)
 		os.exit(1)
 	end
 
-	local inf = io.open(srcpath, "rb")
+	local inf = io.open(srcpath..suffix, "rb")
 	if not inf then
-		print("fstool: couldn't open "..srcpath)
-		os.exit(1)
+		if not force then
+			print("fstool: couldn't open "..srcpath)
+			os.exit(1)
+		end
 	else
 		if not created then
 			local statcmd
@@ -168,13 +172,17 @@ else
 			usage()
 			os.exit(1)
 		end
-	elseif (cmd == "wd") or (cmd == "ud") then
+	elseif (cmd == "wd") or (cmd == "ud") or (cmd == "udf") then
 		local update = (cmd == "ud")
 
 		if arg[3] and arg[4] then
 			local inf = io.open(arg[4], "r")
 
 			if not inf then
+				if cmd == "udf" then
+					os.exit(0)
+				end
+
 				print("fstool: couldn't open "..arg[4])
 				os.exit(1)
 			end
@@ -186,7 +194,7 @@ else
 					local comp = explode(" ", line)
 
 					if (#comp == 2) or (#comp == 3) then
-						writefile(fs, arg[3].."/"..comp[1], comp[2], update, comp[3])
+						writefile(fs, arg[3].."/"..comp[1], comp[2], update, comp[3], (cmd == "udf"), arg[5])
 					end
 				end
 

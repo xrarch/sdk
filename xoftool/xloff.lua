@@ -230,6 +230,20 @@ local XLOFFSPECIALVALUE_START = 1
 local XLOFFSPECIALVALUE_SIZE  = 2
 local XLOFFSPECIALVALUE_END   = 3
 
+local XLOFFFLAG_ALIGN4K  = 1
+local XLOFFFLAG_FRAGMENT = 2
+local XLOFFFLAG_ISTRIP   = 4  -- can't be internally relocated
+local XLOFFFLAG_GSTRIP   = 8  -- can't be dynamically linked against
+local XLOFFFLAG_FSTRIP   = 16 -- can't be fixed up
+
+xloff.flagnames = {}
+
+xloff.flagnames[0] = "ALIGN4K"
+xloff.flagnames[1] = "FRAGMENT"
+xloff.flagnames[2] = "ISTRIP"
+xloff.flagnames[3] = "GSTRIP"
+xloff.flagnames[4] = "FSTRIP"
+
 function xloff.new(filename)
 	local img = {}
 

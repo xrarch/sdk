@@ -45,7 +45,7 @@ isa.registers = {
 	
 	["tp"]   = 30,
 	["r31"]  = 31,
-	["sp"]  = 32,
+	["sp"]   = 32,
 }
 
 isa.controlregisters = {

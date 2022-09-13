@@ -89,11 +89,23 @@ if command == "info" then
     print(string.format("Architecture  %s", image.arch.name))
     print(string.format("Head Length   %d bytes", image.headlength))
 
-    if image.pagealignrequired then
-        print(string.format("Alignment     %d bytes", image.pagealignrequired))
-    else
-        print("Alignment     No restrictions")
+    local flagstring = ""
+
+    local flags = image.flags
+
+    for i = 31, 0, -1 do
+        if band(rshift(flags, i), 1) == 1 then
+            if xloff.flagnames[i] then
+                if flagstring ~= "" then
+                    flagstring = flagstring .. " | "
+                end
+
+                flagstring = flagstring .. xloff.flagnames[i]
+            end
+        end
     end
+
+    print(string.format("Flags         %s", flagstring))
 
     if image.entrysymbol then
         print(string.format("Entrypoint    %s @ $%X", image.entrysymbol.name, image.entrysymbol.value))

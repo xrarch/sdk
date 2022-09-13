@@ -97,7 +97,7 @@ local function writefile(fs, destpath, srcpath, update, mode, force, suffix)
 
 			local srcmod = tonumber(sf:read())
 
-			if srcmod <= node.timestamp then
+			if srcmod < node.timestamp then
 				return
 			end
 		end

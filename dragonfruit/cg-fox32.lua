@@ -591,6 +591,38 @@ local optable = {
 
 		return rd
 	end,
+	["z>"] = function (errtok, op, rootcanmut)
+		local src = op.opers[1]
+
+		local rs = cg.expr(src, false, false, true, rootcanmut)
+
+		if not rs then return false end
+
+		local rd = getmutreg(rootcanmut, rs)
+
+		if not rd then return false end
+
+		if rd.n ~= rs.n then
+			text("\tmov "..rd.n..", "..rs.n)
+		end
+
+		local badout = locallabel()
+		local goodout = locallabel()
+
+		text("\tcmp  "..rs.n..", 0")
+		text("\tifz  jmp "..badout)
+		text("\tand  "..rs.n..", 0x80000000")
+		text("\tifnz jmp "..badout)
+		text("\tmov  "..rd.n..", 1")
+		text("\tjmp  "..goodout)
+		text(badout..":")
+		text("\tmov  "..rd.n..", 0")
+		text(goodout..":")
+
+		freeofp(rd, rs)
+
+		return rd
+	end,
 
 	["s<"] = function (errtok, op, rootcanmut)
 		lerror(errtok, "s< not supported by fox32 backend")

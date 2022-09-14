@@ -273,6 +273,10 @@ if stubs then
 		elseif arch == "fox32" then
 			local savedneeded = math.max(#sys.args, #sys.rets) - FIRSTSAVED + FIRSTREG
 
+			if savedneeded < 0 then
+				savedneeded = 0
+			end
+
 			if savedneeded > 0 then
 				for reg = 0, savedneeded-1 do
 					stubs:write(string.format("\tpush %s\n", regnames[reg + FIRSTSAVED]))
@@ -292,7 +296,7 @@ if stubs then
 				if regnum < ARGCOUNT+FIRSTREG then
 					stubs:write(string.format("\tmov  %s, %s\n", regnames[regnum], regnames[regnum+FIRSTARG-FIRSTREG]))
 				else
-					if not offsetsp and (savedneeded > 0) then
+					if not offsetsp then
 						offsetsp = true
 						offsetby = savedneeded*4+4
 						stubs:write(string.format("\tadd  sp, %d\n", savedneeded*4+4))
@@ -316,13 +320,15 @@ if stubs then
 			stubs:write(string.format("\n\tmov  t0, %d\n", sys.n))
 			stubs:write("\tint  0x30\n\n")
 
+			regnum = FIRSTREG + #sys.rets - 1
+
 			for retn = #sys.rets, 1, -1 do
 				local sysret = sys.rets[retn]
 
 				if regnum < ARGCOUNT+FIRSTREG then
 					stubs:write(string.format("\tmov  %s, %s\n", regnames[regnum+FIRSTARG-FIRSTREG], regnames[regnum]))
 				else
-					if not offsetsp and (savedneeded > 0) then
+					if not offsetsp then
 						offsetsp = true
 						offsetby = savedneeded*4+4 + ((#sys.rets-ARGCOUNT)*4)
 						stubs:write(string.format("\tadd  sp, %d\n", offsetby))
@@ -385,62 +391,123 @@ if trampolines then
 
 		trampolines:write(string.format("OST%s:\n.global OST%s\n", sys.name, sys.name))
 
-		local tfoffset = (FIRSTREG-1)*4
+		if arch == "limn2600" then
+			local tfoffset = (FIRSTREG-1)*4
 
-		-- move all the arguments from the trapframe to their proper ABI register
-		-- or the stack
+			-- move all the arguments from the trapframe to their proper ABI register
+			-- or the stack
 
-		local stackneeded = math.max((math.max(#sys.args, #sys.rets) - ARGCOUNT)*4, 0)
+			local stackneeded = math.max((math.max(#sys.args, #sys.rets) - ARGCOUNT)*4, 0)
 
-		trampolines:write(string.format("\tsubi sp, sp, %d\n", stackneeded + 4))
-		trampolines:write(string.format("\tmov  long [sp], lr\n"))
+			trampolines:write(string.format("\tsubi sp, sp, %d\n", stackneeded + 4))
+			trampolines:write(string.format("\tmov  long [sp], lr\n"))
 
-		local stackoffset = 4
+			local stackoffset = 4
 
-		local saveoffset = 4
-		local regnum = FIRSTREG
+			local saveoffset = 4
+			local regnum = FIRSTREG
 
-		for argn = #sys.args, 1, -1 do
-			local sysarg = sys.args[argn]
+			for argn = #sys.args, 1, -1 do
+				local sysarg = sys.args[argn]
 
-			if regnum < ARGCOUNT+FIRSTREG then
-				trampolines:write(string.format("\tmov  %s, long [s17 + %d] ;%s\n", regnames[regnum+FIRSTARG-FIRSTREG], tfoffset, regnames[tfoffset/4+1]))
-			else
-				trampolines:write(string.format("\n\tmov  t0, long [s17 + %d] ;%s\n", tfoffset, regnames[tfoffset/4+1]))
-				trampolines:write(string.format("\tmov  long [sp + %d], t0\n", saveoffset))
-				saveoffset = saveoffset + 4
+				if regnum < ARGCOUNT+FIRSTREG then
+					trampolines:write(string.format("\tmov  %s, long [s17 + %d] ;%s\n", regnames[regnum+FIRSTARG-FIRSTREG], tfoffset, regnames[tfoffset/4+1]))
+				else
+					trampolines:write(string.format("\n\tmov  t0, long [s17 + %d] ;%s\n", tfoffset, regnames[tfoffset/4+1]))
+					trampolines:write(string.format("\tmov  long [sp + %d], t0\n", saveoffset))
+					saveoffset = saveoffset + 4
+				end
+
+				tfoffset = tfoffset + 4
+				regnum = regnum + 1
 			end
 
-			tfoffset = tfoffset + 4
-			regnum = regnum + 1
-		end
+			trampolines:write(string.format("\n\tjal  %s\n\n", sys.name))
 
-		trampolines:write(string.format("\n\tjal  %s\n\n", sys.name))
+			regnum = FIRSTREG
 
-		regnum = FIRSTREG
+			saveoffset = stackoffset
+			tfoffset = (FIRSTREG-1)*4
 
-		saveoffset = stackoffset
-		tfoffset = (FIRSTREG-1)*4
+			for retn = 1, #sys.rets do
+				local sysret = sys.rets[retn]
 
-		for retn = 1, #sys.rets do
-			local sysret = sys.rets[retn]
+				if regnum < ARGCOUNT+FIRSTREG then
+					trampolines:write(string.format("\tmov  long [s17 + %d], %s ;%s\n", tfoffset, regnames[regnum+FIRSTARG-FIRSTREG], regnames[tfoffset/4+1]))
+				else
+					trampolines:write(string.format("\n\tmov  t0, long [sp + %d]\n", saveoffset))
+					trampolines:write(string.format("\tmov  long [s17 + %d], t0 ;%s\n", tfoffset, regnames[tfoffset/4+1]))
+					saveoffset = saveoffset + 4
+				end
 
-			if regnum < ARGCOUNT+FIRSTREG then
-				trampolines:write(string.format("\tmov  long [s17 + %d], %s ;%s\n", tfoffset, regnames[regnum+FIRSTARG-FIRSTREG], regnames[tfoffset/4+1]))
-			else
-				trampolines:write(string.format("\n\tmov  t0, long [sp + %d]\n", saveoffset))
-				trampolines:write(string.format("\tmov  long [s17 + %d], t0 ;%s\n", tfoffset, regnames[tfoffset/4+1]))
-				saveoffset = saveoffset + 4
+				tfoffset = tfoffset + 4
+				regnum = regnum + 1
 			end
 
-			tfoffset = tfoffset + 4
-			regnum = regnum + 1
+			trampolines:write("\n")
+
+			trampolines:write(string.format("\tmov  lr, long [sp]\n"))
+			trampolines:write(string.format("\taddi sp, sp, %d\n", stackneeded + 4))
+			trampolines:write("\tret\n\n")
+		else
+			local tfoffset = (FIRSTREG-1)*4
+
+			-- move all the arguments from the trapframe to their proper ABI register
+			-- or the stack
+
+			local stackoffset = 4
+
+			local saveoffset = 4
+			local regnum = FIRSTREG
+
+			for argn = #sys.args, 1, -1 do
+				local sysarg = sys.args[argn]
+
+				if regnum < ARGCOUNT+FIRSTREG then
+					trampolines:write(string.format("\n\tmov  t0, s17\n"))
+					trampolines:write(string.format("\tadd  t0, %d ;%s\n", tfoffset, regnames[tfoffset/4+1]))
+					trampolines:write(string.format("\tmov  %s, [t0]\n", regnames[regnum+FIRSTARG-FIRSTREG]))
+				else
+					trampolines:write(string.format("\n\tmov  t0, s17\n"))
+					trampolines:write(string.format("\tadd  t0, %d ;%s\n", tfoffset, regnames[tfoffset/4+1]))
+					trampolines:write(string.format("\tpush [t0]\n"))
+					saveoffset = saveoffset + 4
+				end
+
+				tfoffset = tfoffset + 4
+				regnum = regnum + 1
+			end
+
+			trampolines:write(string.format("\n\tcall %s\n\n", sys.name))
+
+			regnum = FIRSTREG
+
+			saveoffset = stackoffset
+			tfoffset = (FIRSTREG-1)*4
+
+			for retn = 1, #sys.rets do
+				local sysret = sys.rets[retn]
+
+				if regnum < ARGCOUNT+FIRSTREG then
+					trampolines:write(string.format("\n\tmov  t0, s17\n"))
+					trampolines:write(string.format("\tadd  t0, %d ;%s\n", tfoffset, regnames[tfoffset/4+1]))
+					trampolines:write(string.format("\tmov  [t0], %s\n", regnames[regnum+FIRSTARG-FIRSTREG]))
+				else
+					trampolines:write(string.format("\n\tmov  t0, s17\n"))
+					trampolines:write(string.format("\tadd  t0, %d ;%s\n", tfoffset, regnames[tfoffset/4+1]))
+					trampolines:write(string.format("\tpop  t1\n"))
+					trampolines:write(string.format("\tmov  [t0], t1\n"))
+
+					saveoffset = saveoffset + 4
+				end
+
+				tfoffset = tfoffset + 4
+				regnum = regnum + 1
+			end
+
+			trampolines:write("\n")
+
+			trampolines:write("\tret\n\n")
 		end
-
-		trampolines:write("\n")
-
-		trampolines:write(string.format("\tmov  lr, long [sp]\n"))
-		trampolines:write(string.format("\taddi sp, sp, %d\n", stackneeded + 4))
-		trampolines:write("\tret\n\n")
 	end
 end

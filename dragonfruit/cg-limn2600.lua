@@ -585,6 +585,23 @@ local optable = {
 
 		return rd
 	end,
+	["z>"] = function (errtok, op, rootcanmut)
+		local src = op.opers[1]
+
+		local rs = cg.expr(src, false, false, true, rootcanmut)
+
+		if not rs then return false end
+
+		local rd = getmutreg(rootcanmut, rs)
+
+		if not rd then return false end
+
+		text("\tslt  signed "..rd.n..", zero, "..rs.n)
+
+		freeofp(rd, rs)
+
+		return rd
+	end,
 
 	["s<"] = function (errtok, op, rootcanmut)
 		return genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "slt  signed", "slti  signed", true)

@@ -561,6 +561,11 @@ local instructions = {
 		0x3A,
 		0
 	},
+	{
+		"flp",
+		0x3D,
+		1
+	},
 }
 
 -- type:

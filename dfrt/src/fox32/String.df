@@ -1,78 +1,105 @@
 #include "<inc>/const.h"
 #include "<inc>/rt.h"
 
-fn memset { ptr size word -- }
-	while (size@ 4 >=)
-		word@ ptr@!
+asm "
 
-		4 size -=
-		4 ptr +=
-	end
+;a0 - word
+;a1 - size
+;a2 - ptr
+memset:
+.global memset
+	mov  r31, a1
+	srl  r31, 2
+	ifz  jmp .skip
 
-	while (size@)
-		word@ ptr@ sb
+.wordloop:
+	mov  [a2], a0
+	add  a2, 4
+	rloop .wordloop
 
-		1 size -=
-		1 ptr +=
-	end
-end
+.skip:
+	mov  r31, a1
+	and  r31, 3
+	ifz  jmp .skipbyte
 
-fn memcpy { dest src size -- }
-	while (size@ 4 >=)
-		src@@ dest@!
+.byteloop:
+	mov.8 [a2], a0
+	srl  a0, 8
+	add  a2, 1
+	rloop .byteloop
 
-		4 src +=
-		4 dest +=
-		4 size -=
-	end
+.skipbyte:
+	ret
 
-	while (size@)
-		src@ gb dest@ sb
+;a0 - size
+;a1 - src
+;a2 - dest
+memcpy:
+.global memcpy
+	mov  r31, a0
+	srl  r31, 2
+	ifz  jmp .skip
 
-		1 size -=
-		1 src +=
-		1 dest +=
-	end
-end
+.wordloop:
+	mov  [a2], [a1]
+	add  a2, 4
+	add  a1, 4
+	rloop .wordloop
+
+.skip:
+	mov  r31, a0
+	and  r31, 3
+	ifz  jmp .skipbyte
+
+.byteloop:
+	mov.8 [a2], [a1]
+	add  a2, 1
+	add  a1, 1
+	rloop .byteloop
+
+.skipbyte:
+	ret
+
+;a0 - size
+;a1 - src
+;a2 - dest
+memcpybck:
+	mov  r31, a0
+	srl  r31, 2
+	ifz  jmp .skip
+
+	add  a1, a0
+	add  a2, a0
+
+.wordloop:
+	sub  a2, 4
+	sub  a1, 4
+	mov  [a2], [a1]
+	rloop .wordloop
+
+.skip:
+	mov  r31, a0
+	and  r31, 3
+	ifz  jmp .skipbyte
+
+.byteloop:
+	sub  a2, 1
+	sub  a1, 1
+	mov.8 [a2], [a1]
+	rloop .byteloop
+
+.skipbyte:
+	ret
+
+"
+
+extern memcpybck { dest src size -- }
 
 fn memmove { dest src size -- }
 	if (src@ dest@ <)
-		size@ src +=
-		size@ dest +=
-
-		while (size@ 4 >=)
-			4 src -=
-			4 dest -=
-
-			src@@ dest@!
-
-			4 size -=
-		end
-
-		while (size@)
-			1 src -=
-			1 dest -=
-
-			src@ gb dest@ sb
-
-			1 size -=
-		end
+		dest@ src@ size@ memcpybck
 	end else
-		while (size@ 4 >=)
-			src@@ dest@!
-
-			4 src +=
-			4 dest +=
-			4 size -=
-		end
-
-		while (size@)
-			src@ gb dest@ sb
-
-			1 size -=
-			1 src +=
-			1 dest +=
-		end
+		dest@ src@ size@ memcpy
 	end
 end
 

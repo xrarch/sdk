@@ -609,9 +609,9 @@ local optable = {
 		local badout = locallabel()
 		local goodout = locallabel()
 
-		text("\tcmp  "..rs.n..", 0")
+		text("\tcmp  "..rd.n..", 0")
 		text("\tifz  jmp "..badout)
-		text("\tand  "..rs.n..", 0x80000000")
+		text("\tand  "..rd.n..", 0x80000000")
 		text("\tifnz jmp "..badout)
 		text("\tmov  "..rd.n..", 1")
 		text("\tjmp  "..goodout)
@@ -1547,6 +1547,7 @@ function cg.func(func)
 			vc = vc + 1
 
 			if (vc == 4) and (#func.out > 4) then
+				print((#func.out-4)*4, func.name)
 				text("\tadd sp, ".. savedsz + func.allocated + (#func.out-4)*4 + 4)
 
 				reached = true
@@ -1558,8 +1559,8 @@ function cg.func(func)
 		end
 	end
 
-	if reached and (savedsz > 0) then
-		text("\tsub sp, ".. savedsz)
+	if reached then
+		text("\tsub sp, ".. savedsz+4)
 	end
 
 	if func.allocated > 0 then

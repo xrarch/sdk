@@ -1547,8 +1547,7 @@ function cg.func(func)
 			vc = vc + 1
 
 			if (vc == 4) and (#func.out > 4) then
-				print((#func.out-4)*4, func.name)
-				text("\tadd sp, ".. savedsz + func.allocated + (#func.out-4)*4 + 4)
+				text("\tadd sp, ".. saved*4 + func.allocated + (#func.out-4)*4 + 4)
 
 				reached = true
 			end
@@ -1560,7 +1559,7 @@ function cg.func(func)
 	end
 
 	if reached then
-		text("\tsub sp, ".. savedsz+4)
+		text("\tsub sp, ".. saved*4 + func.allocated + 4)
 	end
 
 	if func.allocated > 0 then

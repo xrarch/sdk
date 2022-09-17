@@ -286,6 +286,8 @@ if stubs then
 			end
 
 			local regnum = FIRSTREG
+			local bckreg = FIRSTREG + #sys.args - 1
+
 
 			local offsetsp = false
 			local offsetby = 0
@@ -302,9 +304,10 @@ if stubs then
 						stubs:write(string.format("\tadd  sp, %d\n", savedneeded*4+4))
 					end
 
-					stubs:write(string.format("\tpop  %s\n", regnames[regnum]))
+					stubs:write(string.format("\tpop  %s\n", regnames[bckreg]))
 
 					offsetby = offsetby + 4
+					bckreg = bckreg - 1
 				end
 
 				regnum = regnum + 1
@@ -449,7 +452,7 @@ if trampolines then
 			trampolines:write(string.format("\tmov  lr, long [sp]\n"))
 			trampolines:write(string.format("\taddi sp, sp, %d\n", stackneeded + 4))
 			trampolines:write("\tret\n\n")
-		else
+		elseif arch == "fox32" then
 			local tfoffset = (FIRSTREG-1)*4
 
 			-- move all the arguments from the trapframe to their proper ABI register
@@ -459,6 +462,7 @@ if trampolines then
 
 			local saveoffset = 4
 			local regnum = FIRSTREG
+			local spoff = 0
 
 			for argn = #sys.args, 1, -1 do
 				local sysarg = sys.args[argn]
@@ -472,6 +476,7 @@ if trampolines then
 					trampolines:write(string.format("\tadd  t0, %d ;%s\n", tfoffset, regnames[tfoffset/4+1]))
 					trampolines:write(string.format("\tpush [t0]\n"))
 					saveoffset = saveoffset + 4
+					spoff = spoff + 4
 				end
 
 				tfoffset = tfoffset + 4
@@ -498,11 +503,16 @@ if trampolines then
 					trampolines:write(string.format("\tpop  t1\n"))
 					trampolines:write(string.format("\tmov  [t0], t1\n"))
 
+					spoff = spoff - 4
 					saveoffset = saveoffset + 4
 				end
 
 				tfoffset = tfoffset + 4
 				regnum = regnum + 1
+			end
+
+			if spoff > 0 then
+				trampolines:write(string.format("\n\tadd  sp, %d", spoff))
 			end
 
 			trampolines:write("\n")

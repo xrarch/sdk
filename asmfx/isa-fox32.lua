@@ -46,6 +46,7 @@ isa.registers = {
 	["tp"]   = 30,
 	["r31"]  = 31,
 	["sp"]   = 32,
+	["esp"]  = 33,
 }
 
 isa.controlregisters = {
@@ -527,7 +528,7 @@ local instructions = {
 	{
 		"int",
 		0x2C,
-		0
+		1
 	},
 	{
 		"tlb",

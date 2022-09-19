@@ -1164,6 +1164,28 @@ local muttable = {
 			text("\tsub sp, "..savareasize-((extraargs+#op.argv)*4))
 		end
 
+		for i = #op.argv, 1, -1 do
+			local fa = op.argv[i]
+
+			local r = cg.expr(fa.node, false, false, false)
+
+			if not r then return false end
+
+			local imm2
+
+			if r.typ == "imm" then
+				imm2 = r.id
+			end
+
+			if imm2 then
+				text("\tpush "..tostring(imm2))
+			else
+				text("\tpush "..r.n)
+			end
+
+			freeof(r)
+		end
+
 		for i = 1, #op.fin do
 			local fa = op.fin[i]
 
@@ -1208,28 +1230,6 @@ local muttable = {
 
 				freeof(r)
 			end
-		end
-
-		for i = #op.argv, 1, -1 do
-			local fa = op.argv[i]
-
-			local r = cg.expr(fa.node, false, false, false)
-
-			if not r then return false end
-
-			local imm2
-
-			if r.typ == "imm" then
-				imm2 = r.id
-			end
-
-			if imm2 then
-				text("\tpush "..tostring(imm2))
-			else
-				text("\tpush "..r.n)
-			end
-
-			freeof(r)
 		end
 
 		if op.ptr then
@@ -1482,7 +1482,6 @@ function cg.func(func)
 	end
 
 	local popped = 0
-	local savedsz = 0
 
 	for i = #func.fin, 1, -1 do
 		local s = func.symb[func.fin[i]]
@@ -1493,9 +1492,7 @@ function cg.func(func)
 		ac = ac + 1
 
 		if (ac == 4) and (i ~= 1) then
-			savedsz = saved*4+4
-
-			text("\tadd sp, "..savedsz)
+			text("\tadd sp, ".. saved*4 + 4)
 			popped = 0
 
 			for j = 1, i-1 do
@@ -1504,8 +1501,6 @@ function cg.func(func)
 				text("\tpop "..s.reg.n)
 				popped = popped + 1
 			end
-
-			savedsz = savedsz + popped*4
 
 			break
 		end
@@ -1519,13 +1514,19 @@ function cg.func(func)
 		text("\tmov "..argcs.reg.n..", a0")
 		text("\tmov "..func.argvoff.n..", sp")
 
-		if savedsz == 0 then
+		if popped == 0 then
 			text("\tadd "..func.argvoff.n..", "..saved*4+4)
 		end
 	end
 
-	if savedsz + func.allocated > 0 then
-		text("\tsub sp, " .. savedsz + func.allocated)
+	if saved*4 + popped*4 + func.allocated > 0 then
+		if popped == 0 then
+			if func.allocated > 0 then
+				text("\tsub sp, " .. func.allocated)
+			end
+		else
+			text("\tsub sp, " .. saved*4 + popped*4 + func.allocated + 4)
+		end
 	end
 
 	-- append fn text
@@ -1559,10 +1560,8 @@ function cg.func(func)
 	end
 
 	if reached then
-		text("\tsub sp, ".. saved*4 + func.allocated + 4)
-	end
-
-	if func.allocated > 0 then
+		text("\tsub sp, ".. saved*4 + 4)
+	elseif func.allocated > 0 then
 		text("\tadd sp, "..func.allocated)
 	end
 

@@ -1139,7 +1139,7 @@ local muttable = {
 
 		local extraargs = 0
 
-		local extraret = 0
+		local extraret = math.max(#op.rets-4, 0)
 
 		if #op.rets > 4 then
 			extraret = #op.rets - 4
@@ -1154,9 +1154,7 @@ local muttable = {
 			an = 0
 		end
 
-		if #op.fin > 4 then
-			extraargs = #op.fin - 4 + an
-		end
+		extraargs = math.max(#op.fin - 4 + an, 0)
 
 		local savareasize = math.max(extraargs+#op.argv, extraret)*4
 

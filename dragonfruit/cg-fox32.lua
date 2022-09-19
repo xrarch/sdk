@@ -1466,6 +1466,9 @@ function cg.func(func)
 		text(".global "..func.name)
 	end
 
+	text("\tpush fp")
+	text("\tmov  fp, sp")
+
 	local saved = 0
 
 	for i = 0, SAVEMAX do
@@ -1492,7 +1495,7 @@ function cg.func(func)
 		ac = ac + 1
 
 		if (ac == 4) and (i ~= 1) then
-			text("\tadd sp, ".. saved*4 + 4)
+			text("\tadd sp, ".. saved*4 + 8)
 			popped = 0
 
 			for j = 1, i-1 do
@@ -1515,7 +1518,7 @@ function cg.func(func)
 		text("\tmov "..func.argvoff.n..", sp")
 
 		if popped == 0 then
-			text("\tadd "..func.argvoff.n..", "..saved*4+4)
+			text("\tadd "..func.argvoff.n..", "..saved*4+8)
 		end
 	end
 
@@ -1525,7 +1528,7 @@ function cg.func(func)
 				text("\tsub sp, " .. func.allocated)
 			end
 		else
-			text("\tsub sp, " .. saved*4 + popped*4 + func.allocated + 4)
+			text("\tsub sp, " .. saved*4 + popped*4 + func.allocated + 8)
 		end
 	end
 
@@ -1548,7 +1551,7 @@ function cg.func(func)
 			vc = vc + 1
 
 			if (vc == 4) and (#func.out > 4) then
-				text("\tadd sp, ".. saved*4 + func.allocated + (#func.out-4)*4 + 4)
+				text("\tadd sp, ".. saved*4 + func.allocated + (#func.out-4)*4 + 8)
 
 				reached = true
 			end
@@ -1560,7 +1563,7 @@ function cg.func(func)
 	end
 
 	if reached then
-		text("\tsub sp, ".. saved*4 + 4)
+		text("\tsub sp, ".. saved*4 + 8)
 	elseif func.allocated > 0 then
 		text("\tadd sp, "..func.allocated)
 	end
@@ -1571,6 +1574,7 @@ function cg.func(func)
 		end
 	end
 
+	text("\tpop  fp")
 	text("\tret")
 
 	curfn = nil

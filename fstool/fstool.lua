@@ -84,9 +84,9 @@ local function writefile(fs, destpath, srcpath, update, mode, force, suffix)
 			-- dear god.
 
 			if bsdstat then
-				statcmd = "stat -f %m "..srcpath
+				statcmd = "stat -f %m "..srcpath..suffix
 			else
-				statcmd = "stat -c %Y "..srcpath
+				statcmd = "stat -c %Y "..srcpath..suffix
 			end
 
 			local sf = io.popen(statcmd)

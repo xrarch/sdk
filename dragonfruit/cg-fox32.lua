@@ -1141,10 +1141,6 @@ local muttable = {
 
 		local extraret = math.max(#op.rets-4, 0)
 
-		if #op.rets > 4 then
-			extraret = #op.rets - 4
-		end
-
 		local an
 
 		if op.fn.varin then

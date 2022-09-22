@@ -78,7 +78,7 @@ local function writefile(fs, destpath, srcpath, update, mode, force, suffix)
 			node.chmod(mode)
 		end
 	else
-		if not created then
+		if (not created) and (update) then
 			local statcmd
 
 			-- dear god.
@@ -174,8 +174,8 @@ else
 			usage()
 			os.exit(1)
 		end
-	elseif (cmd == "wd") or (cmd == "ud") or (cmd == "udf") then
-		local update = (cmd == "ud")
+	elseif (cmd == "wd") or (cmd == "ud") or (cmd == "udf") or (cmd == "wdf") then
+		local update = ((cmd == "ud") or (cmd == "udf"))
 
 		if arg[3] and arg[4] then
 			local inf = io.open(arg[4], "r")
@@ -196,7 +196,7 @@ else
 					local comp = explode(" ", line)
 
 					if (#comp == 2) or (#comp == 3) then
-						writefile(fs, arg[3].."/"..comp[1], comp[2], update, comp[3], (cmd == "udf"), arg[5])
+						writefile(fs, arg[3].."/"..comp[1], comp[2], update, comp[3], ((cmd == "udf") or (cmd == "wdf")), arg[5])
 					end
 				end
 

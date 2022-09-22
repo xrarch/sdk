@@ -454,7 +454,7 @@ eval.immop = {
 		if (op1.kind == "num") then
 			local n = 0
 
-			if op2.ident < 0 then
+			if op1.ident < 0 then
 				n = 1
 			end
 
@@ -473,7 +473,7 @@ eval.immop = {
 		if (op1.kind == "num") then
 			local n = 0
 
-			if op2.ident > 0 then
+			if op1.ident > 0 then
 				n = 1
 			end
 

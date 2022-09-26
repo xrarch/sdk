@@ -181,7 +181,7 @@ else
 			local inf = io.open(arg[4], "r")
 
 			if not inf then
-				if cmd == "udf" then
+				if (cmd == "udf") or (cmd == "wdf") then
 					os.exit(0)
 				end
 

@@ -509,6 +509,8 @@ function fat.mount(image, offset, noroot)
 			node.entry = 0xFFFFFFFF
 			node.size = 0
 
+			node.blocks = {}
+
 			node.dirty = true
 		end
 

@@ -1316,7 +1316,7 @@ function asm.assemble(codestring, filename, isa, encoder)
 	end
 	]]
 
-	constants["__DATE"] = os.date()
+	constants["__DATE"] = os.date("%Y-%m-%d")
 
 	if not asm.labels(isa, sections, lines, sectionsbyid) then return false end
 

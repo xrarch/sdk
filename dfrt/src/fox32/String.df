@@ -8,6 +8,9 @@ asm "
 ;a2 - ptr
 memset:
 .global memset
+	push fp
+	mov  fp, sp
+
 	mov  r31, a1
 	srl  r31, 2
 	ifz  jmp .skip
@@ -29,6 +32,7 @@ memset:
 	rloop .byteloop
 
 .skipbyte:
+	pop  fp
 	ret
 
 ;a0 - size
@@ -36,6 +40,9 @@ memset:
 ;a2 - dest
 memcpy:
 .global memcpy
+	push fp
+	mov  fp, sp
+
 	mov  r31, a0
 	srl  r31, 2
 	ifz  jmp .skip
@@ -58,12 +65,17 @@ memcpy:
 	rloop .byteloop
 
 .skipbyte:
+	pop  fp
 	ret
 
 ;a0 - size
 ;a1 - src
 ;a2 - dest
-memcpybck:
+memcpy_bck:
+.global memcpy_bck
+	push fp
+	mov  fp, sp
+
 	mov  r31, a0
 	srl  r31, 2
 	ifz  jmp .skip
@@ -89,19 +101,53 @@ memcpybck:
 	rloop .byteloop
 
 .skipbyte:
+	pop  fp
+	ret
+
+;a0 - size
+;a1 - src
+;a2 - dest
+memmove:
+.global memmove
+	cmp  a1, a2
+	iflt jmp .backwards
+	jmp  memcpy
+.backwards:
+	jmp  memcpy_bck
+
+;a0 - max
+;a1 - src
+;a2 - dest
+strncpy:
+.global strncpy
+	push fp
+	mov  fp, sp
+
+	mov  t2, 0
+
+.loop:
+	cmp  a0, 0
+	ifz  jmp .done
+	mov  t0, a1
+	add  t0, t2
+	mov  t1, a2
+	add  t1, t2
+	mov.8 t3, [t0]
+	mov.8 [t1], t3
+	add  t2, 1
+	sub  a0, 1
+	cmp  t3, 0
+	ifnz jmp .loop
+
+.done:
+	mov  t1, a2
+	add  t1, t2
+	mov.8 [t1], 0
+
+	pop  fp
 	ret
 
 "
-
-extern memcpybck { dest src size -- }
-
-fn memmove { dest src size -- }
-	if (src@ dest@ <)
-		dest@ src@ size@ memcpybck
-	end else
-		dest@ src@ size@ memcpy
-	end
-end
 
 fn strcmp { str1 str2 -- eq }
 	while (str1@ gb str2@ gb ==)
@@ -119,19 +165,6 @@ end
 
 fn strcpy { dest src -- }
 	while (src@ gb 0 ~=)
-		src@ gb dest@ sb
-
-		1 dest +=
-		1 src +=
-	end
-
-	0 dest@ sb
-end
-
-fn strncpy { dest src max -- }
-	dest@ max@ + max!
-
-	while (src@ gb 0 ~= dest@ max@ < &&)
 		src@ gb dest@ sb
 
 		1 dest +=

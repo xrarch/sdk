@@ -552,6 +552,16 @@ local instructions = {
 		1
 	},
 	{
+		"idiv",
+		0x34,
+		2
+	},
+	{
+		"irem",
+		0x35,
+		2
+	},
+	{
 		"rta",
 		0x39,
 		2,

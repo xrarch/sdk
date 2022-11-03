@@ -301,20 +301,18 @@ if stubs then
 					if not offsetsp then
 						offsetsp = true
 						offsetby = savedneeded*4+4
-						stubs:write(string.format("\tadd  sp, %d\n", savedneeded*4+4))
+						stubs:write(string.format("\tmov  r31, sp\n"))
+						stubs:write(string.format("\tadd  r31, %d\n", offsetby))
 					end
 
-					stubs:write(string.format("\tpop  %s\n", regnames[bckreg]))
+					stubs:write(string.format("\tmov  %s, [r31]\n", regnames[bckreg]))
+					stubs:write(string.format("\tadd  r31, 4\n"))
 
 					offsetby = offsetby + 4
 					bckreg = bckreg - 1
 				end
 
 				regnum = regnum + 1
-			end
-
-			if offsetsp then
-				stubs:write(string.format("\tsub  sp, %d\n", offsetby))
 			end
 
 			offsetsp = false
@@ -334,18 +332,16 @@ if stubs then
 					if not offsetsp then
 						offsetsp = true
 						offsetby = savedneeded*4+4 + ((#sys.rets-ARGCOUNT)*4)
-						stubs:write(string.format("\tadd  sp, %d\n", offsetby))
+						stubs:write(string.format("\tmov  r31, sp\n"))
+						stubs:write(string.format("\tadd  r31, %d\n", offsetby))
 					end
 
-					stubs:write(string.format("\tpush %s\n", regnames[regnum]))
+					stubs:write(string.format("\tsub  r31, 4\n"))
+					stubs:write(string.format("\tmov  %s, [r31]\n", regnames[regnum]))
 					offsetby = offsetby - 4
 				end
 
 				regnum = regnum - 1
-			end
-
-			if offsetsp then
-				stubs:write(string.format("\tadd  sp, %d\n", offsetby))
 			end
 
 			stubs:write("\n")

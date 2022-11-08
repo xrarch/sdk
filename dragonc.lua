@@ -15,6 +15,7 @@ local sd = getdirectory(arg[0])
 
 local flat = false
 local incdir = ""
+local libdir = ""
 local target = "target=limn2600"
 local format = "format=xloff"
 local preprocargs = " "
@@ -29,6 +30,8 @@ for k,v in ipairs(arg) do
 		asmout = true
 	elseif v:sub(1,7) == "incdir=" then
 		incdir = v
+	elseif v:sub(1,7) == "libdir=" then
+		libdir = v
 	elseif v:sub(1,7) == "target=" then
 		target = v
 	elseif v:sub(1,7) == "format=" then
@@ -62,7 +65,7 @@ for i = 1, #narg/2 do
 end
 
 local lua = sd.."lua.sh "
-local preproc = sd.."preproc/preproc.lua "..incdir.." "..preprocargs
+local preproc = sd.."preproc/preproc.lua "..incdir.." "..libdir.." "..preprocargs
 local dragonc = sd.."dragonfruit/dragonc.lua "..target.." "
 local asm = sd.."asmfx/asmfx.lua "..format.." "..target.." "
 

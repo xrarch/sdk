@@ -41,6 +41,7 @@ function explode(d,p)
 end
 
 local incdir = {}
+local libdir = {}
 local narg = {}
 local symbols = {}
 
@@ -49,6 +50,10 @@ for k,v in ipairs(arg) do
 		local incs = v:sub(8)
 
 		incdir = explode(":", incs)
+	elseif v:sub(1,7) == "libdir=" then
+		local libs = v:sub(8)
+
+		libdir = explode(":", libs)
 	else
 		local off = string.find(v, "=")
 
@@ -197,11 +202,21 @@ function preproc(name, srcf, destf)
 								realpath = sd.."/../headers/dfrt/"..incpath:sub(6)
 								f = io.open(realpath, "r")
 							elseif incpath:sub(1,5) == "<ll>/" then
-								realpath = sd.."/../headers/"..incpath:sub(6)
-								f = io.open(realpath, "r")
-							elseif incpath:sub(1,6) == "<inc>/" then
-								realpath = sd.."/../headers/"..incpath:sub(6)
+								local rpath = incpath:sub(6)
 
+								for _,path in ipairs(libdir) do
+									realpath = path.."/"..rpath
+
+									f = io.open(realpath)
+
+									if f then break end
+								end
+
+								if not f then
+									realpath = sd.."/../headers/"..rpath
+									f = io.open(realpath, "r")
+								end
+							elseif incpath:sub(1,6) == "<inc>/" then
 								local rpath = incpath:sub(7)
 
 								for _,path in ipairs(incdir) do

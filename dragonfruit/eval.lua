@@ -193,6 +193,27 @@ eval.immop = {
 
 		return
 	end,
+	["_max"] = function (s, tok)
+		local op1 = s.pop(tok)
+		if not op1 then return false end
+
+		local op2 = s.pop(tok)
+		if not op2 then return false end
+
+		if (op1.kind == "num") and (op2.kind == "num") then
+			if op1.ident > op2.ident then
+				s.push(stacknode_t("num", op1.ident, tok))
+			else
+				s.push(stacknode_t("num", op2.ident, tok))
+			end
+			return
+		else
+			lerror(tok, "_max only works with constant values")
+			return false
+		end
+
+		return
+	end,
 	["&&"] = function (s, tok)
 		local op1 = s.pop(tok)
 		if not op1 then return false end

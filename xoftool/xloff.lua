@@ -1128,12 +1128,12 @@ function xloff.new(filename)
 	end
 
 	function img:gettextsection()
-		-- return first section with TEXT flag
+		-- return first section called text
 
 		for i = 0, self.sectioncount-1 do
 			local section = self.sectionsbyid[i]
 
-			if band(section.flags, XLOFFSECTIONFLAG_TEXT) ~= 0 then
+			if section.name == "text" then
 				return section
 			end
 		end

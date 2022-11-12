@@ -57,16 +57,42 @@ end
 
 local cmd = arg[2]
 
-local function writefile(fs, destpath, srcpath, update, mode, force, suffix)
+local function writefile(fs, destpath, srcpath, update, mode, force, suffix, uid)
 	if not suffix then suffix = "" end
+
+	if srcpath == "-" then
+		srcpath = nil
+	end
+
+	if mode == "-" then
+		mode = nil
+	end
+
+	if uid == "-" then
+		uid = nil
+	end
 
 	local node, errmsg, _1, _2, created = fs:path(destpath, true)
 	if not node then
 		print("fstool: "..errmsg)
 		os.exit(1)
-	elseif node.kind == "dir" then
-		print("fstool: "..arg[3].." is a directory")
+	elseif node.kind == "dir" and srcpath then
+		print("fstool: "..destpath.." is a directory")
 		os.exit(1)
+	end
+
+	if created then
+		if mode then
+			node.chmod(mode)
+		end
+
+		if uid then
+			node.chown(uid)
+		end
+	end
+
+	if not srcpath then
+		return
 	end
 
 	local inf = io.open(srcpath..suffix, "rb")
@@ -74,8 +100,6 @@ local function writefile(fs, destpath, srcpath, update, mode, force, suffix)
 		if not force then
 			print("fstool: couldn't open "..srcpath)
 			os.exit(1)
-		elseif created and mode then
-			node.chmod(mode)
 		end
 	else
 		if (not created) and (update) then
@@ -195,8 +219,8 @@ else
 				if (#line > 0) and (line:sub(1,1) ~= "#") then
 					local comp = explode(" ", line)
 
-					if (#comp == 2) or (#comp == 3) then
-						writefile(fs, arg[3].."/"..comp[1], comp[2], update, comp[3], ((cmd == "udf") or (cmd == "wdf")), arg[5])
+					if #comp > 0 then
+						writefile(fs, arg[3].."/"..comp[1], comp[2], update, comp[3], ((cmd == "udf") or (cmd == "wdf")), arg[5], comp[4])
 					end
 				end
 

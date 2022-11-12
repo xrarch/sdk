@@ -966,6 +966,11 @@ function asm.labels(isa, sections, lines, sectionsbyid)
 		end
 	end
 
+	if not currentsection then
+		print("no section selected")
+		return false
+	end
+
 	return true
 end
 

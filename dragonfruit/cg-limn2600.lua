@@ -25,11 +25,17 @@ cg.wordsize = 4
 local textsections = {}
 local textsectionsi = {}
 
-local rodatasections = {}
+local rosections = {}
+local rosectionsi = {}
 
-local datasection
+local bsssections = {}
+local bsssectionsi = {}
 
-local bsssection
+local datasections = {}
+local datasectionsi = {}
+
+local currentdatasection = "data"
+local currentbsssection = "bss"
 
 local defs
 
@@ -52,43 +58,65 @@ local function atext(str)
 end
 
 local function data(str)
-	datasection = datasection .. str .. "\n"
+	if not datasections[currentdatasection] then
+		datasections[currentdatasection] = ".section "..currentdatasection.."\n"
+		datasectionsi[#datasectionsi+1] = currentdatasection
+	end
+
+	datasections[currentdatasection] = datasections[currentdatasection] .. str .. "\n"
 end
 
 local function adata(str)
-	datasection = datasection .. str
+	if not datasections[currentdatasection] then
+		datasections[currentdatasection] = ".section "..currentdatasection.."\n"
+		datasectionsi[#datasectionsi+1] = currentdatasection
+	end
+
+	datasections[currentdatasection] = datasections[currentdatasection] .. str
 end
 
-local function rodata(str)
-	local section
-
-	if curfn then
-		section = curfn.section
-	else
+local function rodata(str, section)
+	if not section then
 		section = "text"
 	end
 
-	rodatasections["text"] = rodatasections["text"] .. str .. "\n"
+	if not rosections[section] then
+		rosections[section] = ".section "..section.."\n"
+		rosectionsi[#rosectionsi+1] = section
+	end
+
+	rosections[section] = rosections[section] .. str .. "\n"
 end
 
-local function arodata(str)
-	local section
-
-	if curfn then
-		section = curfn.section
-	else
+local function arodata(str, section)
+	if not section then
 		section = "text"
 	end
 
-	rodatasections["text"] = rodatasections["text"] .. str
+	if not rosections[section] then
+		rosections[section] = ".section "..section.."\n"
+		rosectionsi[#rosectionsi+1] = section
+	end
+
+	rosections[section] = rosections[section] .. str
 end
 
 local function bss(str)
-	bsssection = bsssection .. str .. "\n"
+	if not bsssections[currentbsssection] then
+		bsssections[currentbsssection] = ".section "..currentbsssection.."\n"
+		bsssectionsi[#bsssectionsi+1] = currentbsssection
+	end
+
+	bsssections[currentbsssection] = bsssections[currentbsssection] .. str .. "\n"
 end
 
 local function abss(str)
-	bsssection = bsssection .. str
+	if not bsssections[currentbsssection] then
+		bsssections[currentbsssection] = ".section "..currentbsssection.."\n"
+		bsssectionsi[#bsssectionsi+1] = currentbsssection
+	end
+
+	bsssections[currentbsssection] = bsssections[currentbsssection] .. str
 end
 
 local labln
@@ -111,25 +139,25 @@ end
 
 local strings = {}
 
-local function cstring(str, n)
+local function cstring(str, n, rosection)
 	if (not n) and strings[str] then
 		return strings[str]
 	end
 
 	local sno = n or label()
 
-	rodata(sno..":")
-	arodata('\t.ds "')
+	rodata(sno..":", rosection)
+	arodata('\t.ds "', rosection)
 
 	for i = 1, #str do
 		local c = str:sub(i,i)
 		if c == "\n" then
-			arodata("\\n")
+			arodata("\\n", rosection)
 		else
-			arodata(c)
+			arodata(c, rosection)
 		end
 	end
-	rodata('\\0"')
+	rodata('\\0"', rosection)
 
 	strings[str] = sno
 
@@ -812,7 +840,7 @@ function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, al
 
 		if not r then return false end
 
-		local l = cstring(node.ident)
+		local l = cstring(node.ident, nil, node.rosection)
 
 		loadimm(r, l)
 
@@ -1398,7 +1426,6 @@ function cg.func(func)
 
 	if not textsections[curfn.section] then
 		textsections[curfn.section] = ".section "..curfn.section.."\n"
-		rodatasections[curfn.section] = ""
 		textsectionsi[#textsectionsi+1] = curfn.section
 	end
 
@@ -1586,12 +1613,16 @@ function cg.gen(edefs, public, extern, asms, const)
 	defs = edefs
 
 	textsections["text"] = ".section text\n"
-	rodatasections["text"] = ""
 	textsectionsi[1] = "text"
 
-	datasection = ".section data\n"
+	datasections["data"] = ".section data\n"
+	datasectionsi[1] = "data"
 
-	bsssection = ".section bss\n"
+	bsssections["bss"] = ".section bss\n"
+	bsssectionsi[1] = "bss"
+
+	rosections["text"] = ".section text\n"
+	rosectionsi[1] = "text"
 
 	local defsection = ""
 
@@ -1610,6 +1641,14 @@ function cg.gen(edefs, public, extern, asms, const)
 	end
 
 	for k,v in pairs(defs) do
+		if v.datasection then
+			currentdatasection = v.datasection
+		end
+
+		if v.bsssection then
+			currentbsssection = v.bsssection
+		end
+
 		if v.kind == "var" then
 			if v.value == 0 then
 				bss(".align 4")
@@ -1651,7 +1690,7 @@ function cg.gen(edefs, public, extern, asms, const)
 				end
 
 				for k2,s in ipairs(strs) do
-					cstring(s[2], s[1])
+					cstring(s[2], s[1], v.rosection)
 				end
 			end
 		elseif v.kind == "fn" then
@@ -1667,17 +1706,37 @@ function cg.gen(edefs, public, extern, asms, const)
 		textsections["text"] = textsections["text"] .. asms[i] .. "\n"
 	end
 
+	local publics = ""
+
 	for k,v in pairs(public) do
-		bss(".global "..k)
+		publics = publics .. ".global "..k.."\n"
 	end
 
 	local texts = ""
 
 	for k,v in ipairs(textsectionsi) do
-		texts = texts .. textsections[v] .. rodatasections[v] .. ".align 4\n"
+		texts = texts .. textsections[v] .. ".align 4\n"
 	end
 
-	return defsection .. texts .. datasection .. bsssection
+	local rodatas = ""
+
+	for k,v in ipairs(rosectionsi) do
+		rodatas = rodatas .. rosections[v] .. ".align 4\n"
+	end
+
+	local datas = ""
+
+	for k,v in ipairs(datasectionsi) do
+		datas = datas .. datasections[v] .. ".align 4\n"
+	end
+
+	local bss = ""
+
+	for k,v in ipairs(bsssectionsi) do
+		bss = bss .. bsssections[v] .. ".align 4\n"
+	end
+
+	return defsection .. texts .. rodatas .. datas .. bss .. publics
 end
 
 return cg

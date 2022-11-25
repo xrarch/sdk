@@ -52,6 +52,14 @@ local function stacknode_t(kind, ident, errtok, opk, ...)
 	return n
 end
 
+local function stackdatanode_t(kind, ident, errtok, v)
+	local node = stacknode_t(kind, ident, errtok)
+
+	node.rosection = v.rosection
+
+	return node
+end
+
 local function stack_t()
 	local s = {}
 
@@ -1010,7 +1018,7 @@ function eval.blockeval(block, errtok, constant, rets, ixb)
 			if tok[2] == "number" then
 				s.push(stacknode_t("num", tok[1], tok))
 			elseif tok[2] == "string" then
-				s.push(stacknode_t("str", tok[1], tok))
+				s.push(stackdatanode_t("str", tok[1], tok, v))
 			elseif immop[tok[1]] then
 				if (mustend[tok[1]]) and (k ~= #block.block) then
 					lerror(tok, tok[1].." must be at the end of a block")
@@ -1308,6 +1316,9 @@ local function basicdef(symdef)
 	local mb = {}
 	mb.name = symdef.ident
 	mb.kind = symdef.kind
+	mb.datasection = symdef.datasection
+	mb.bsssection = symdef.bsssection
+	mb.rosection = symdef.rosection
 
 	local c = symdef.value
 

@@ -494,7 +494,7 @@ local function section_t(name)
 	section.origin = 0
 	section.offset = 0
 
-	if name == "bss" then
+	if name:sub(-3,-1) == "bss" then
 		section.bss = true
 	end
 

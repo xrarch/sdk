@@ -13,11 +13,18 @@ local function lerror(token, err)
 	print(string.format("dragonc: parser: %s:%d: %s", token[4], token[3], err))
 end
 
+local currentdatasection = "data"
+local currentbsssection = "bss"
+local currentrosection = "text"
+
 local function node_t(kind, errtok, ident)
 	local node = {}
 	node.ident = ident
 	node.kind = kind
 	node.errtok = errtok
+	node.datasection = currentdatasection
+	node.bsssection = currentbsssection
+	node.rosection = currentrosection
 	return node
 end
 
@@ -89,6 +96,9 @@ local function define(ident, kind, errtok, scoped, value)
 	d.errtok = errtok
 	d.value = value
 	d.scoped = scoped
+	d.datasection = currentdatasection
+	d.bsssection = currentbsssection
+	d.rosection = currentrosection
 
 	if scoped then
 		currentfn.def[ident] = d
@@ -454,6 +464,7 @@ function parser.block(endtok, defines)
 
 		if t[2] == "string" then
 			b[#b + 1] = node_t("lazy", t, t)
+			b[#b].rosection = currentrosection
 		elseif ident == "if" then
 			local pq = parser.pif()
 
@@ -477,6 +488,8 @@ function parser.block(endtok, defines)
 			end
 
 			currentfn.section = t[1]
+		elseif ident == "rosection" then
+			if not parser.rosection() then return false end
 		elseif ident == "pointerof" then
 			local pq = parser.pointerof()
 
@@ -870,6 +883,45 @@ function parser.public()
 	return true
 end
 
+function parser.datasection()
+	local t, ok = lex:expect("string")
+
+	if not ok then
+		lerror(t, "expected string, got "..t[2])
+		return false
+	end
+
+	currentdatasection = t[1]
+
+	return true
+end
+
+function parser.bsssection()
+	local t, ok = lex:expect("string")
+
+	if not ok then
+		lerror(t, "expected string, got "..t[2])
+		return false
+	end
+
+	currentbsssection = t[1]
+
+	return true
+end
+
+function parser.rosection()
+	local t, ok = lex:expect("string")
+
+	if not ok then
+		lerror(t, "expected string, got "..t[2])
+		return false
+	end
+
+	currentrosection = t[1]
+
+	return true
+end
+
 function parser.asm()
 	local t, ok = lex:expect("string")
 
@@ -927,6 +979,12 @@ function parser.parse(lexer, sourcetext, filename, incd, reserve, cg)
 			if not parser.def("buffer", true) then return false end
 		elseif ident == "struct" then
 			if not parser.struct() then return false end
+		elseif ident == "datasection" then
+			if not parser.datasection() then return false end
+		elseif ident == "bsssection" then
+			if not parser.bsssection() then return false end
+		elseif ident == "rosection" then
+			if not parser.rosection() then return false end
 		elseif ident == "asm" then
 			local pq = parser.asm()
 

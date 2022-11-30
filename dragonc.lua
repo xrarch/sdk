@@ -105,7 +105,7 @@ for k,v in ipairs(sourcef) do
 	-- is there a better way to do this? probably.
 	err = os.execute(lua..preproc..v.." "..pout)
 
-	if err > 0 then
+	if not err or (err > 0) then
 		os.execute("rm -f "..pout)
 		os.exit(1)
 	end
@@ -114,7 +114,7 @@ for k,v in ipairs(sourcef) do
 
 	os.execute("rm -f "..pout)
 
-	if err > 0 then os.exit(1) end
+	if not err or (err > 0) then os.exit(1) end
 
 	if asmout then
 		return
@@ -122,7 +122,7 @@ for k,v in ipairs(sourcef) do
 
 	err = os.execute(lua..asm..eout..destf[k])
 
-	if err > 0 then os.exit(1) end
+	if not err or (err > 0) then os.exit(1) end
 
 	os.execute("rm -f "..eout)
 end

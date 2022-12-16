@@ -123,26 +123,22 @@ strncpy:
 	push fp
 	mov  fp, sp
 
-	mov  t2, 0
-
 .loop:
 	cmp  a0, 0
 	ifz  jmp .done
-	mov  t0, a1
-	add  t0, t2
-	mov  t1, a2
-	add  t1, t2
-	mov.8 t3, [t0]
-	mov.8 [t1], t3
-	add  t2, 1
+	movz.8 t3, [a1]
+	mov.8 [a2], t3
+	add  a1, 1
+	add  a2, 1
 	sub  a0, 1
 	cmp  t3, 0
 	ifnz jmp .loop
 
+	pop  fp
+	ret
+
 .done:
-	mov  t1, a2
-	add  t1, t2
-	mov.8 [t1], 0
+	mov.8 [a2], 0
 
 	pop  fp
 	ret

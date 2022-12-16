@@ -771,6 +771,9 @@ strncpy:
 	subi a0, a0, 1
 	bne  t0, .loop
 
+	addi sp, sp, 4
+	ret
+
 .done:
 	mov  byte [a2 + t2], zero
 

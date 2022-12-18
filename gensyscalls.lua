@@ -388,7 +388,7 @@ if trampolines then
 	for i = 1, #syscalls do
 		local sys = syscalls[i]
 
-		trampolines:write(string.format("OST%s:\n.global OST%s\n", sys.name, sys.name))
+		trampolines:write(string.format("OST%s:\n", sys.name))
 
 		if arch == "limn2600" then
 			local tfoffset = (FIRSTREG-1)*4

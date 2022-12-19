@@ -449,6 +449,9 @@ if trampolines then
 			trampolines:write(string.format("\taddi sp, sp, %d\n", stackneeded + 4))
 			trampolines:write("\tret\n\n")
 		elseif arch == "fox32" then
+			trampolines:write("\tpush fp\n")
+			trampolines:write("\tmov  fp, sp\n")
+
 			local tfoffset = (FIRSTREG-1)*4
 
 			-- move all the arguments from the trapframe to their proper ABI register
@@ -513,6 +516,7 @@ if trampolines then
 
 			trampolines:write("\n")
 
+			trampolines:write("\tpop  fp\n")
 			trampolines:write("\tret\n\n")
 		end
 	end

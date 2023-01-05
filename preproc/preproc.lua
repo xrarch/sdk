@@ -14,7 +14,7 @@ local sd = getdirectory(arg[0])
 
 local function printhelp()
 	print("== preproc.lua ==")
-	print("preprocessor for LIMNstation cross-toolchain")
+	print("preprocessor for XR/station cross-toolchain")
 end
 
 function explode(d,p)

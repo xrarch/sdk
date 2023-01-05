@@ -1,5 +1,5 @@
 ifndef TARGET
-	TARGET := limn2600
+	TARGET := xr17032
 endif
 
 DFILES := $(wildcard ./src/*.df ./src/$(TARGET)/*.df)

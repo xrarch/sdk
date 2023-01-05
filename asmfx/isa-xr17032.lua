@@ -1,6 +1,6 @@
 local isa = {}
 
-isa.name = "limn2600"
+isa.name = "xr17032"
 
 isa.bits = 32
 
@@ -127,8 +127,8 @@ local RELOC_LIMN2500_LONG = 1
 local RELOC_LIMN2500_ABSJ = 2
 local RELOC_LIMN2500_LA   = 3
 
-local RELOC_LIMN2600_FAR_INT  = 4
-local RELOC_LIMN2600_FAR_LONG = 5
+local RELOC_XR17032_FAR_INT  = 4
+local RELOC_XR17032_FAR_LONG = 5
 
 function isa.reloctype(format, relocation)
 	-- returns a relocation type number
@@ -147,14 +147,14 @@ function isa.reloctype(format, relocation)
 		elseif operand.bits == 32 then
 			return RELOC_LIMN2500_LA
 		elseif operand.bits == 31 then
-			return RELOC_LIMN2600_FAR_INT
+			return RELOC_XR17032_FAR_INT
 		elseif operand.bits == 30 then
-			return RELOC_LIMN2600_FAR_LONG
+			return RELOC_XR17032_FAR_LONG
 		else
 			error("weird relocation")
 		end
 	else
-		print("asm: isa-limn2600: I don't support "..format.name)
+		print("asm: isa-xr17032: I don't support "..format.name)
 		return false
 	end
 end

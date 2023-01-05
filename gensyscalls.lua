@@ -152,7 +152,7 @@ local FIRSTARG
 
 local regnames
 
-if arch == "limn2600" then
+if arch == "xr17032" then
 	FIRSTREG   = 2
 	FIRSTSAVED = 11
 	LASTREG    = 27
@@ -205,7 +205,7 @@ if stubs then
 
 		stubs:write(string.format("%s:\n.global %s\n", sys.name, sys.name))
 
-		if arch == "limn2600" then
+		if arch == "xr17032" then
 			local savedneeded = math.max(#sys.args, #sys.rets) - FIRSTSAVED + FIRSTREG
 
 			local stackoffset = 4
@@ -390,7 +390,7 @@ if trampolines then
 
 		trampolines:write(string.format("OST%s:\n", sys.name))
 
-		if arch == "limn2600" then
+		if arch == "xr17032" then
 			local tfoffset = (FIRSTREG-1)*4
 
 			-- move all the arguments from the trapframe to their proper ABI register

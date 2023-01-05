@@ -14,7 +14,7 @@ local function tprint (tbl, indent)
 end
 
 local function lerror(token, err)
-	print(string.format("dragonc: cg-limn2600: %s:%d: %s", token[4], token[3], err))
+	print(string.format("dragonc: cg-xr17032: %s:%d: %s", token[4], token[3], err))
 end
 
 local cg = {}

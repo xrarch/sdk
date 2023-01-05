@@ -22,7 +22,7 @@ local function printhelp()
 	print("usage: asmfx.lua [source] [dest]")
 end
 
-local target = "limn2600"
+local target = "xr17032"
 
 local format = "xloff"
 

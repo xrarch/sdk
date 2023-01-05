@@ -62,7 +62,7 @@ local isas = {
 		archid = 4,
 		align = 4,
 	},
-	["limn2600"] = {
+	["xr17032"] = {
 		archid = 5,
 		align = 4,
 	}

@@ -55,7 +55,7 @@ local reloc_s = struct {
 }
 
 local isas = {
-	["limn2600"] = {
+	["xr17032"] = {
 		archid = 1,
 		align = 4,
 	},

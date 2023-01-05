@@ -16,7 +16,7 @@ local sd = getdirectory(arg[0])
 local flat = false
 local incdir = ""
 local libdir = ""
-local target = "target=limn2600"
+local target = "target=xr17032"
 local format = "format=xloff"
 local preprocargs = " "
 local asmout = false
@@ -45,7 +45,7 @@ end
 
 local function printhelp()
 	print("== dragonc.lua ==")
-	print("compiler for dragonfruit to loff/limn2600 object files")
+	print("compiler for dragonfruit to xloff/xr17032 object files")
 	print("(or flat binaries with the -flat argument)")
 	print("usage: dragonc.lua [source1 source2 ...] [dest1 dest2 ...]")
 end

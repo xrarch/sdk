@@ -123,9 +123,9 @@ function isa.relocate(sections)
 	return true
 end
 
-local RELOC_LIMN2500_LONG = 1
-local RELOC_LIMN2500_ABSJ = 2
-local RELOC_LIMN2500_LA   = 3
+local RELOC_XR17032_LONG = 1
+local RELOC_XR17032_ABSJ = 2
+local RELOC_XR17032_LA   = 3
 
 local RELOC_XR17032_FAR_INT  = 4
 local RELOC_XR17032_FAR_LONG = 5
@@ -141,11 +141,11 @@ function isa.reloctype(format, relocation)
 		end
 
 		if relocation.long then
-			return RELOC_LIMN2500_LONG
+			return RELOC_XR17032_LONG
 		elseif operand.bits == 29 then
-			return RELOC_LIMN2500_ABSJ
+			return RELOC_XR17032_ABSJ
 		elseif operand.bits == 32 then
-			return RELOC_LIMN2500_LA
+			return RELOC_XR17032_LA
 		elseif operand.bits == 31 then
 			return RELOC_XR17032_FAR_INT
 		elseif operand.bits == 30 then

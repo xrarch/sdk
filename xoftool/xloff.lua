@@ -59,9 +59,9 @@ local XLOFFRELOC_FOX32_JMP  = 4
 local XLOFFRELOC_FOX32_MDST = 5
 local XLOFFRELOC_FOX32_LDST = 6
 
-local XLOFFRELOC_LIMN2500_LONG     = 1
-local XLOFFRELOC_LIMN2500_ABSJ     = 2
-local XLOFFRELOC_LIMN2500_LA       = 3
+local XLOFFRELOC_XR17032_LONG     = 1
+local XLOFFRELOC_XR17032_ABSJ     = 2
+local XLOFFRELOC_XR17032_LA       = 3
 local XLOFFRELOC_XR17032_FAR_INT  = 4
 local XLOFFRELOC_XR17032_FAR_LONG = 5
 
@@ -77,9 +77,9 @@ archinfo[1].align = 4
 archinfo[1].id = 1
 
 archinfo[1].relocnames = {}
-archinfo[1].relocnames[XLOFFRELOC_LIMN2500_LONG]     = "LONG"
-archinfo[1].relocnames[XLOFFRELOC_LIMN2500_ABSJ]     = "ABSJ"
-archinfo[1].relocnames[XLOFFRELOC_LIMN2500_LA]       = "LA"
+archinfo[1].relocnames[XLOFFRELOC_XR17032_LONG]     = "LONG"
+archinfo[1].relocnames[XLOFFRELOC_XR17032_ABSJ]     = "ABSJ"
+archinfo[1].relocnames[XLOFFRELOC_XR17032_LA]       = "LA"
 archinfo[1].relocnames[XLOFFRELOC_XR17032_FAR_LONG] = "FARLONG"
 archinfo[1].relocnames[XLOFFRELOC_XR17032_FAR_INT]  = "FARINT"
 
@@ -87,11 +87,11 @@ archinfo[1].dofixup = function (tab, off, nval, rtype)
 	local old = gv32(tab, off)
 	local new = old
 
-	if rtype == XLOFFRELOC_LIMN2500_ABSJ then
+	if rtype == XLOFFRELOC_XR17032_ABSJ then
 		new = bor(band(old, 0x7), lshift(band(rshift(nval, 2), 0x1FFFFFFF), 3))
-	elseif rtype == XLOFFRELOC_LIMN2500_LONG then
+	elseif rtype == XLOFFRELOC_XR17032_LONG then
 		new = nval
-	elseif rtype == XLOFFRELOC_LIMN2500_LA then
+	elseif rtype == XLOFFRELOC_XR17032_LA then
 		local old2 = gv32(tab, off + 4)
 		local new2 = bor(lshift(band(nval, 0xFFFF), 16), band(old2, 0xFFFF))
 
@@ -128,12 +128,12 @@ archinfo[1].dostub = function (section, ptr)
 
 	sv32(section.data, stublocation, bor(lshift(rshift(ptr, 2), 3), 6))
 
-	return stublocation, 4, XLOFFRELOC_LIMN2500_ABSJ
+	return stublocation, 4, XLOFFRELOC_XR17032_ABSJ
 end
 
 archinfo[1].shouldredirect = function (section, fixup)
 	-- determine if a fixup should be redirected to a call stub.
-	return fixup.type == XLOFFRELOC_LIMN2500_ABSJ
+	return fixup.type == XLOFFRELOC_XR17032_ABSJ
 end
 
 archinfo[2] = {}

@@ -150,9 +150,9 @@ archinfo[2].relocnames[XLOFFRELOC_FOX32_MDST] = "MDST"
 archinfo[2].relocnames[XLOFFRELOC_FOX32_LDST] = "LDST"
 
 archinfo[2].dofixup = function (tab, off, nval, rtype)
-	if (rtype == XLOFFRELOC_FOX32_LONG) or (rtype == XLOFFRELOC_FOX32_JMP) then
+	if rtype == XLOFFRELOC_FOX32_LONG then
 		-- nothing
-	elseif rtype == XLOFFRELOC_FOX32_SRC then
+	elseif (rtype == XLOFFRELOC_FOX32_SRC) or (rtype == XLOFFRELOC_FOX32_JMP) then
 		off = off + 2
 	elseif rtype == XLOFFRELOC_FOX32_DEST then
 		off = off + 3

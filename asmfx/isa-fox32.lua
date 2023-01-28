@@ -686,7 +686,8 @@ function addFoxFormats(instr)
 					addFormat(
 						opinfo,
 						repeatbit("s", fbittage)..makeFoxOpcode(opcode, v2, 0, 0, opid),
-						f2.." "..opfmt
+						f2.." "..opfmt,
+						instr[4]
 					)
 				end
 			elseif opcount == 2 then
@@ -735,7 +736,8 @@ function addFoxFormats(instr)
 						addFormat(
 							opinfo,
 							repeatbit("d", dbittage)..repeatbit("s", sbittage)..makeFoxOpcode(opcode, v2, 0, did, sid),
-							f2.." "..dfmt.." "..sfmt
+							f2.." "..dfmt.." "..sfmt,
+							instr[4]
 						)
 					end
 				end

@@ -16,8 +16,8 @@ local function usage()
 	print("utility to manipulate aisixfat images")
 	print("usage: fstool.lua [image] [command] [args] ...")
 	print([[commands:
-  f:    format
-  i:    dump superblock info
+  f     format
+  i     dump superblock info
   wd    [dest] [src]: write files to directory dest as specified in file src
   w     [dest] [src]: write file from src to dest
   ud    [dest] [src]: same as wd but only if the src file was modified later than dest file

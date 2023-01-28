@@ -703,7 +703,13 @@ function asm.labels(isa, sections, lines, sectionsbyid)
 					return false
 				end
 
-				currentsection.bc = currentsection.bc + howmany
+				if howmany < 0 then
+					if currentsection.bc < math.abs(howmany) then
+						currentsection.bc = math.abs(howmany)
+					end
+				else
+					currentsection.bc = currentsection.bc + howmany
+				end
 			elseif t1 == ".org" then
 				if not currentsection then
 					lerror(line, "no section selected")
@@ -1017,13 +1023,26 @@ function asm.instr(isa, sections, lines, sectionsbyid)
 				which = myToNumber(which)
 
 				if not currentsection.bss then
-					for i = 1, howmany do
-						currentsection.data[currentsection.offset] = which
+					if howmany < 0 then
+						while currentsection.offset < math.abs(howmany) do
+							currentsection.data[currentsection.offset] = which
+							currentsection.offset = currentsection.offset + 1
 
-						currentsection.offset = currentsection.offset + 1
+						end
+					else
+						for i = 1, howmany do
+							currentsection.data[currentsection.offset] = which
+							currentsection.offset = currentsection.offset + 1
+						end
 					end
 				else
-					currentsection.offset = currentsection.offset + howmany
+					if howmany < 0 then
+						if currentsection.offset < math.abs(howmany) then
+							currentsection.offset = math.abs(howmany)
+						end
+					else
+						currentsection.offset = currentsection.offset + howmany
+					end
 				end
 			elseif t1 == ".static" then
 				-- include a binary file

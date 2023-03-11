@@ -13,7 +13,13 @@ local function tprint (tbl, indent)
 	end
 end
 
+local curtokhack
+
 local function lerror(token, err)
+	if not token then
+		token = curtokhack
+	end
+
 	print(string.format("dragonc: cg-xr17032: %s:%d: %s", token[4], token[3], err))
 end
 
@@ -580,6 +586,8 @@ local optable = {
 	["=="] = function (errtok, op, rootcanmut)
 		local rd = genarith(errtok, op.opers[1], op.opers[2], rootcanmut, 0xFFFF, "sub ", "subi")
 
+		if not rd then return false end
+
 		rd.inverse = true
 
 		return rd
@@ -793,6 +801,8 @@ local optable = {
 }
 
 function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, allowinverse, lockref, superallowdirectptr)
+	curtokhack = node.errtok
+
 	-- print(node)
 
 	if node.kind == "reg" then

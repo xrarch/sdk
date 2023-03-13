@@ -80,7 +80,7 @@ function isa.relocate(sections)
 			local nval = r.symbol.bc + r.symbol.section.origin
 
 			if r.long then
-				-- nothing
+				sv32(data, r.offset, nval)
 			elseif r.field == "s" then
 				sv32(data, r.offset + 2, nval)
 			elseif r.field == "d" then

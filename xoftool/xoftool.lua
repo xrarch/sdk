@@ -149,7 +149,7 @@ if command == "info" then
 elseif command == "symbols" then
     if not image:load() then os.exit(1) end
 
-    print(string.format("%-10s %-7s %-8s %-4s %s", "Section", "Type", "Value", "Flag", "Name"))
+    print(string.format("%-4s %-10s %-7s %-8s %-4s %s", "Index", "Section", "Type", "Value", "Flag", "Name"))
 
     for i = 0, image.symbolcount-1 do
         local symbol = image.symbolsbyid[i]
@@ -166,7 +166,7 @@ elseif command == "symbols" then
 
         local symtypename = xloff.symtypenames[symbol.type] or "UNKNOWN"
 
-        print(string.format("%-10s %-7s %-8x %-4x %s", section, symtypename, symbol.value, symbol.flags, name))
+        print(string.format("%-4d %-10s %-7s %-8x %-4x %s", i, section, symtypename, symbol.value, symbol.flags, name))
     end
 elseif command == "relocs" then
     if not image:load() then os.exit(1) end

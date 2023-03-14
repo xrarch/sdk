@@ -220,17 +220,7 @@ function format.encode(sections, symbols, isa, sectionsbyid)
 
 	local entrySymbol = 0xFFFFFFFF
 
-	local isymbols = {}
-
 	for k,v in pairs(symbols) do
-		isymbols[#isymbols + 1] = k
-	end
-
-	table.sort(isymbols)
-
-	for ky,va in ipairs(isymbols) do
-		local v = symbols[va]
-
 		if (v.type ~= "extern") or (v.erefs > 0) then
 			for k2, v2 in pairs(v.locallabels) do
 				if v2.rrefs > 0 then

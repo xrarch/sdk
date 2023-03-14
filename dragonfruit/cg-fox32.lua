@@ -1620,45 +1620,17 @@ function cg.gen(edefs, public, extern, asms, const)
 
 	--tprint(defs)
 
-	local iextern = {}
-	local iconst = {}
-	local idef = {}
-	local ipublic = {}
-
 	for k,v in pairs(extern) do
-		iextern[#iextern + 1] = k
+		defsection = defsection .. ".extern "..k.."\n"
 	end
 
 	for k,v in pairs(const) do
-		iconst[#iconst + 1] = k
-	end
-
-	for k,v in pairs(defs) do
-		idef[#idef + 1] = k
-	end
-
-	for k,v in pairs(public) do
-		ipublic[#ipublic + 1] = k
-	end
-
-	table.sort(iextern)
-	table.sort(iconst)
-	table.sort(idef)
-	table.sort(ipublic)
-
-	for k,v in ipairs(iextern) do
-		defsection = defsection .. ".extern "..v.."\n"
-	end
-
-	for k,v in ipairs(iconst) do
-		if not extern[v] then
-			defsection = defsection .. ".define "..v.." "..tostring(const[v]).."\n"
+		if not extern[k] then
+			defsection = defsection .. ".define "..k.." "..tostring(v).."\n"
 		end
 	end
 
-	for ky,va in ipairs(idef) do
-		local v = defs[va]
-
+	for k,v in pairs(defs) do
 		if v.datasection then
 			currentdatasection = v.datasection
 		end
@@ -1726,14 +1698,9 @@ function cg.gen(edefs, public, extern, asms, const)
 
 	local publics = ""
 
-	for k,v in ipairs(ipublic) do
-		publics = publics .. ".global "..v.."\n"
+	for k,v in pairs(public) do
+		publics = publics .. ".global "..k.."\n"
 	end
-
-	table.sort(textsectionsi)
-	table.sort(rosectionsi)
-	table.sort(datasectionsi)
-	table.sort(bsssectionsi)
 
 	local texts = ""
 

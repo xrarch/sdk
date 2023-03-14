@@ -1169,17 +1169,7 @@ function xloff.new(filename)
 		self.importsbyid[self.importcount] = import
 		self.importcount = self.importcount + 1
 
-		local isym = {}
-
-		for k,v in pairs(self.symbolsbyname) do
-			isym[#isym + 1] = k
-		end
-
-		table.sort(isym)
-
-		for i = 1, #isym do
-			local sym = self.symbolsbyname[isym[i]]
-
+		for k,sym in pairs(self.symbolsbyname) do
 			if sym.type == XLOFFSYMTYPE_EXTERN then
 				local lookup = withimg.symbolsbyname[sym.name]
 

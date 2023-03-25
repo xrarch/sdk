@@ -71,11 +71,71 @@ memcpy:
 ;a0 - size
 ;a1 - src
 ;a2 - dest
-memcpy_bck:
-.global memcpy_bck
+memmove_fwd:
 	push fp
 	mov  fp, sp
 
+; if src - dest > 3, we can do our tricks.
+; otherwise, this will cause horrible things to happen.
+
+	mov  t0, a1
+	sub  t0, a2
+	cmp  t0, 3
+	ifgt jmp .go
+
+	mov  r31, a0
+
+	jmp  .byteloop
+
+.go:
+	mov  r31, a0
+	srl  r31, 2
+	ifz  jmp .skip
+
+.wordloop:
+	mov  [a2], [a1]
+	add  a2, 4
+	add  a1, 4
+	rloop .wordloop
+
+.skip:
+	mov  r31, a0
+	and  r31, 3
+	ifz  jmp .skipbyte
+
+.byteloop:
+	mov.8 [a2], [a1]
+	add  a2, 1
+	add  a1, 1
+	rloop .byteloop
+
+.skipbyte:
+	pop  fp
+	ret
+
+;a0 - size
+;a1 - src
+;a2 - dest
+memmove_bck:
+	push fp
+	mov  fp, sp
+
+; if dest - src > 3, we can do our tricks.
+; otherwise, this will cause horrible things to happen.
+
+	mov  t0, a2
+	sub  t0, a1
+	cmp  t0, 3
+	ifgt jmp .go
+
+	mov  r31, a0
+
+	add  a1, a0
+	add  a2, a0
+
+	jmp  .byteloop
+
+.go:
 	mov  r31, a0
 	srl  r31, 2
 	ifz  jmp .skip
@@ -109,11 +169,18 @@ memcpy_bck:
 ;a2 - dest
 memmove:
 .global memmove
+	cmp  a0, 0
+	ifz  jmp .out
+
 	cmp  a1, a2
 	iflt jmp .backwards
-	jmp  memcpy
+	jmp  memmove_fwd
+
 .backwards:
-	jmp  memcpy_bck
+	jmp  memmove_bck
+
+.out:
+	ret
 
 ;a0 - max
 ;a1 - src

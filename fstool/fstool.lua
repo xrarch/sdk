@@ -57,7 +57,7 @@ end
 
 local cmd = arg[2]
 
-local function writefile(fs, destpath, srcpath, update, mode, force, suffix, uid)
+local function writefile(fs, destpath, srcpath, update, mode, force, suffix, uid, gid)
 	if not suffix then suffix = "" end
 
 	if srcpath == "-" then
@@ -70,6 +70,10 @@ local function writefile(fs, destpath, srcpath, update, mode, force, suffix, uid
 
 	if uid == "-" then
 		uid = nil
+	end
+
+	if gid == "-" then
+		gid = nil
 	end
 
 	local node, errmsg, _1, _2, created = fs:path(destpath, true)
@@ -88,6 +92,10 @@ local function writefile(fs, destpath, srcpath, update, mode, force, suffix, uid
 
 		if uid then
 			node.chown(uid)
+		end
+
+		if gid then
+			node.chgrp(gid)
 		end
 	end
 
@@ -220,7 +228,7 @@ else
 					local comp = explode(" ", line)
 
 					if #comp > 0 then
-						writefile(fs, arg[3].."/"..comp[1], comp[2], update, comp[3], ((cmd == "udf") or (cmd == "wdf")), arg[5], comp[4])
+						writefile(fs, arg[3].."/"..comp[1], comp[2], update, comp[3], ((cmd == "udf") or (cmd == "wdf")), arg[5], comp[4], comp[5])
 					end
 				end
 
@@ -312,6 +320,24 @@ else
 			end
 
 			local ok, errmsg = node.chown(tonumber(arg[4]))
+
+			if not ok then
+				print("fstool: "..errmsg)
+				os.exit(1)
+			end
+		else
+			usage()
+			os.exit(1)
+		end
+	elseif cmd == "chgrp" then
+		if arg[3] and tonumber(arg[4]) then
+			local node, errmsg = fs:path(arg[3])
+			if not node then
+				print("fstool: "..errmsg)
+				os.exit(1)
+			end
+
+			local ok, errmsg = node.chgrp(tonumber(arg[4]))
 
 			if not ok then
 				print("fstool: "..errmsg)

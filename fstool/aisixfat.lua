@@ -39,7 +39,7 @@ local inode_s = struct {
 	{4, "iparent"},
 	{4, "timestamp"},
 	{4, "startblock"},
-	{4, "RESERVED"},
+	{4, "gid"},
 	{4, "bytesize"},
 }
 
@@ -193,15 +193,18 @@ function fat.mount(image, offset, noroot)
 
 	function fs.isetup(parent, ino, kind)
 		local uid
+		local gid
 		local permissions
 		local iparent
 
 		if parent then
 			uid = parent.uid
+			gid = parent.gid
 			permissions = parent.permissions
 			iparent = parent.inum
 		else
 			uid = 0
+			gid = 0
 			permissions = 493
 			iparent = 1 -- root inode, iparent is 1 (itself)
 		end
@@ -213,6 +216,7 @@ function fat.mount(image, offset, noroot)
 		ino.kind = kind
 		ino.entry = 0xFFFFFFFF
 		ino.uid = uid
+		ino.gid = gid
 		ino.permissions = permissions
 		ino.size = 0
 		ino.iparent = iparent
@@ -244,6 +248,7 @@ function fat.mount(image, offset, noroot)
 		node.parent = parent
 		node.size = 0
 		node.uid = 0
+		node.gid = 0
 		node.permissions = 0
 		node.dirty = false
 		node.blocks = {}
@@ -288,6 +293,7 @@ function fat.mount(image, offset, noroot)
 
 		node.permissions = ino_s.gv("permissions")
 		node.uid = ino_s.gv("uid")
+		node.gid = ino_s.gv("gid")
 		node.entry = ino_s.gv("startblock")
 		node.size = ino_s.gv("bytesize")
 		node.iparent = ino_s.gv("iparent")
@@ -315,6 +321,14 @@ function fat.mount(image, offset, noroot)
 
 		function node.chown(uid)
 			node.uid = uid
+
+			node.dirty = true
+
+			return true
+		end
+
+		function node.chgrp(gid)
+			node.gid = gid
 
 			node.dirty = true
 
@@ -364,6 +378,7 @@ function fat.mount(image, offset, noroot)
 
 			ino_s.sv("permissions", node.permissions)
 			ino_s.sv("uid", node.uid)
+			ino_s.sv("gid", node.gid)
 			ino_s.sv("startblock", node.entry)
 			ino_s.sv("bytesize", node.size)
 			ino_s.sv("iparent", node.iparent)

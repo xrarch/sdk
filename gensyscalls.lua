@@ -271,6 +271,9 @@ if stubs then
 
 			stubs:write("\tret\n\n")
 		elseif arch == "fox32" then
+			stubs:write("\tpush fp\n")
+			stubs:write("\tmov  fp, sp\n\n")
+
 			local savedneeded = math.max(#sys.args, #sys.rets) - FIRSTSAVED + FIRSTREG
 
 			if savedneeded < 0 then
@@ -300,7 +303,7 @@ if stubs then
 				else
 					if not offsetsp then
 						offsetsp = true
-						offsetby = savedneeded*4+4
+						offsetby = savedneeded*4+8
 						stubs:write(string.format("\tmov  r31, sp\n"))
 						stubs:write(string.format("\tadd  r31, %d\n", offsetby))
 					end
@@ -331,7 +334,7 @@ if stubs then
 				else
 					if not offsetsp then
 						offsetsp = true
-						offsetby = savedneeded*4+4 + ((#sys.rets-ARGCOUNT)*4)
+						offsetby = savedneeded*4+8 + ((#sys.rets-ARGCOUNT)*4)
 						stubs:write(string.format("\tmov  r31, sp\n"))
 						stubs:write(string.format("\tadd  r31, %d\n", offsetby))
 					end
@@ -352,6 +355,7 @@ if stubs then
 				end
 			end
 
+			stubs:write("\tpop  fp\n")
 			stubs:write("\tret\n\n")
 		end
 	end

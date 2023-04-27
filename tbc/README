@@ -1,0 +1,4 @@
+Tower Bootstrap Compiler
+
+Tower -> C compiler for use in writing the real self-hosted compiler.
+Won't be maintained after that compiler is complete.

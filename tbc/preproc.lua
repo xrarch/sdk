@@ -8,29 +8,6 @@ local function getdirectory(p)
 	return "./"
 end
 
-function explode(d,p)
-	local t, ll
-	t={}
-	ll=0
-	if(#p == 1) then return {p} end
-		while true do
-			while p:sub(1,1) == d do
-				p = p:sub(2)
-			end
-
-			l=string.find(p,d,ll,true) -- find the next d in the string
-			if l~=nil then -- if "not not" found then..
-				table.insert(t, string.sub(p,ll,l-1)) -- Save it in our array.
-				ll=l+1 -- save just after where we found it for searching next time.
-			else
-				table.insert(t, string.sub(p,ll)) -- Save what's left in our array.
-				break -- Break at end, as it should be, according to the lua manual.
-			end
-		end
-
-	return t
-end
-
 local includedalready
 
 require("sb")
@@ -74,7 +51,7 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 		end
 	end
 
-	srctext.append(string.format("@%s %d\n", name, 1))
+	srctext.append(string.format("#%s %d\n", name, 1))
 
 	while true do
 		local c = srcf:read(1)
@@ -192,7 +169,7 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 
 								srctext.append(npp)
 
-								srctext.append(string.format("@%s %d\n", name, line))
+								srctext.append(string.format("#%s %d\n", name, line))
 							end
 						else
 							print(string.format("tbc: %s:%d: malformed include", name, line))

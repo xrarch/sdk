@@ -20,7 +20,7 @@ end
 
 local tbcdir = getdirectory(arg[0])
 
-local function explode(d,p)
+function _G.explode(d,p)
 	local t, ll
 	t={}
 	ll=0

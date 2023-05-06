@@ -6,7 +6,7 @@ function parser.parse(filename, file, incdir, libdir, symbols)
 	local lex = lexer.new(filename, file, incdir, libdir, symbols)
 
 	while true do
-		local token = lex.nextToken()
+		local token = lex.nextNonemptyToken()
 
 		if token.eof then
 			break

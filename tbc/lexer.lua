@@ -306,6 +306,28 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 		return token
 	end
 
+	function lex.nextNonemptyToken(stopnl)
+		while true do
+			local token = lex.nextToken()
+
+			if token.eof then
+				return token
+			end
+
+			if token.length ~= 0 then
+				return token
+			end
+
+			if token.literal then
+				return token
+			end
+
+			if stopnl and token.newline then
+				return token
+			end
+		end
+	end
+
 	function lex.lastToken()
 		-- un-consume the last token so that it will be returned again
 		-- by nextToken in an identical fashion to the last time it was

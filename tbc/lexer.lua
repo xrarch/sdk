@@ -42,19 +42,19 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 	lex.length = #lex.srctext
 
 	lex.position = 0
-	lex.lineNumber = 1
-	lex.fileName = filename
+	lex.linenumber = 1
+	lex.filename = filename
 	lex.newline = true
 
-	lex.lastPosition = 0
-	lex.lastLineNumber = 1
-	lex.lastFileName = filename
+	lex.lastposition = 0
+	lex.lastlinenumber = 1
+	lex.lastfilename = filename
 
 	function lex.nextCharRaw()
 		-- return the next character at the current position in the input
 		-- stream.
 
-		local lastln = lex.lineNumber
+		local lastln = lex.linenumber
 		local lastpos
 		local char
 
@@ -68,7 +68,7 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 
 			lastpos = lex.position
 			lex.position = lex.position + 1
-			lex.lineNumber = lex.lineNumber + 1
+			lex.linenumber = lex.linenumber + 1
 			lex.newline = true
 
 			char = "\n"
@@ -83,7 +83,7 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 		lex.position = lex.position + 1
 
 		if char == "\n" then
-			lex.lineNumber = lex.lineNumber + 1
+			lex.linenumber = lex.linenumber + 1
 			lex.newline = true
 		else
 			lex.newline = false
@@ -96,7 +96,7 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 		-- return next character with processing for the @ directives from the
 		-- preprocessor.
 
-		local lastfn = lex.fileName
+		local lastfn = lex.filename
 
 		local nl = lex.newline
 
@@ -132,17 +132,18 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 			return char, lastpos, lastln, lastfn
 		end
 
-		lastfn = lex.fileName
-		lex.fileName = dirt[1]
-		lex.lineNumber = tonumber(dirt[2])
+		lastfn = lex.filename
+		lex.filename = dirt[1]
+		lex.linenumber = tonumber(dirt[2])
 
 		return char, lastpos, lastln, lastfn
 	end
 
-	local LEXSTATE_NORMAL = 1
-	local LEXSTATE_STRING = 2
+	local LEXSTATE_NORMAL  = 1
+	local LEXSTATE_STRING  = 2
+	local LEXSTATE_CHARLIT = 3
 
-	function lex.nextToken()
+	function lex.nextTokenRaw()
 		-- return a table representing a token, or nil if no next token.
 
 		local firstpos = 0
@@ -156,12 +157,14 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 
 		local token = {}
 		token.str = ""
+		token.value = nil
 		token.length = 0
 		token.eof = false
 		token.newline = false
 		token.literal = false
-		token.lineNumber = lex.lineNumber
-		token.fileName = lex.fileName
+		token.charliteral = false
+		token.linenumber = lex.linenumber
+		token.filename = lex.filename
 
 		function add(char)
 			token.str = token.str .. char
@@ -178,8 +181,8 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 			end
 
 			if nolastyet then
-				token.lineNumber = lex.lineNumber
-				token.fileName = lex.fileName
+				token.linenumber = lex.linenumber
+				token.filename = lex.filename
 
 				firstpos = lastpos
 				firstln = lastln
@@ -194,8 +197,31 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 					goto continue
 				end
 
-				add(char)
+				local ch
 
+				if char == "n" then
+					ch = "\n"
+				elseif char == "r" then
+					ch = string.char(0xD)
+				elseif char == "t" then
+					ch = "\t"
+				elseif char == "b" then
+					ch = "\b"
+				elseif char == "[" then
+					ch = string.char(0x1B)
+				else
+					ch = char
+				end
+
+				add(ch)
+
+				if state == LEXSTATE_CHARLIT then
+					token.value = token.value * 256 + string.byte(ch)
+				end
+
+				goto continue
+			elseif char == "\\" then
+				isbackslash = true
 				goto continue
 			end
 
@@ -213,16 +239,34 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 					end
 				end
 
-				if char == "\\" then
-					isbackslash = true
-					goto continue
-				end
-
 				ignorewhitespace = false
 
 				if char == "\"" then
+					if token.length ~= 0 then
+						lex.position = lastpos
+						lex.linenumber = lastln
+						lex.filename = lastfn
+
+						break
+					end
+
 					token.literal = true
 					state = LEXSTATE_STRING
+
+					goto continue
+				elseif char == "'" then
+					if token.length ~= 0 then
+						lex.position = lastpos
+						lex.linenumber = lastln
+						lex.filename = lastfn
+
+						break
+					end
+
+					token.charliteral = true
+					token.value = 0
+					state = LEXSTATE_CHARLIT
+
 					goto continue
 				end
 
@@ -236,8 +280,8 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 
 					if token.length ~= 0 then
 						lex.position = lastpos
-						lex.lineNumber = lastln
-						lex.fileName = lastfn
+						lex.linenumber = lastln
+						lex.filename = lastfn
 
 						break
 					end
@@ -249,8 +293,8 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 					goto continue
 				elseif coalescechar then
 					lex.position = lastpos
-					lex.lineNumber = lastln
-					lex.fileName = lastfn
+					lex.linenumber = lastln
+					lex.filename = lastfn
 
 					break
 				end
@@ -258,8 +302,8 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 				if tmt == CHAR_SPLIT then
 					if (token.length ~= 0) or token.literal then
 						lex.position = lastpos
-						lex.lineNumber = lastln
-						lex.fileName = lastfn
+						lex.linenumber = lastln
+						lex.filename = lastfn
 
 						break
 					end
@@ -278,8 +322,8 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 						token.newline = true
 					elseif (char ~= " ") and (char ~= "\t") then
 						lex.position = lastpos
-						lex.lineNumber = lastln
-						lex.fileName = lastfn
+						lex.linenumber = lastln
+						lex.filename = lastfn
 					end
 
 					break
@@ -290,25 +334,40 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 				end
 
 				add(char)
+			elseif state == LEXSTATE_CHARLIT then
+				if char == "'" then
+					break
+				end
+
+				if char == "\\" then
+					isbackslash = true
+					goto continue
+				end
+
+				add(char)
+
+				token.value = token.value * 256 + string.byte(char)
 			end
 		end
 
 		if not nolastyet then
-			lex.lastPosition = firstpos
-			lex.lastLineNumber = firstln
-			lex.lastFileName = firstfn
+			lex.lastposition = firstpos
+			lex.lastlinenumber = firstln
+			lex.lastfilename = firstfn
 		end
 
 		if (token.length == 0) and not token.newline then
 			token.eof = true
+		elseif (not token.literal) and (not token.charliteral) then
+			token.value = tonumber(token.str)
 		end
 
 		return token
 	end
 
-	function lex.nextNonemptyToken(stopnl)
+	function lex.nextToken()
 		while true do
-			local token = lex.nextToken()
+			local token = lex.nextTokenRaw()
 
 			if token.eof then
 				return token
@@ -321,10 +380,6 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 			if token.literal then
 				return token
 			end
-
-			if stopnl and token.newline then
-				return token
-			end
 		end
 	end
 
@@ -335,9 +390,9 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 		-- state necessary to fetch any tokens before that has been lost by
 		-- now.
 
-		lex.position = lex.lastPosition
-		lex.lineNumber = lex.lastLineNumber
-		lex.fileName = lex.lastFileName
+		lex.position = lex.lastposition
+		lex.linenumber = lex.lastlinenumber
+		lex.filename = lex.lastfilename
 		lex.newline = false
 	end
 

@@ -89,6 +89,8 @@ package.path = package.path .. ";" .. tbcdir .. "?.lua"
 local parser = require("parser")
 local gen = require("gen")
 
+require("util")
+
 local inputfilename = arg[1]
 local outputfilename = arg[2]
 

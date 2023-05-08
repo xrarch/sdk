@@ -16,6 +16,7 @@ local chartreatment = {
 	[","] = CHAR_SPLIT,
 	["["] = CHAR_SPLIT,
 	["]"] = CHAR_SPLIT,
+	[":"] = CHAR_SPLIT,
 
 	["="] = CHAR_COALESCE,
 	["&"] = CHAR_COALESCE,
@@ -28,7 +29,6 @@ local chartreatment = {
 	["*"] = CHAR_COALESCE,
 	["/"] = CHAR_COALESCE,
 	["%"] = CHAR_COALESCE,
-	[":"] = CHAR_COALESCE,
 	["."] = CHAR_COALESCE,
 }
 
@@ -38,6 +38,8 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 	lex.srctext = preproc.pp(filename, file, incdir, libdir, symbols, true)
 
 	if not lex.srctext then return false end
+
+	lex.ungetstack = {}
 
 	lex.length = #lex.srctext
 
@@ -145,6 +147,10 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 
 	function lex.nextTokenRaw()
 		-- return a table representing a token, or nil if no next token.
+
+		if #lex.ungetstack > 0 then
+			return table.remove(lex.ungetstack, 1)
+		end
 
 		local firstpos = 0
 		local firstln = 0
@@ -383,17 +389,12 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 		end
 	end
 
-	function lex.lastToken()
+	function lex.lastToken(token)
 		-- un-consume the last token so that it will be returned again
 		-- by nextToken in an identical fashion to the last time it was
-		-- returned. this can only be done one step backwards in time, as the
-		-- state necessary to fetch any tokens before that has been lost by
-		-- now.
+		-- returned.
 
-		lex.position = lex.lastposition
-		lex.linenumber = lex.lastlinenumber
-		lex.filename = lex.lastfilename
-		lex.newline = false
+		lex.ungetstack[#lex.ungetstack + 1] = token
 	end
 
 	return lex

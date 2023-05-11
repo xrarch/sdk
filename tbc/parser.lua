@@ -868,11 +868,10 @@ parser.keywords = {
 				return false
 			end
 
-			block.conditional = expr
-
 			if elseblock then
 				node.elseblock = block
 			else
+				block.conditional = expr
 				table.insert(node.bodies, block)
 			end
 

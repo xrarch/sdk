@@ -22,16 +22,28 @@ function _G.defineSymbol(scopeblock, def)
 	return true
 end
 
-function _G.tprint (tbl, indent)
-	if not indent then indent = 0 end
+local gencount = 0
 
-	if indent > 20 then
-		error("too deep")
+function _G.tprint (tbl, indent)
+	if not indent then
+		gencount = gencount + 1
+		indent = 0
 	end
 
+	if tbl._tprint_gen_count == gencount then
+		local formatting = string.rep("  ", indent)
+
+		print(formatting .. "already printed!")
+
+		return
+	end
+
+	tbl._tprint_gen_count = gencount
+
 	for k, v in pairs(tbl) do
-		if k ~= "parentblock" then
-			formatting = string.rep("  ", indent) .. k .. ": "
+		if k ~= "_tprint_gen_count" then
+			local formatting = string.rep("  ", indent) .. k .. ": "
+
 			if type(v) == "table" then
 				print(formatting)
 				tprint(v, indent+1)

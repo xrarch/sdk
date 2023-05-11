@@ -147,6 +147,12 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 
 	function lex.nextTokenRaw()
 		-- return a table representing a token, or nil if no next token.
+		-- NOTE: this is not done, but reserved keywords can be enforced more
+		-- strictly here than they are by the parser, by tagging a token as a
+		-- keyword. Do this in the actual self-hosted TOWER compiler. This can
+		-- be done in linear time, inline with token scanning, with a trie.
+		-- NOTE: double-quote string termination isn't checked either, the
+		-- string token terminates when EOF is reached.
 
 		if #lex.ungetstack > 0 then
 			return table.remove(lex.ungetstack, 1)

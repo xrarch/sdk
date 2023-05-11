@@ -1,3 +1,5 @@
+-- C generator for the TOWER Bootstrap Compiler
+
 require("sb")
 
 local gen = {}

@@ -15,6 +15,57 @@ local function astnode_t(type, errtoken)
 	return node
 end
 
+local function def_t(name, symboltype)
+	-- create and initialize a symbol definition
+
+	local def = {}
+	def.name = name
+	def.symboltype = symboltype
+
+	def.const = false
+	def.funcdef = nil
+	def.type = nil
+	def.value = nil
+	def.extern = false
+
+	return def
+end
+
+local function typedef_t(name, type)
+	local def = def_t(name, symboltypes.SYM_TYPE)
+	def.value = type
+
+	return def
+end
+
+local function idnode_t(name, errtoken)
+	local node = astnode_t("id", errtoken)
+	node.names = {}
+	node.names[1] = name
+
+	return node
+end
+
+local function type_t()
+	local type = {}
+	type.pointer = false
+	type.array = false
+	type.funcdef = nil
+	type.arraybounds = nil
+	type.primitive = nil
+
+	return type
+end
+
+local function funcdef_t(name)
+	local funcdef = {}
+	funcdef.args = {}
+	funcdef.returntype = nil
+	funcdef.name = name
+
+	return funcdef
+end
+
 function parser.err(token, err)
 	print(string.format("tbc: %s:%d: %s", token.filename, token.linenumber, err))
 end
@@ -49,8 +100,6 @@ function parser.parseBlock(lex, terminators)
 	-- if statement
 	-- while loop
 
-	local lastblock = parser.currentblock
-
 	terminators = terminators or {}
 
 	local block = astnode_t("block")
@@ -62,6 +111,8 @@ function parser.parseBlock(lex, terminators)
 	parser.currentblock = block
 
 	block.parentblock = lastblock
+
+	local terminated = false
 
 	while true do
 		local token = lex.nextToken()
@@ -91,10 +142,16 @@ function parser.parseBlock(lex, terminators)
 					-- block is terminated.
 					-- allow caller to consume terminator token.
 
+					terminated = true
+
 					lex.lastToken(token)
 
 					break
 				end
+			end
+
+			if terminated then
+				break
 			end
 
 			-- this is either a declaration, an assignment, or an expression.
@@ -107,7 +164,24 @@ function parser.parseBlock(lex, terminators)
 			if nexttoken.str == ":" then
 				-- declaration
 
-				stmt = parser.parseDeclaration(lex)
+				local def = parser.parseDeclaration(lex)
+
+				if not def then
+					return false
+				end
+
+				if block.parentblock then
+					-- this declaration happened somewhere other than the root
+					-- block, so we want to generate an assign node if there's
+					-- a value.
+
+					if def.value then
+						stmt = astnode_t("assign", token)
+
+						stmt.dest = idnode_t(def.name)
+						stmt.src = def.value
+					end
+				end
 			else
 				-- this is an atom of some kind.
 
@@ -124,7 +198,7 @@ function parser.parseBlock(lex, terminators)
 				if nexttoken.str == "=" then
 					-- assignment
 
-					stmt = astnode_t("assign", atom.errtoken)
+					stmt = astnode_t("assign", token)
 
 					stmt.dest = atom
 					stmt.src = parser.parseExpression(lex)
@@ -140,11 +214,15 @@ function parser.parseBlock(lex, terminators)
 			end
 		end
 
-		if not stmt then
+		-- stmt can be nil, but not false.
+
+		if stmt == false then
 			return false
 		end
 
-		block.statements[#block.statements + 1] = stmt
+		if stmt then
+			table.insert(block.statements, stmt)
+		end
 	end
 
 	parser.currentblock = lastblock
@@ -195,13 +273,11 @@ function parser.parseExpression(lex, minprec)
 	return atom
 end
 
-function parser.parseAtom(lex, depth)
+function parser.parseAtom(lex)
 	-- an atom here means any individual value, such as an array reference,
 	-- a variable reference, a numerical constant, or a parenthesized
 	-- expression. lvalues and rvalues are parsed identically and are checked
 	-- during a later stage of the compiler.
-
-	depth = depth or 0
 
 	local atom
 
@@ -211,7 +287,15 @@ function parser.parseAtom(lex, depth)
 		return false
 	end
 
-	if token.str == "(" then
+	if token.literal then
+		-- string
+
+		atom = astnode_t("string", token)
+
+		atom.value = token.str
+
+		return atom
+	elseif token.str == "(" then
 		-- parenthesized expression
 
 		atom = parser.parseExpression(lex)
@@ -286,15 +370,30 @@ function parser.parseAtom(lex, depth)
 		atom = astnode_t("number", token)
 
 		atom.value = token.value
-		atom.precedence = math.huge
 
 		return atom
 	else
 		-- identifier
 
-		atom = astnode_t("id", token)
+		atom = idnode_t(token.str, token)
 
-		atom.name = token.str
+		local aheadtoken = lex.nextToken()
+
+		while aheadtoken.str == "." do
+			-- more names!
+
+			local nametoken = lex.nextToken()
+
+			if not parser.checkToken(nametoken) then
+				return false
+			end
+
+			table.insert(atom.names, nametoken.str)
+
+			aheadtoken = lex.nextToken()
+		end
+
+		lex.lastToken(aheadtoken)
 	end
 
 	-- we have to look ahead one token to determine whether this is an
@@ -302,40 +401,12 @@ function parser.parseAtom(lex, depth)
 	-- there could be an arbitrary combination of some of these, so check
 	-- in a loop until we don't find anything.
 
-	local aheadtoken = lex.nextToken()
-
-	local realatom
-
 	while true do
-		local gotnone = true
-
-		if aheadtoken.str == "." then
-			-- struct ref
-
-			local realatom = astnode_t("structref", token)
-
-			realatom.left = atom
-			realatom.right = parser.parseAtom(lex, depth + 1)
-
-			if not realatom.right then
-				return false
-			end
-
-			atom = realatom
-
-			aheadtoken = lex.nextToken()
-
-			gotnone = false
-		end
+		local aheadtoken = lex.nextToken()
+		local realatom
 
 		if aheadtoken.str == "[" then
 			-- its an array reference
-
-			if depth > 0 then
-				lex.lastToken(aheadtoken)
-
-				return atom
-			end
 
 			realatom = astnode_t("arrayref", token)
 
@@ -358,22 +429,8 @@ function parser.parseAtom(lex, depth)
 				parser.err(token, "unexpected token, expected ]")
 				return false
 			end
-
-			atom = realatom
-
-			aheadtoken = lex.nextToken()
-
-			gotnone = false
-		end
-
-		if aheadtoken.str == "(" then
+		elseif aheadtoken.str == "(" then
 			-- its a function call
-
-			if depth > 0 then
-				lex.lastToken(aheadtoken)
-
-				return atom
-			end
 
 			realatom = astnode_t("call", token)
 
@@ -412,27 +469,21 @@ function parser.parseAtom(lex, depth)
 					return false
 				end
 			end
-
-			atom = realatom
-
-			aheadtoken = lex.nextToken()
-
-			gotnone = false
-		end
-
-		if gotnone then
+		else
 			lex.lastToken(aheadtoken)
 
 			break
 		end
+
+		atom = realatom
 	end
 
 	return atom
 end
 
 function parser.parseDeclaration(lex, const)
-	local def = {}
-	def.const = const
+	-- returns a def, caller decides whether to turn that into a statement.
+	-- does define the symbol for you.
 
 	local nametoken = lex.nextToken()
 
@@ -440,7 +491,8 @@ function parser.parseDeclaration(lex, const)
 		return false
 	end
 
-	def.name = nametoken.str
+	local def = def_t(nametoken.str, symboltypes.SYM_VAR)
+	def.const = const
 
 	local colontoken = lex.nextToken()
 
@@ -485,7 +537,7 @@ function parser.parseDeclaration(lex, const)
 
 			lex.lastToken(eqtoken)
 		else
-			def.value = parser.parseExpression()
+			def.value = parser.parseExpression(lex)
 
 			if not def.value then
 				return false
@@ -493,23 +545,16 @@ function parser.parseDeclaration(lex, const)
 		end
 	end
 
-	local node = astnode_t("decl", nametoken)
-	node.def = def
-
-	if not defineSymbol(parser.currentblock, def.name, def) then
+	if not defineSymbol(parser.currentblock, def) then
 		parser.err(nametoken, string.format("%s already defined", def.name))
 		return false
 	end
 
-	return node
+	return def
 end
 
 function parser.parseType(lex)
-	local type = {}
-	type.pointer = false
-	type.array = false
-	type.arraybounds = nil
-	type.primitive = nil
+	local type = type_t()
 
 	local token = lex.nextToken()
 
@@ -552,6 +597,10 @@ function parser.parseType(lex)
 
 	token = lex.nextToken()
 
+	if not parser.checkToken(token) then
+		return false
+	end
+
 	if token.str ~= "]" then
 		parser.err(token, "expected ]")
 		return false
@@ -560,16 +609,304 @@ function parser.parseType(lex)
 	return type
 end
 
-function parser.parseFunction(lex)
-	error("unimp")
+function parser.compareFunctionSignatures(funcdef1, funcdef2)
+	-- compares the function signatures of both funcdefs
+
+	if #funcdef1.args ~= #funcdef2.args then
+		return false
+	end
+
+	if funcdef1.returntype then
+		if not funcdef2.returntype then
+			return false
+		end
+
+		if not comparetables(funcdef1.returntype, funcdef2.returntype) then
+			return false
+		end
+	elseif funcdef2.returntype then
+		return false
+	end
+
+	for i,arg in ipairs(funcdef1.args) do
+		local arg2 = funcdef2.args[i]
+
+		if arg.name ~= arg2.name then
+			return false
+		end
+
+		if not comparetables(arg.type, arg2.type) then
+			return false
+		end
+	end
+
+	return true
+end
+
+function parser.parseFunctionSignature(lex)
+	-- returns a funcdef representing the function signature.
+
+	local aheadtoken = lex.nextToken()
+
+	if not parser.checkToken(aheadtoken) then
+		return false
+	end
+
+	local fntype = nil
+
+	if aheadtoken.str == "(" then
+		-- theres a reference fnptr we want to compare with
+
+		local fnptrtoken = lex.nextToken()
+
+		if not parser.checkToken(fnptrtoken) then
+			return false
+		end
+
+		aheadtoken = lex.nextToken()
+
+		if aheadtoken.str ~= ")" then
+			parser.err(aheadtoken, "expected )")
+			return false
+		end
+
+		local fnptrname = fnptrtoken.str
+
+		local fnptrsym = findSymbol(parser.currentblock, fnptrname)
+
+		if not fnptrsym then
+			parser.err(aheadtoken, string.format("%s is not a declared symbol", fnptrname))
+			return false
+		end
+
+		if fnptrsym.symboltype ~= symboltypes.SYM_TYPE then
+			parser.err(aheadtoken, string.format("%s is not a type", fnptrname))
+			return false
+		end
+
+		fntype = fnptrsym.value
+
+		if not fntype.funcdef then
+			parser.err(aheadtoken, string.format("%s is not a function type"), fnptrname)
+			return false
+		end
+
+		aheadtoken = lex.nextToken()
+
+		if not parser.checkToken(aheadtoken) then
+			return false
+		end
+	end
+
+	local funcdef = funcdef_t(aheadtoken.str)
+
+	funcdef.fnptrtype = fntype
+
+	aheadtoken = lex.nextToken()
+
+	if aheadtoken.str ~= "(" then
+		parser.err(token, "expected (")
+		return false
+	end
+
+	-- parse the argument list, which is of the form:
+	-- name : type(,)
+	-- until a close parenthesis is found.
+
+	while true do
+		aheadtoken = lex.nextToken()
+
+		if not parser.checkToken(aheadtoken) then
+			return false
+		end
+
+		if aheadtoken.str == ")" then
+			break
+		end
+
+		if funcdef.varargs then
+			parser.err(nametoken, "extra arguments after varargs specified")
+			return false
+		end
+
+		if aheadtoken.str == "..." then
+			funcdef.varargs = true
+		else
+			local arg = {}
+
+			if (aheadtoken.str == "in") or
+				(aheadtoken.str == "out") then
+
+				if aheadtoken.str == "in" then
+					arg.inspec = true
+				else
+					arg.outspec = true
+				end
+
+				aheadtoken = lex.nextToken()
+
+				if not parser.checkToken(aheadtoken, true) then
+					return false
+				end
+			end
+
+			arg.name = aheadtoken.str
+
+			aheadtoken = lex.nextToken()
+
+			if aheadtoken.str ~= ":" then
+				parser.err(aheadtoken, "expected :")
+				return false
+			end
+
+			arg.type = parser.parseType(lex)
+
+			if not arg.type then
+				return false
+			end
+
+			table.insert(funcdef.args, arg)
+		end
+
+		aheadtoken = lex.nextToken()
+
+		if aheadtoken.str == ")" then
+			break
+		elseif aheadtoken.str ~= "," then
+			parser.err(aheadtoken, "unexpected token, expected ','")
+			return false
+		end
+	end
+
+	-- check if there is a return type specified or not
+
+	aheadtoken = lex.nextToken()
+
+	if aheadtoken.str == ":" then
+		-- there is one
+
+		funcdef.returntype = parser.parseType(lex)
+
+		if not funcdef.returntype then
+			return false
+		end
+	else
+		-- there ain't one
+
+		lex.lastToken(aheadtoken)
+	end
+
+	if fntype then
+		if not parser.compareFunctionSignatures(funcdef, fntype.funcdef) then
+			parser.err(aheadtoken, "mismatched function signatures")
+			return false
+		end
+	end
+
+	return funcdef
+end
+
+function parser.parseFunction(lex, macro)
+	local funcdef = parser.parseFunctionSignature(lex)
+
+	if not funcdef then
+		return false
+	end
+
+	funcdef.body = parser.parseBlock(lex, {"end"})
+
+	if not funcdef.body then
+		return false
+	end
+
+	-- consume the token for end
+
+	lex.nextToken()
+
+	local def = def_t(funcdef.name, symboltypes.SYM_VAR)
+	def.const = macro
+	def.funcdef = funcdef
+
+	if not defineSymbol(parser.currentblock, def) then
+		parser.err(nametoken, string.format("%s already defined", def.name))
+		return false
+	end
 end
 
 parser.keywords = {
-	["if"] = function ()
+	["if"] = function (lex)
+		local expr = parser.parseExpression(lex)
 
+		if not expr then
+			return false
+		end
+
+		local aheadtoken = lex.nextToken()
+
+		if aheadtoken.str ~= "then" then
+			parser.err(aheadtoken, "expected 'then'")
+			return false
+		end
+
+		local node = astnode_t("if", expr.errtoken)
+
+		node.bodies = {}
+		node.elseblock = nil
+
+		local elseblock = false
+
+		local terminators = {
+			"end",
+			"else",
+			"elseif"
+		}
+
+		while true do
+			local block = parser.parseBlock(lex, terminators)
+
+			if not block then
+				return false
+			end
+
+			block.conditional = expr
+
+			if elseblock then
+				node.elseblock = block
+			else
+				table.insert(node.bodies, block)
+			end
+
+			aheadtoken = lex.nextToken()
+
+			if aheadtoken.str == "end" then
+				break
+			elseif aheadtoken.str == "else" then
+				if elseblock then
+					parser.err(aheadtoken, "already declared an else block")
+					return false
+				end
+
+				elseblock = true
+			elseif aheadtoken.str == "elseif" then
+				expr = parser.parseExpression(lex)
+
+				if not expr then
+					return false
+				end
+
+				aheadtoken = lex.nextToken()
+
+				if aheadtoken.str ~= "then" then
+					parser.err(aheadtoken, "expected 'then'")
+					return false
+				end
+			end
+		end
+
+		return node
 	end,
-	["while"] = function ()
-
+	["while"] = function (lex)
+		error("unimp")
 	end,
 	["return"] = function (lex)
 		local expr = parser.parseExpression(lex)
@@ -586,106 +923,180 @@ parser.keywords = {
 	end,
 
 	["type"] = function (lex)
+		local nametoken = lex.nextToken()
 
+		if not parser.checkToken(nametoken) then
+			return false
+		end
+
+		local colontoken = lex.nextToken()
+
+		if not parser.checkToken(colontoken) then
+			return false
+		end
+
+		if colontoken.str ~= ":" then
+			parser.err(colontoken, "unexpected token, expected :")
+			return false
+		end
+
+		local type = parser.parseType(lex)
+
+		if not type then
+			return false
+		end
+
+		local def = typedef_t(nametoken.str, type)
+
+		if not defineSymbol(parser.currentblock, def) then
+			parser.err(nametoken, string.format("%s already defined", def.name))
+			return false
+		end
+
+		return nil
 	end,
 	["struct"] = function (lex)
+		error("unimp")
+	end,
+	["union"] = function (lex)
+		error("unimp")
+	end,
+	["fnptr"] = function (lex)
+		local funcdef = parser.parseFunctionSignature(lex)
 
+		if not funcdef then
+			return false
+		end
+
+		local type = type_t()
+		type.funcdef = funcdef
+		type.pointer = true
+
+		local def = typedef_t(funcdef.name, type)
+
+		if not defineSymbol(parser.currentblock, def) then
+			parser.err(nametoken, string.format("%s already defined", def.name))
+			return false
+		end
+
+		return nil
 	end,
 	["extern"] = function (lex)
+		local nametoken = lex.nextToken()
 
+		if not parser.checkToken(nametoken) then
+			return false
+		end
+
+		local declop = parser.decls[nametoken.str]
+		local def
+
+		if declop then
+			def = declop(lex)
+		else
+			lex.lastToken(nametoken)
+
+			def = parser.parseDeclaration(lex)
+		end
+
+		if not def then
+			return false
+		end
+
+		def.extern = true
+
+		return nil
 	end,
 	["const"] = function (lex)
-		return parser.parseDeclaration(lex, true)
+		parser.parseDeclaration(lex, true)
+
+		return nil
 	end,
 
 	["fn"] = parser.parseFunction,
 
 	["macro"] = function (lex)
-		local fndef = parser.parseFunction(lex)
-
-		if not fndef then
-			return false
-		end
-
-		fndef.nodetype = "macro"
-
-		return fndef
+		return parser.parseFunction(lex, true)
 	end,
 }
 
 parser.operators = {
 	["*"] = {
-		precedence = 10,
+		precedence = 20,
 		associativity = LEFT,
 	},
 	["/"] = {
-		precedence = 10,
+		precedence = 20,
 		associativity = LEFT,
 	},
 	["%"] = {
-		precedence = 10,
+		precedence = 20,
 		associativity = LEFT,
 	},
 	["+"] = {
-		precedence = 9,
+		precedence = 19,
 		associativity = LEFT,
 	},
 	["-"] = {
-		precedence = 9,
+		precedence = 19,
 		associativity = LEFT,
 	},
 	["<<"] = {
-		precedence = 8,
+		precedence = 18,
 		associativity = LEFT,
 	},
 	[">>"] = {
-		precedence = 8,
+		precedence = 18,
 		associativity = LEFT,
 	},
 	["<"] = {
-		precedence = 7,
+		precedence = 17,
 		associativity = LEFT,
 	},
 	[">"] = {
-		precedence = 7,
+		precedence = 17,
 		associativity = LEFT,
 	},
 	["<="] = {
-		precedence = 7,
+		precedence = 17,
 		associativity = LEFT,
 	},
 	[">="] = {
-		precedence = 7,
+		precedence = 17,
 		associativity = LEFT,
 	},
 	["=="] = {
-		precedence = 6,
+		precedence = 16,
 		associativity = LEFT,
 	},
 	["!="] = {
-		precedence = 6,
+		precedence = 16,
 		associativity = LEFT,
 	},
 	["&"] = {
-		precedence = 5,
+		precedence = 15,
 		associativity = LEFT,
 	},
 	["^"] = {
-		precedence = 4,
+		precedence = 14,
 		associativity = LEFT,
 	},
 	["|"] = {
-		precedence = 3,
+		precedence = 13,
 		associativity = LEFT,
 	},
 	["and"] = {
-		precedence = 2,
+		precedence = 12,
 		associativity = LEFT,
 	},
 	["or"] = {
-		precedence = 1,
+		precedence = 11,
 		associativity = LEFT,
-	}
+	},
+	["cast"] = {
+		precedence = 4,
+		associativity = LEFT,
+	},
 }
 
 parser.decls = {

@@ -95,11 +95,11 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 	end
 
 	function lex.nextChar()
-		-- return next character with processing for the @ directives from the
-		-- preprocessor.
+		-- return next character with processing for the # directives from the
+		-- preprocessor, which tell us the boundaries between files and lets
+		-- us update line numbers appropriately.
 
 		local lastfn = lex.filename
-
 		local nl = lex.newline
 
 		local char, lastpos, lastln = lex.nextCharRaw()

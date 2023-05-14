@@ -10,14 +10,21 @@ function _G.findSymbol(searchblock, name)
 	end
 end
 
-function _G.defineSymbol(scopeblock, def)
-	local sym = findSymbol(scopeblock, def.name)
+function _G.defineSymbol(scopeblock, def, nocheck)
+	if not nocheck then
+		local sym = findSymbol(scopeblock, def.name)
 
-	if sym then
-		return false
+		if sym then
+			return false
+		end
 	end
 
 	scopeblock.scope[def.name] = def
+
+	-- add to an ordered list of definitions as well for things that would
+	-- like to iterate that, so that the output can be deterministic.
+
+	table.insert(scopeblock.iscope, def)
 
 	return true
 end
@@ -56,19 +63,24 @@ function _G.tprint (tbl, indent)
 	end
 end
 
-function _G.comparetables(table1, table2)
-	for k,v in pairs(table1) do
-		local equ = table2[k]
-
-		if v ~= equ then
-			return false
-		end
+function _G.compareTypes(type1, type2)
+	if type1.pointer ~= type2.pointer then
+		return false
 	end
 
-	return true
+	if type1.array ~= type2.array then
+		return false
+	end
+
+	if type(type1.base) == "string" then
+		return type1.base == type2.base
+	end
+
+	return compareTypes(type1.base, type2.base)
 end
 
 _G.symboltypes = {
-	SYM_VAR  = 1,
-	SYM_TYPE = 2,
+	SYM_VAR   = 1,
+	SYM_TYPE  = 2,
+	SYM_LABEL = 3,
 }

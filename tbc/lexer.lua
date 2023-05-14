@@ -30,6 +30,7 @@ local chartreatment = {
 	["/"] = CHAR_COALESCE,
 	["%"] = CHAR_COALESCE,
 	["."] = CHAR_COALESCE,
+	["@"] = CHAR_COALESCE,
 }
 
 function lexer.new(filename, file, incdir, libdir, symbols)
@@ -153,6 +154,10 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 		-- be done in linear time, inline with token scanning, with a trie.
 		-- NOTE: double-quote string termination isn't checked either, the
 		-- string token terminates when EOF is reached.
+		-- NOTE: the lexer should probably cache a lookahead token instead of
+		-- the general purpose mechanism which actually isn't necessary for
+		-- Tower's grammar, this would be faster and should be done in the
+		-- self-hosted compiler.
 
 		if #lex.ungetstack > 0 then
 			return table.remove(lex.ungetstack, 1)

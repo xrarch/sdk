@@ -369,6 +369,25 @@ function parser.parseAtom(lex)
 			parser.err(token, "unexpected token, expected )")
 			return false
 		end
+	elseif token.str == "cast" then
+		atom = astnode_t("cast", token)
+
+		atom.expr = parser.parseExpression(lex)
+
+		token = lex.nextToken()
+
+		if not parser.checkToken(token) then
+			return false
+		end
+
+		if token.str ~= "to" then
+			parser.err(token, "unexpected token, expected 'to'")
+			return false
+		end
+
+		atom.type = parser.parseType(lex)
+
+		return atom
 	elseif token.str == "not" then
 		-- unary logical not
 
@@ -1323,10 +1342,6 @@ parser.operators = {
 	},
 	["or"] = {
 		precedence = 11,
-		associativity = LEFT,
-	},
-	["cast"] = {
-		precedence = 4,
 		associativity = LEFT,
 	},
 }

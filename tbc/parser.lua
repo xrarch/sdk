@@ -140,6 +140,8 @@ function parser.parseBlock(lex, terminators, func)
 			block.errtoken = token
 		end
 
+		parser.errtoken = token
+
 		local stmt = nil
 
 		local kw = parser.keywords[token.str]
@@ -1128,6 +1130,14 @@ parser.keywords = {
 		node.name = nametoken.str
 
 		return node
+	end,
+
+	["break"] = function (lex)
+		return astnode_t("break", parser.errtoken)
+	end,
+
+	["continue"] = function (lex)
+		return astnode_t("continue", parser.errtoken)
 	end,
 
 	["return"] = function (lex)

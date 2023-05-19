@@ -215,10 +215,10 @@ function parser.parseBlock(lex, terminators, func)
 					-- a value.
 
 					if def.value then
-						stmt = astnode_t("assign", token)
+						stmt = astnode_t("=", token)
 
-						stmt.dest = idnode_t(def.name)
-						stmt.src = def.value
+						stmt.left = idnode_t(def.name)
+						stmt.right = def.value
 					end
 				end
 			else
@@ -234,15 +234,15 @@ function parser.parseBlock(lex, terminators, func)
 
 				nexttoken = lex.nextToken()
 
-				if nexttoken.str == "=" then
+				if parser.assigns[nexttoken.str] then
 					-- assignment
 
-					stmt = astnode_t("assign", token)
+					stmt = astnode_t(nexttoken.str, token)
 
-					stmt.dest = atom
-					stmt.src = parser.parseExpression(lex)
+					stmt.left = atom
+					stmt.right = parser.parseExpression(lex)
 
-					if not stmt.src then
+					if not stmt.right then
 						return false
 					end
 				else
@@ -920,6 +920,13 @@ function parser.parseFunctionSignature(lex)
 				return false
 			end
 
+			if arg.outspec then
+				if not arg.type.pointer then
+					parser.err(aheadtoken, "out argument has non-pointer type")
+					return false
+				end
+			end
+
 			table.insert(funcdef.args, arg)
 		end
 
@@ -1374,6 +1381,19 @@ parser.decls = {
 
 		return def
 	end,
+}
+
+parser.assigns = {
+	["="] = true,
+	["+="] = true,
+	["*="] = true,
+	["/="] = true,
+	["%="] = true,
+	["&="] = true,
+	["|="] = true,
+	[".="] = true,
+	[">>="] = true,
+	["<<="] = true,
 }
 
 return parser

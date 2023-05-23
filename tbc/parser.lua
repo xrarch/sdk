@@ -338,13 +338,13 @@ function parser.parseAtom(lex)
 		atom.value = token.str
 
 		return atom
-	elseif token.str == "true" then
+	elseif token.str == "TRUE" then
 		atom = astnode_t("number", token)
 
 		atom.value = 1
 
 		return atom
-	elseif token.str == "false" then
+	elseif token.str == "FALSE" then
 		atom = astnode_t("number", token)
 
 		atom.value = 0
@@ -371,7 +371,7 @@ function parser.parseAtom(lex)
 			parser.err(token, "unexpected token, expected )")
 			return false
 		end
-	elseif token.str == "cast" then
+	elseif token.str == "CAST" then
 		atom = astnode_t("cast", token)
 
 		atom.expr = parser.parseExpression(lex)
@@ -382,15 +382,15 @@ function parser.parseAtom(lex)
 			return false
 		end
 
-		if token.str ~= "to" then
-			parser.err(token, "unexpected token, expected 'to'")
+		if token.str ~= "TO" then
+			parser.err(token, "unexpected token, expected 'TO'")
 			return false
 		end
 
 		atom.type = parser.parseType(lex)
 
 		return atom
-	elseif token.str == "not" then
+	elseif token.str == "NOT" then
 		-- unary logical not
 
 		atom = astnode_t("not", token)
@@ -889,10 +889,10 @@ function parser.parseFunctionSignature(lex)
 		else
 			local arg = {}
 
-			if (aheadtoken.str == "in") or
-				(aheadtoken.str == "out") then
+			if (aheadtoken.str == "IN") or
+				(aheadtoken.str == "OUT") then
 
-				if aheadtoken.str == "in" then
+				if aheadtoken.str == "IN" then
 					arg.inspec = true
 				else
 					arg.outspec = true
@@ -975,7 +975,7 @@ function parser.parseFunction(lex, macro)
 		return false
 	end
 
-	funcdef.body = parser.parseBlock(lex, {"end"}, true)
+	funcdef.body = parser.parseBlock(lex, {"END"}, true)
 
 	if not funcdef.body then
 		return false
@@ -1021,7 +1021,7 @@ function parser.parseFunction(lex, macro)
 end
 
 parser.keywords = {
-	["if"] = function (lex)
+	["IF"] = function (lex)
 		local expr = parser.parseExpression(lex)
 
 		if not expr then
@@ -1030,8 +1030,8 @@ parser.keywords = {
 
 		local aheadtoken = lex.nextToken()
 
-		if aheadtoken.str ~= "then" then
-			parser.err(aheadtoken, "expected 'then'")
+		if aheadtoken.str ~= "THEN" then
+			parser.err(aheadtoken, "expected 'THEN'")
 			return false
 		end
 
@@ -1043,9 +1043,9 @@ parser.keywords = {
 		local elseblock = false
 
 		local terminators = {
-			"end",
-			"else",
-			"elseif"
+			"END",
+			"ELSE",
+			"ELSEIF"
 		}
 
 		while true do
@@ -1064,16 +1064,16 @@ parser.keywords = {
 
 			aheadtoken = lex.nextToken()
 
-			if aheadtoken.str == "end" then
+			if aheadtoken.str == "END" then
 				break
-			elseif aheadtoken.str == "else" then
+			elseif aheadtoken.str == "ELSE" then
 				if elseblock then
 					parser.err(aheadtoken, "already declared an else block")
 					return false
 				end
 
 				elseblock = true
-			elseif aheadtoken.str == "elseif" then
+			elseif aheadtoken.str == "ELSEIF" then
 				expr = parser.parseExpression(lex)
 
 				if not expr then
@@ -1082,8 +1082,8 @@ parser.keywords = {
 
 				aheadtoken = lex.nextToken()
 
-				if aheadtoken.str ~= "then" then
-					parser.err(aheadtoken, "expected 'then'")
+				if aheadtoken.str ~= "THEN" then
+					parser.err(aheadtoken, "expected 'THEN'")
 					return false
 				end
 			end
@@ -1092,7 +1092,7 @@ parser.keywords = {
 		return node
 	end,
 
-	["while"] = function (lex)
+	["WHILE"] = function (lex)
 		local expr = parser.parseExpression(lex)
 
 		if not expr then
@@ -1101,14 +1101,14 @@ parser.keywords = {
 
 		local aheadtoken = lex.nextToken()
 
-		if aheadtoken.str ~= "do" then
-			parser.err(aheadtoken, "expected 'do'")
+		if aheadtoken.str ~= "DO" then
+			parser.err(aheadtoken, "expected 'DO'")
 			return false
 		end
 
 		local node = astnode_t("while", expr.errtoken)
 
-		local block = parser.parseBlock(lex, {"end"})
+		local block = parser.parseBlock(lex, {"END"})
 
 		if not block then
 			return false
@@ -1125,7 +1125,7 @@ parser.keywords = {
 		return node
 	end,
 
-	["goto"] = function (lex)
+	["GOTO"] = function (lex)
 		local nametoken = lex.nextToken()
 
 		if not parser.checkToken(nametoken) then
@@ -1139,15 +1139,15 @@ parser.keywords = {
 		return node
 	end,
 
-	["break"] = function (lex)
+	["BREAK"] = function (lex)
 		return astnode_t("break", parser.errtoken)
 	end,
 
-	["continue"] = function (lex)
+	["CONTINUE"] = function (lex)
 		return astnode_t("continue", parser.errtoken)
 	end,
 
-	["return"] = function (lex)
+	["RETURN"] = function (lex)
 		local expr = parser.parseExpression(lex)
 
 		if not expr then
@@ -1161,7 +1161,7 @@ parser.keywords = {
 		return node
 	end,
 
-	["type"] = function (lex)
+	["TYPE"] = function (lex)
 		local nametoken = lex.nextToken()
 
 		if not parser.checkToken(nametoken) then
@@ -1195,15 +1195,15 @@ parser.keywords = {
 		return nil
 	end,
 
-	["struct"] = function (lex)
+	["STRUCT"] = function (lex)
 		error("unimp")
 	end,
 
-	["union"] = function (lex)
+	["UNION"] = function (lex)
 		error("unimp")
 	end,
 
-	["fnptr"] = function (lex)
+	["FNPTR"] = function (lex)
 		local funcdef = parser.parseFunctionSignature(lex)
 
 		if not funcdef then
@@ -1224,7 +1224,7 @@ parser.keywords = {
 		return nil
 	end,
 
-	["extern"] = function (lex)
+	["EXTERN"] = function (lex)
 		local nametoken = lex.nextToken()
 
 		if not parser.checkToken(nametoken) then
@@ -1261,14 +1261,14 @@ parser.keywords = {
 		return nil
 	end,
 
-	["const"] = function (lex)
+	["CONST"] = function (lex)
 		parser.parseDeclaration(lex, true)
 
 		return nil
 	end,
 
-	["begin"] = function (lex)
-		local node = parser.parseBlock(lex, {"end"})
+	["BEGIN"] = function (lex)
+		local node = parser.parseBlock(lex, {"END"})
 
 		if not node then
 			return false
@@ -1281,9 +1281,9 @@ parser.keywords = {
 		return node
 	end,
 
-	["fn"] = parser.parseFunction,
+	["FN"] = parser.parseFunction,
 
-	["macro"] = function (lex)
+	["MACRO"] = function (lex)
 		return parser.parseFunction(lex, true)
 	end,
 }
@@ -1353,18 +1353,18 @@ parser.operators = {
 		precedence = 13,
 		associativity = LEFT,
 	},
-	["and"] = {
+	["AND"] = {
 		precedence = 12,
 		associativity = LEFT,
 	},
-	["or"] = {
+	["OR"] = {
 		precedence = 11,
 		associativity = LEFT,
 	},
 }
 
 parser.decls = {
-	["fn"] = function (lex)
+	["FN"] = function (lex)
 		local funcdef = parser.parseFunctionSignature(lex)
 
 		if not funcdef then

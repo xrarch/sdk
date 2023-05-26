@@ -89,6 +89,8 @@ end
 function parser.parse(filename, file, incdir, libdir, symbols)
 	local lex = lexer.new(filename, file, incdir, libdir, symbols)
 
+	parser.loopdepth = 0
+
 	return parser.parseBlock(lex)
 end
 
@@ -240,7 +242,7 @@ function parser.parseBlock(lex, terminators, func)
 					stmt = astnode_t(nexttoken.str, token)
 
 					stmt.left = atom
-					stmt.right = parser.parseExpression(lex)
+					stmt.right = parser.parseExpression(lex, nil, true)
 
 					if not stmt.right then
 						return false
@@ -273,10 +275,10 @@ function parser.parseBlock(lex, terminators, func)
 	return block
 end
 
-function parser.parseExpression(lex, minprec)
+function parser.parseExpression(lex, minprec, assign)
 	minprec = minprec or 0
 
-	local atom = parser.parseAtom(lex)
+	local atom = parser.parseAtom(lex, assign)
 
 	if not atom then
 		return false
@@ -285,6 +287,11 @@ function parser.parseExpression(lex, minprec)
 	local optoken = lex.nextToken()
 
 	local op = parser.operators[optoken.str]
+
+	if assign and atom.nodetype == "initializer" and op then
+		parser.err(optoken, "unexpected token after initializer")
+		return false
+	end
 
 	while op do
 		if op.precedence < minprec then
@@ -316,7 +323,7 @@ function parser.parseExpression(lex, minprec)
 	return atom
 end
 
-function parser.parseAtom(lex)
+function parser.parseAtom(lex, assign)
 	-- an atom here means any individual value, such as an array reference,
 	-- a variable reference, a numerical constant, or a parenthesized
 	-- expression. lvalues and rvalues are parsed identically and are checked
@@ -336,6 +343,19 @@ function parser.parseAtom(lex)
 		atom = astnode_t("string", token)
 
 		atom.value = token.str
+
+		return atom
+	elseif token.str == "{" then
+		-- initializer
+
+		if not assign then
+			parser.err(token, "unexpected initializer")
+			return false
+		end
+
+		atom = astnode_t("initializer", token)
+
+		atom.value = parser.parseInitializer(lex)
 
 		return atom
 	elseif token.str == "TRUE" then
@@ -543,7 +563,7 @@ function parser.parseAtom(lex)
 			while true do
 				aheadtoken = lex.nextToken()
 
-				if not parser.checkToken(token, true) then
+				if not parser.checkToken(aheadtoken, true) then
 					return false
 				end
 
@@ -622,13 +642,9 @@ function parser.parseDeclaration(lex, const)
 		if not def.type then
 			return false
 		end
-	else
-		-- implicit type
 
-		lex.lastToken(eqtoken)
+		eqtoken = lex.nextToken()
 	end
-
-	local eqtoken = lex.nextToken()
 
 	if not eqtoken.eof then
 		if not parser.checkToken(eqtoken) then
@@ -640,7 +656,7 @@ function parser.parseDeclaration(lex, const)
 
 			lex.lastToken(eqtoken)
 		else
-			def.value = parser.parseExpression(lex)
+			def.value = parser.parseExpression(lex, nil, true)
 
 			if not def.value then
 				return false
@@ -1020,6 +1036,68 @@ function parser.parseFunction(lex, macro)
 	end
 end
 
+function parser.parseCompoundType(lex, compound)
+	local type = type_t()
+	type.compound = compound
+	type.elements = {}
+
+	local nametoken = lex.nextToken()
+
+	if not parser.checkToken(nametoken) then
+		return false
+	end
+
+	while true do
+		local aheadtoken = lex.nextToken()
+
+		if not parser.checkToken(aheadtoken, true) then
+			return false
+		end
+
+		if aheadtoken.str == "END" then
+			break
+		end
+
+		local element = {}
+		element.name = aheadtoken.str
+
+		aheadtoken = lex.nextToken()
+
+		if aheadtoken.str ~= ":" then
+			parser.err(aheadtoken, "unexpected token, expected ':'")
+			return false
+		end
+
+		element.type = parser.parseType(lex)
+
+		if not element.type then
+			return false
+		end
+
+		table.insert(type.elements, element)
+
+		aheadtoken = lex.nextToken()
+
+		if aheadtoken.str == "END" then
+			break
+		elseif aheadtoken.str ~= "," then
+			parser.err(aheadtoken, "unexpected token, expected ','")
+			return false
+		end
+	end
+
+	local def = typedef_t(nametoken.str, type)
+
+	if not defineSymbol(parser.currentblock, def, false) then
+		parser.err(nametoken, string.format("%s already defined", def.name))
+		return false
+	end
+end
+
+function parser.parseInitializer(lex)
+	error("unimp")
+end
+
 parser.keywords = {
 	["IF"] = function (lex)
 		local expr = parser.parseExpression(lex)
@@ -1108,7 +1186,11 @@ parser.keywords = {
 
 		local node = astnode_t("while", expr.errtoken)
 
+		parser.loopdepth = parser.loopdepth + 1
+
 		local block = parser.parseBlock(lex, {"END"})
+
+		parser.loopdepth = parser.loopdepth - 1
 
 		if not block then
 			return false
@@ -1140,10 +1222,20 @@ parser.keywords = {
 	end,
 
 	["BREAK"] = function (lex)
+		if parser.loopdepth == 0 then
+			parser.err(parser.errtoken, "break outside of loop")
+			return false
+		end
+
 		return astnode_t("break", parser.errtoken)
 	end,
 
 	["CONTINUE"] = function (lex)
+		if parser.loopdepth == 0 then
+			parser.err(parser.errtoken, "continue outside of loop")
+			return false
+		end
+
 		return astnode_t("continue", parser.errtoken)
 	end,
 
@@ -1196,11 +1288,15 @@ parser.keywords = {
 	end,
 
 	["STRUCT"] = function (lex)
-		error("unimp")
+		parser.parseCompoundType(lex, "struct")
+
+		return nil
 	end,
 
 	["UNION"] = function (lex)
-		error("unimp")
+		parser.parseCompoundType(lex, "union")
+
+		return nil
 	end,
 
 	["FNPTR"] = function (lex)

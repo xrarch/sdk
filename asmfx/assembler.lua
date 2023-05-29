@@ -274,8 +274,6 @@ function asm.match(isa, line)
 	-- returns false if there is no match
 	-- otherwise it returns a table with the name and value of the operands
 
-	local formats = isa.formats
-
 	local lbias = 0
 
 	local coperand
@@ -285,6 +283,12 @@ function asm.match(isa, line)
 		lbias = 1
 	elseif isa.conditions then
 		coperand = 0
+	end
+
+	local formats = isa.formats[line.tokens[1 + lbias]]
+
+	if not formats then
+		return false
 	end
 
 	for i = 1, #formats do
@@ -298,7 +302,7 @@ function asm.match(isa, line)
 			operands["c"] = coperand
 		end
 
-		for j = 1, #format.tokens do
+		for j = 2, #format.tokens do
 			local field, value, rept = match(isa, format, format.tokens[j], line.tokens[j+lbias])
 
 			if not field then

@@ -303,7 +303,14 @@ local function addFormat(operandinfo, encodingstring, formatstring)
 		end
 	end
 
-	formats[#formats + 1] = format
+	local kt = formats[tokens[1]]
+
+	if not kt then
+		kt = {}
+		formats[tokens[1]] = kt
+	end
+
+	table.insert(kt, format)
 end
 
 -- PSEUDOINSTRUCTIONS

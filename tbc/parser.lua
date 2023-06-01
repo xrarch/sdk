@@ -396,6 +396,10 @@ function parser.parseAtom(lex, assign)
 
 		atom.expr = parser.parseExpression(lex)
 
+		if not atom.expr then
+			return false
+		end
+
 		token = lex.nextToken()
 
 		if not parser.checkToken(token) then
@@ -408,6 +412,16 @@ function parser.parseAtom(lex, assign)
 		end
 
 		atom.type = parser.parseType(lex)
+
+		return atom
+	elseif token.str == "SIZEOF" then
+		atom = astnode_t("sizeof", token)
+
+		atom.expr = parser.parseExpression(lex)
+
+		if not atom.expr then
+			return false
+		end
 
 		return atom
 	elseif token.str == "NOT" then

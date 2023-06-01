@@ -1061,6 +1061,16 @@ function parser.parseCompoundType(lex, compound)
 		return false
 	end
 
+	if nametoken.str == "PACKED" then
+		type.packed = true
+
+		nametoken = lex.nextToken()
+
+		if not parser.checkToken(nametoken) then
+			return false
+		end
+	end
+
 	while true do
 		local aheadtoken = lex.nextToken()
 
@@ -1501,7 +1511,7 @@ parser.assigns = {
 	["%="] = true,
 	["&="] = true,
 	["|="] = true,
-	[".="] = true,
+	[".="] = true, -- xor equals
 	[">>="] = true,
 	["<<="] = true,
 }

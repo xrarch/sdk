@@ -81,7 +81,7 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 
 				local dir = dirtab[1]
 
-				if dir == "ifdef" then
+				if dir == "IFDEF" then
 					if not ifdefstack[#ifdefstack] then
 						ifdefstack[#ifdefstack+1] = false
 					elseif symbols[dirtab[2]] then
@@ -89,7 +89,7 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 					else
 						ifdefstack[#ifdefstack+1] = false
 					end
-				elseif dir == "ifndef" then
+				elseif dir == "IFNDEF" then
 					if not ifdefstack[#ifdefstack] then
 						ifdefstack[#ifdefstack+1] = false
 					elseif symbols[dirtab[2]] then
@@ -97,7 +97,7 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 					else
 						ifdefstack[#ifdefstack+1] = true
 					end
-				elseif dir == "else" then
+				elseif dir == "ELSE" then
 					if #ifdefstack == 1 then
 						print(string.format("tbc: %s:%d: no matching ifdef", name, line))
 						return false
@@ -106,7 +106,7 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 					if ifdefstack[#ifdefstack-1] then
 						ifdefstack[#ifdefstack] = not ifdefstack[#ifdefstack]
 					end
-				elseif dir == "endif" then
+				elseif dir == "ENDIF" then
 					if #ifdefstack == 1 then
 						print(string.format("tbc: %s:%d: no matching ifdef", name, line))
 						return false
@@ -114,7 +114,7 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 
 					ifdefstack[#ifdefstack] = nil
 				elseif ifdefstack[#ifdefstack] then
-					if dir == "include" then
+					if dir == "INCLUDE" then
 						local inc = dirtab[2]
 
 						if (#inc > 2) and (inc:sub(1,1) == '"') and (inc:sub(-1,-1) == '"') then
@@ -175,7 +175,7 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 							print(string.format("tbc: %s:%d: malformed include", name, line))
 							return
 						end
-					elseif dir == "define" then
+					elseif dir == "DEFINE" then
 						if dirtab[2] then
 							if dirtab[3] then
 								if dirtab[3] ~= "0" then
@@ -193,7 +193,7 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 								srctext.append("const "..dirtab[2].." : int = 0")
 							end
 						end
-					elseif dir == "undef" then
+					elseif dir == "UNDEF" then
 						symbols[dirtab[2]] = nil
 					else
 						print(string.format("tbc: %s:%d: unknown directive '%s'", name, line, dir))

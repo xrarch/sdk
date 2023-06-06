@@ -17,6 +17,8 @@ local chartreatment = {
 	["["] = CHAR_SPLIT,
 	["]"] = CHAR_SPLIT,
 	[":"] = CHAR_SPLIT,
+	["{"] = CHAR_SPLIT,
+	["}"] = CHAR_SPLIT,
 
 	["="] = CHAR_COALESCE,
 	["&"] = CHAR_COALESCE,

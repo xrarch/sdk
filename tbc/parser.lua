@@ -357,6 +357,10 @@ function parser.parseAtom(lex, assign)
 
 		atom.value = parser.parseInitializer(lex)
 
+		if not atom.value then
+			return false
+		end
+
 		return atom
 	elseif token.str == "TRUE" then
 		atom = astnode_t("number", token)
@@ -616,7 +620,7 @@ function parser.parseAtom(lex, assign)
 	return atom
 end
 
-function parser.parseDeclaration(lex, const)
+function parser.parseDeclaration(lex, const, public)
 	-- returns a def, caller decides whether to turn that into a statement.
 	-- does define the symbol for you.
 
@@ -628,6 +632,7 @@ function parser.parseDeclaration(lex, const)
 
 	local def = def_t(nametoken.str, symboltypes.SYM_VAR)
 	def.const = const
+	def.public = public
 
 	local colontoken = lex.nextToken()
 
@@ -1062,6 +1067,11 @@ function parser.parseCompoundType(lex, compound)
 	end
 
 	if nametoken.str == "PACKED" then
+		if compound ~= "struct" then
+			parser.err(nametoken, "union specified as packed")
+			return false
+		end
+
 		type.packed = true
 
 		nametoken = lex.nextToken()
@@ -1119,7 +1129,104 @@ function parser.parseCompoundType(lex, compound)
 end
 
 function parser.parseInitializer(lex)
-	error("unimp")
+	local initializer = {}
+	initializer.vals = {}
+
+	local isnamed = false
+	local isnum = false
+
+	while true do
+		local token = lex.nextToken()
+
+		if not parser.checkToken(token, true) then
+			return false
+		end
+
+		if token.str == "}" then
+			break
+		end
+
+		local atom
+
+		if token.str == "[" then
+			if isnum then
+				parser.err(token, "can't mix named and non-named fields in initializer")
+				return false
+			end
+
+			isnamed = true
+
+			local expr = parser.parseExpression(lex)
+
+			if not expr then
+				return false
+			end
+
+			local namedfield = {}
+			namedfield.name = expr
+
+			token = lex.nextToken()
+
+			if not parser.checkToken(token) then
+				return false
+			end
+
+			if not token.str == "]" then
+				parser.err(token, "expected ]")
+				return false
+			end
+
+			token = lex.nextToken()
+
+			if not parser.checkToken(token) then
+				return false
+			end
+
+			if not token.str == "=" then
+				parser.err(token, "expected =")
+				return false
+			end
+
+			namedfield.value = parser.parseExpression(lex, nil, true)
+
+			if not namedfield then
+				return false
+			end
+
+			table.insert(initializer.vals, namedfield)
+		else
+			if isnamed then
+				parser.err(token, "can't mix named and non-named fields in initializer")
+				return false
+			end
+
+			isnum = true
+
+			lex.lastToken(token)
+
+			local expr = parser.parseExpression(lex)
+
+			if not expr then
+				return false
+			end
+
+			table.insert(initializer.vals, expr)
+		end
+
+		token = lex.nextToken()
+
+		if token.str == "}" then
+			break
+		elseif token.str ~= "," then
+			parser.err(token, "unexpected token, expected ','")
+			return false
+		end
+	end
+
+	initializer.isnamed = isnamed
+	initializer.isnum = isnum
+
+	return initializer
 end
 
 parser.keywords = {
@@ -1377,6 +1484,12 @@ parser.keywords = {
 		end
 
 		def.extern = true
+
+		return nil
+	end,
+
+	["PUBLIC"] = function (lex)
+		parser.parseDeclaration(lex, false, true)
 
 		return nil
 	end,

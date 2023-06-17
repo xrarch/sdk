@@ -84,3 +84,41 @@ _G.symboltypes = {
 	SYM_TYPE  = 2,
 	SYM_LABEL = 3,
 }
+
+_G.primitivetypes = {}
+
+primitivetypes.byte = {}
+primitivetypes.byte.min = -128
+primitivetypes.byte.max = 127
+primitivetypes.byte.bits = 8
+primitivetypes.byte.ctype = "int8_t"
+
+primitivetypes.int = {}
+primitivetypes.int.min = -32768
+primitivetypes.int.max = 32767
+primitivetypes.int.bits = 16
+primitivetypes.int.ctype = "int16_t"
+
+primitivetypes.long = {}
+primitivetypes.long.min = -2147483648
+primitivetypes.long.max = 2147483647
+primitivetypes.long.bits = 32
+primitivetypes.long.ctype = "int32_t"
+
+primitivetypes.ubyte = {}
+primitivetypes.ubyte.min = 0
+primitivetypes.ubyte.max = 255
+primitivetypes.ubyte.bits = 8
+primitivetypes.ubyte.ctype = "uint8_t"
+
+primitivetypes.uint = {}
+primitivetypes.uint.min = 0
+primitivetypes.uint.max = 65535
+primitivetypes.uint.bits = 16
+primitivetypes.uint.ctype = "uint16_t"
+
+primitivetypes.ulong = {}
+primitivetypes.ulong.min = 0
+primitivetypes.ulong.max = 4294967295
+primitivetypes.ulong.bits = 32
+primitivetypes.ulong.ctype = "uint32_t"

@@ -15,7 +15,7 @@ local function astnode_t(type, errtoken)
 	return node
 end
 
-local function def_t(name, symboltype)
+local function def_t(name, symboltype, errtoken)
 	-- create and initialize a symbol definition
 
 	local def = {}
@@ -28,13 +28,16 @@ local function def_t(name, symboltype)
 	def.value = nil
 	def.extern = false
 	def.enumconst = false
+	def.decltype = nil
+	def.errtoken = errtoken
 
 	return def
 end
 
-local function typedef_t(name, type)
-	local def = def_t(name, symboltypes.SYM_TYPE)
+local function typedef_t(name, type, errtoken)
+	local def = def_t(name, symboltypes.SYM_TYPE, errtoken)
 	def.value = type
+	def.decltype = "type"
 
 	return def
 end
@@ -59,11 +62,12 @@ local function type_t()
 	return type
 end
 
-local function funcdef_t(name)
+local function funcdef_t(name, errtoken)
 	local funcdef = {}
 	funcdef.args = {}
 	funcdef.returntype = nil
 	funcdef.name = name
+	funcdef.errtoken = errtoken
 
 	return funcdef
 end
@@ -96,6 +100,27 @@ function parser.checkToken(token, canbenumerical)
 end
 
 function parser.parse(filename, file, incdir, libdir, symbols)
+	local gtype = type_t()
+	gtype.base = "ubyte"
+	gtype.primitive = primitivetypes.ubyte
+
+	local type = type_t()
+	type.pointer = true
+	type.base = gtype
+
+	_G.stringtype = type
+
+	type = type_t()
+	type.base = "ulong"
+	type.primitive = primitivetypes.ulong
+
+	_G.defnumtype = type
+
+	type = type_t()
+	type.pointer = true
+
+	_G.defptrtype = type
+
 	local lex = lexer.new(filename, file, incdir, libdir, symbols)
 
 	parser.loopdepth = 0
@@ -175,7 +200,8 @@ function parser.parseBlock(lex, terminators, func)
 				return false
 			end
 
-			local def = def_t(nexttoken.str, symboltypes.SYM_LABEL)
+			local def = def_t(nexttoken.str, symboltypes.SYM_LABEL, token)
+			def.decltype = "label"
 
 			if not defineSymbol(parser.funcblock, def, false) then
 				parser.err(token, "label name already declared")
@@ -460,13 +486,21 @@ function parser.parseAtom(lex, assign)
 	elseif token.str == "-" then
 		-- unary inverse
 
-		atom = astnode_t("inverse", token)
+		local expr = parser.parseAtom(lex)
 
-		atom.expr = parser.parseAtom(lex)
-
-		if not atom.expr then
+		if not expr then
 			return false
 		end
+
+		if expr.nodetype == "number" then
+			expr.value = -expr.value
+
+			return expr
+		end
+
+		atom = astnode_t("inverse", token)
+
+		atom.expr = expr
 
 		return atom
 	elseif token.str == "^" then
@@ -632,9 +666,10 @@ function parser.parseDeclaration(lex, const, public)
 		return false
 	end
 
-	local def = def_t(nametoken.str, symboltypes.SYM_VAR)
+	local def = def_t(nametoken.str, symboltypes.SYM_VAR, nametoken)
 	def.const = const
 	def.public = public
+	def.decltype = "var"
 
 	local colontoken = lex.nextToken()
 
@@ -723,7 +758,9 @@ function parser.parseDeclaration(lex, const, public)
 	return def
 end
 
-function parser.parseType(lex)
+function parser.parseType(lex, depth)
+	depth = depth or 0
+
 	local type = type_t()
 
 	local token = lex.nextToken()
@@ -734,23 +771,25 @@ function parser.parseType(lex)
 
 	if token.str == "^" then
 		type.pointer = true
-		type.base = parser.parseType(lex)
+		type.base = parser.parseType(lex, depth + 1)
 
 		if not type.base then
 			return false
 		end
+	else
+		local base = token.str
+		type.base = base
 
+		if primitivetypes[base] then
+			type.primitive = primitivetypes[base]
+		else
+			type.simple = true
+		end
+	end
+
+	if depth > 0 then
 		return type
 	end
-
-	local base = token.str
-	type.base = base
-
-	if primitivetypes[base] then
-		type.primitive = primitivetypes[base]
-	end
-
-	local curtype = type
 
 	-- collect all of the array parts
 
@@ -762,7 +801,7 @@ function parser.parseType(lex)
 		return type
 	end
 
-	type.primitive = false
+	type.simple = false
 	type.array = true
 	type.dimensions = 0
 	type.bounds = {}
@@ -904,7 +943,7 @@ function parser.parseFunctionSignature(lex)
 		end
 	end
 
-	local funcdef = funcdef_t(aheadtoken.str)
+	local funcdef = funcdef_t(aheadtoken.str, aheadtoken)
 
 	funcdef.fnptrtype = fntype
 
@@ -1036,12 +1075,27 @@ function parser.parseFunction(lex)
 		return false
 	end
 
+	for i = 1, #funcdef.args do
+		local arg = funcdef.args[i]
+
+		local argdef = def_t(arg.name, symboltypes.SYM_VAR, funcdef.errtoken)
+		argdef.decltype = "var"
+		argdef.enumconst = true -- this is a lie but it stops it from being gen'd
+		argdef.type = arg.type
+
+		if not defineSymbol(funcdef.body, argdef) then
+			parser.err(funcdef.errtoken, string.format("%s already defined", argdef.name))
+			return false
+		end
+	end
+
 	-- consume the token for end
 
 	local tok = lex.nextToken()
 
-	local def = def_t(funcdef.name, symboltypes.SYM_VAR)
+	local def = def_t(funcdef.name, symboltypes.SYM_VAR, funcdef.errtoken)
 	def.funcdef = funcdef
+	def.decltype = "fn"
 
 	if nocheck then
 		local sym = findSymbol(parser.currentblock, def.name)
@@ -1076,6 +1130,7 @@ function parser.parseCompoundType(lex, compound)
 	local type = type_t()
 	type.compound = compound
 	type.elements = {}
+	type.elementsbyname = {}
 
 	local nametoken = lex.nextToken()
 
@@ -1097,6 +1152,8 @@ function parser.parseCompoundType(lex, compound)
 			return false
 		end
 	end
+
+	type.name = nametoken.str
 
 	while true do
 		local aheadtoken = lex.nextToken()
@@ -1126,6 +1183,7 @@ function parser.parseCompoundType(lex, compound)
 		end
 
 		table.insert(type.elements, element)
+		type.elementsbyname[aheadtoken.str] = element
 
 		aheadtoken = lex.nextToken()
 
@@ -1137,12 +1195,14 @@ function parser.parseCompoundType(lex, compound)
 		end
 	end
 
-	local def = typedef_t(nametoken.str, type)
+	local def = typedef_t(nametoken.str, type, nametoken)
 
 	if not defineSymbol(parser.currentblock, def, false) then
 		parser.err(nametoken, string.format("%s already defined", def.name))
 		return false
 	end
+
+	return true
 end
 
 function parser.parseInitializer(lex)
@@ -1404,7 +1464,7 @@ parser.keywords = {
 			return false
 		end
 
-		local def = typedef_t(nametoken.str, type)
+		local def = typedef_t(nametoken.str, type, nametoken)
 
 		if not defineSymbol(parser.currentblock, def, false) then
 			parser.err(nametoken, string.format("%s already defined", def.name))
@@ -1415,13 +1475,17 @@ parser.keywords = {
 	end,
 
 	["STRUCT"] = function (lex)
-		parser.parseCompoundType(lex, "struct")
+		if not parser.parseCompoundType(lex, "struct") then
+			return false
+		end
 
 		return nil
 	end,
 
 	["UNION"] = function (lex)
-		parser.parseCompoundType(lex, "union")
+		if not parser.parseCompoundType(lex, "union") then
+			return false
+		end
 
 		return nil
 	end,
@@ -1437,7 +1501,7 @@ parser.keywords = {
 		type.funcdef = funcdef
 		type.pointer = true
 
-		local def = typedef_t(funcdef.name, type)
+		local def = typedef_t(funcdef.name, type, funcdef.errtoken)
 
 		if not defineSymbol(parser.currentblock, def, false) then
 			parser.err(nametoken, string.format("%s already defined", def.name))
@@ -1524,7 +1588,7 @@ parser.keywords = {
 		local type = type_t()
 		type.base = basetype
 
-		local def = typedef_t(nametoken.str, type)
+		local def = typedef_t(nametoken.str, type, nametoken)
 
 		if not defineSymbol(parser.currentblock, def, false) then
 			parser.err(nametoken, string.format("%s already defined", def.name))
@@ -1545,8 +1609,10 @@ parser.keywords = {
 				break
 			end
 
-			local def = def_t(token.str, symboltypes.SYM_VAR)
+			local def = def_t(token.str, symboltypes.SYM_VAR, token)
 			def.enumconst = true
+			def.const = true
+			def.type = basetype
 
 			if not defineSymbol(parser.currentblock, def, false) then
 				parser.err(nametoken, string.format("%s already defined", def.name))
@@ -1680,8 +1746,9 @@ parser.decls = {
 			return false
 		end
 
-		local def = def_t(funcdef.name, symboltypes.SYM_VAR)
+		local def = def_t(funcdef.name, symboltypes.SYM_VAR, funcdef.errtoken)
 		def.funcdef = funcdef
+		def.decltype = "fn"
 
 		if not defineSymbol(parser.currentblock, def, false) then
 			parser.err(nametoken, string.format("%s already defined", def.name))

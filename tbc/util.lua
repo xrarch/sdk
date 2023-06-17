@@ -19,7 +19,12 @@ function _G.defineSymbol(scopeblock, def, nocheck)
 		end
 	end
 
+	if not def.decltype then
+		error("no decltype")
+	end
+
 	scopeblock.scope[def.name] = def
+	def.scopeblock = scopeblock
 
 	-- add to an ordered list of definitions as well for things that would
 	-- like to iterate that, so that the output can be deterministic.
@@ -87,38 +92,50 @@ _G.symboltypes = {
 
 _G.primitivetypes = {}
 
-primitivetypes.byte = {}
-primitivetypes.byte.min = -128
-primitivetypes.byte.max = 127
-primitivetypes.byte.bits = 8
-primitivetypes.byte.ctype = "int8_t"
+primitivetypes._char = {}
+primitivetypes._char.min = -128
+primitivetypes._char.max = 127
+primitivetypes._char.bits = 8
+primitivetypes._char.ctype = "char"
 
-primitivetypes.int = {}
-primitivetypes.int.min = -32768
-primitivetypes.int.max = 32767
-primitivetypes.int.bits = 16
-primitivetypes.int.ctype = "int16_t"
+primitivetypes._int = {}
+primitivetypes._int.min = -2147483648
+primitivetypes._int.max = 2147483647
+primitivetypes._int.bits = 32
+primitivetypes._int.ctype = "int"
 
-primitivetypes.long = {}
-primitivetypes.long.min = -2147483648
-primitivetypes.long.max = 2147483647
-primitivetypes.long.bits = 32
-primitivetypes.long.ctype = "int32_t"
+primitivetypes.BYTE = {}
+primitivetypes.BYTE.min = -128
+primitivetypes.BYTE.max = 127
+primitivetypes.BYTE.bits = 8
+primitivetypes.BYTE.ctype = "int8_t"
 
-primitivetypes.ubyte = {}
-primitivetypes.ubyte.min = 0
-primitivetypes.ubyte.max = 255
-primitivetypes.ubyte.bits = 8
-primitivetypes.ubyte.ctype = "uint8_t"
+primitivetypes.INT = {}
+primitivetypes.INT.min = -32768
+primitivetypes.INT.max = 32767
+primitivetypes.INT.bits = 16
+primitivetypes.INT.ctype = "int16_t"
 
-primitivetypes.uint = {}
-primitivetypes.uint.min = 0
-primitivetypes.uint.max = 65535
-primitivetypes.uint.bits = 16
-primitivetypes.uint.ctype = "uint16_t"
+primitivetypes.LONG = {}
+primitivetypes.LONG.min = -2147483648
+primitivetypes.LONG.max = 2147483647
+primitivetypes.LONG.bits = 32
+primitivetypes.LONG.ctype = "int32_t"
 
-primitivetypes.ulong = {}
-primitivetypes.ulong.min = 0
-primitivetypes.ulong.max = 4294967295
-primitivetypes.ulong.bits = 32
-primitivetypes.ulong.ctype = "uint32_t"
+primitivetypes.UBYTE = {}
+primitivetypes.UBYTE.min = 0
+primitivetypes.UBYTE.max = 255
+primitivetypes.UBYTE.bits = 8
+primitivetypes.UBYTE.ctype = "uint8_t"
+
+primitivetypes.UINT = {}
+primitivetypes.UINT.min = 0
+primitivetypes.UINT.max = 65535
+primitivetypes.UINT.bits = 16
+primitivetypes.UINT.ctype = "uint16_t"
+
+primitivetypes.ULONG = {}
+primitivetypes.ULONG.min = 0
+primitivetypes.ULONG.max = 4294967295
+primitivetypes.ULONG.bits = 32
+primitivetypes.ULONG.ctype = "uint32_t"

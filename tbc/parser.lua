@@ -817,24 +817,22 @@ function parser.parseFunctionSignature(lex)
 		else
 			local arg = {}
 
-			if (aheadtoken.str == "IN") or
-				(aheadtoken.str == "OUT") or 
-				(aheadtoken.str == "INOUT") then
+			if aheadtoken.str == "IN" then
+				arg.inspec = true
+			elseif aheadtoken.str == "OUT" then
+				arg.outspec = true
+			elseif aheadtoken.str == "INOUT" then
+				arg.inspec = true
+				arg.outspec = true
+			else
+				parser.err(aheadtoken, "expected IN, OUT, or INOUT")
+				return false
+			end
 
-				if aheadtoken.str == "IN" then
-					arg.inspec = true
-				elseif aheadtoken.str == "OUT" then
-					arg.outspec = true
-				elseif aheadtoken.str == "INOUT" then
-					arg.inspec = true
-					arg.outspec = true
-				end
+			aheadtoken = lex.nextToken()
 
-				aheadtoken = lex.nextToken()
-
-				if not parser.checkToken(aheadtoken, true) then
-					return false
-				end
+			if not parser.checkToken(aheadtoken, true) then
+				return false
 			end
 
 			arg.name = aheadtoken.str

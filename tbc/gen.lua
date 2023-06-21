@@ -66,6 +66,7 @@ function gen.genBlock(block)
 
 	gen.output = oldout
 	gen.forwards = oldforwards
+	gen.currentblock = brackets
 
 	return true
 end
@@ -218,7 +219,7 @@ function gen.getSymbol(scopeblock, name, errtoken, symtype)
 	local sym = findSymbol(scopeblock, name)
 
 	if not sym then
-		error("hm")
+		--error("hm")
 		gen.err(errtoken, string.format("undefined symbol %s", name))
 		return false
 	end
@@ -228,7 +229,7 @@ function gen.getSymbol(scopeblock, name, errtoken, symtype)
 		return false
 	end
 
-	if not sym.genned then
+	if (not sym.genned) and (not sym.funcdef) then
 		if not gen.genDeclaration(sym) then
 			return false
 		end

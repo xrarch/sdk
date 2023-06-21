@@ -12,7 +12,6 @@ function newsb()
 	end
 
 	function sb.tostring()
-		print(#sb.stack)
 		return table.concat(sb.stack)
 	end
 

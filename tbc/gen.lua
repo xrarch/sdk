@@ -48,8 +48,6 @@ function gen.genBlock(block)
 	for i = 1, #block.statements do
 		local stmt = block.statements[i]
 
-		print("w",stmt.nodetype)
-
 		if not gen.genExprFunctions[stmt.nodetype](stmt) then
 			return false
 		end
@@ -88,8 +86,6 @@ function gen.genDeclaration(decl)
 
 	decl.genned = true
 
-	print(decl.decltype)
-
 	local oldout = gen.output
 	local oldforwards = gen.forwards
 
@@ -108,7 +104,6 @@ end
 
 function gen.genType(typenode, name, arrayhack)
 	local rootnode = gen.suffix == nil
-	print("weufe",gen.suffix)
 
 	if rootnode then
 		gen.suffix = newsb()
@@ -199,8 +194,6 @@ function gen.genType(typenode, name, arrayhack)
 		end
 	end
 
-	print(rootnode)
-
 	if rootnode then
 		gen.output.append(gen.suffix.tostring())
 		gen.suffix = nil
@@ -210,8 +203,6 @@ function gen.genType(typenode, name, arrayhack)
 end
 
 function gen.generateExpression(expr)
-	print(expr.nodetype)
-
 	return gen.genExprFunctions[expr.nodetype](expr)
 end
 
@@ -248,8 +239,6 @@ function gen.evaluateType(etype, errtoken)
 	end
 
 	if type(etype.base) == "string" then
-		print(etype.base)
-
 		local sym = gen.getSymbol(gen.currentblock, etype.base, errtoken, symboltypes.SYM_TYPE)
 
 		if not sym then

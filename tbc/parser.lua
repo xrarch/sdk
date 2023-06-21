@@ -79,7 +79,6 @@ local function numnode_t(number, errtoken)
 end
 
 function parser.err(token, err)
-	--error("waaaah")
 	print(string.format("tbc: %s:%d: %s", token.filename, token.linenumber, err))
 end
 
@@ -524,8 +523,6 @@ function parser.parseDeclaration(lex, const, public, extern)
 	end
 
 	local nocheck = not const
-
-	print(nocheck)
 
 	if nocheck then
 		local sym = findSymbol(parser.currentblock, def.name)

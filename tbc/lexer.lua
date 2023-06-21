@@ -33,6 +33,7 @@ local chartreatment = {
 	["%"] = CHAR_COALESCE,
 	["."] = CHAR_COALESCE,
 	["@"] = CHAR_COALESCE,
+	["$"] = CHAR_COALESCE,
 }
 
 function lexer.new(filename, file, incdir, libdir, symbols)
@@ -162,7 +163,7 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 		-- self-hosted compiler.
 
 		if #lex.ungetstack > 0 then
-			return table.remove(lex.ungetstack, 1)
+			return table.remove(lex.ungetstack)
 		end
 
 		local firstpos = 0

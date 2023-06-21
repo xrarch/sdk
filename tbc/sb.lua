@@ -3,11 +3,16 @@ function newsb()
 
 	sb.stack = {}
 
+	function sb.prepend(str)
+		table.insert(sb.stack, 1, str)
+	end
+
 	function sb.append(str)
 		table.insert(sb.stack, str)
 	end
 
 	function sb.tostring()
+		print(#sb.stack)
 		return table.concat(sb.stack)
 	end
 

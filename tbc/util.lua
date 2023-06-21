@@ -11,11 +11,13 @@ function _G.findSymbol(searchblock, name)
 end
 
 function _G.defineSymbol(scopeblock, def, nocheck)
-	if not nocheck then
-		local sym = findSymbol(scopeblock, def.name)
+	local sym = findSymbol(scopeblock, def.name)
 
-		if sym then
+	if sym then
+		if not nocheck or scopeblock.parentblock then
 			return false
+		else
+			sym.ignore = true -- makes it skip it
 		end
 	end
 

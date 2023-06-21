@@ -105,51 +105,104 @@ function gen.genDeclaration(decl)
 	return true
 end
 
-function gen.genType(typenode, name)
-	local aname = name or ""
+function gen.genType(typenode, name, arrayhack)
+	local rootnode = gen.suffix == nil
+	print("weufe",gen.suffix)
+
+	if rootnode then
+		gen.suffix = newsb()
+	end
 
 	if type(typenode) == "string" then
-		gen.output.append(typenode.." "..aname)
+		gen.output.append(typenode)
 
-		return true
-	end
+		if name then
+			gen.output.append(" "..name)
+		end
+	elseif typenode.compound or typenode.enumtype then
+		gen.output.append(typenode.name)
 
-	if typenode.compound then
-		gen.output.append(typenode.name.." "..aname)
+		if name then
+			gen.output.append(" "..name)
+		end
+	elseif typenode.pointer then
+		if typenode.base.funcdef then
+			if not gen.genFunctionSignatureCommon(typenode.base.funcdef, name) then
+				return false
+			end
+		else
+			if not gen.genType(typenode.base) then
+				return false
+			end
 
-		return true
-	end
+			if (typenode.base.pointer or typenode.base.array) and name then
+				gen.output.append("(")
+			end
 
-	if typenode.pointer then
-		if not gen.genType(typenode.base) then
+			gen.output.append("*")
+
+			if name then
+				gen.output.append(" "..name)
+			end
+
+			if (typenode.base.pointer or typenode.base.array) and name then
+				gen.output.append(")")
+			end
+		end
+	elseif typenode.primitive then
+		gen.output.append(typenode.primitive.ctype)
+
+		if name then
+			gen.output.append(" "..name)
+		end
+	elseif typenode.array then
+		if not gen.genType(typenode.base, name) then
 			return false
 		end
 
-		gen.output.append("*" .. aname)
-	elseif typenode.primitive then
-		gen.output.append(typenode.primitive.ctype.." "..aname)
+		local arsb = newsb()
+
+		arsb.append("[")
+
+		local oldout = gen.output
+		gen.output = arsb
+
+		if typenode.bounds then
+			if not gen.generateExpression(typenode.bounds) then
+				return false
+			end
+		end
+
+		gen.output = oldout
+
+		arsb.append("]")
+
+		gen.suffix.prepend(arsb.tostring())
+	elseif typenode.funcdef then
+		-- coerce to pointer
+
+		local newtypenode = {}
+		newtypenode.pointer = true
+		newtypenode.base = typenode
+		
+		if not gen.genType(newtypenode, name) then
+			return false
+		end
 	else
 		if not gen.genType(typenode.base) then
 			return false
 		end
 
 		if name then
-			gen.output.append(name)
+			gen.output.append(" "..name)
 		end
 	end
 
-	if typenode.array then
-		for i = 1, typenode.dimensions do
-			gen.output.append("[")
+	print(rootnode)
 
-			if typenode.bounds[i] then
-				if not gen.generateExpression(typenode.bounds[i]) then
-					return false
-				end
-			end
-
-			gen.output.append("]")
-		end
+	if rootnode then
+		gen.output.append(gen.suffix.tostring())
+		gen.suffix = nil
 	end
 
 	return true
@@ -165,6 +218,7 @@ function gen.getSymbol(scopeblock, name, errtoken, symtype)
 	local sym = findSymbol(scopeblock, name)
 
 	if not sym then
+		error("hm")
 		gen.err(errtoken, string.format("undefined symbol %s", name))
 		return false
 	end
@@ -185,6 +239,10 @@ end
 
 function gen.evaluateType(etype, errtoken)
 	if etype.primitive then
+		return etype
+	end
+
+	if etype.enumtype then
 		return etype
 	end
 
@@ -210,77 +268,7 @@ function gen.evaluateType(etype, errtoken)
 end
 
 function gen.determineType(expr)
-	if expr.nodetype == "string" then
-		return stringtype
-	end
-
-	if expr.nodetype == "number" then
-		return defnumtype
-	end
-
-	if expr.nodetype == "cast" then
-		return expr.type
-	end
-
-	if expr.nodetype == "addrof" then
-		local type = {}
-		type.pointer = true
-		type.base = gen.determineType(expr.expr)
-
-		if not type.base then
-			return false
-		end
-
-		return type
-	end
-
-	if expr.nodetype == "deref" then
-		local type = gen.determineType(expr.expr)
-
-		if not type then
-			return false
-		end
-
-		if not type.pointer then
-			gen.err(expr.errtoken, "attempt to deref a non-pointer type")
-			return false
-		end
-
-		return type.base
-	end
-
-	if expr.nodetype == "id" then
-		local varname = expr.names[1]
-
-		local sym = gen.getSymbol(gen.currentblock, varname, expr.errtoken, symboltypes.SYM_VAR)
-
-		if not sym then
-			return false
-		end
-
-		local type
-
-		if sym.funcdef then
-			type = {}
-			type.pointer = true
-			type.funcdef = sym.funcdef
-		else
-			type = sym.type
-		end
-
-		for i = 2, #expr.names do
-			print(expr.names[i])
-
-			if not type.compound then
-				gen.err(expr.errtoken, "attempt to access a field in a non compound type")
-				return false
-			end
-		end
-
-		return type
-	end
-
-	tprint(expr)
+	return gen.determineTypeFunctions[expr.nodetype](expr)
 end
 
 function gen.genCompoundType(decl)
@@ -356,7 +344,7 @@ function gen.genFunctionSignature(funcdef, extern)
 	return gen.genFunctionSignatureCommon(funcdef)
 end
 
-function gen.genFunctionSignatureCommon(funcdef)
+function gen.genFunctionSignatureCommon(funcdef, fnptrname)
 	if funcdef.returntype then
 		if not gen.genType(funcdef.returntype) then
 			return false
@@ -367,7 +355,15 @@ function gen.genFunctionSignatureCommon(funcdef)
 		gen.output.append("void ")
 	end
 
-	gen.output.append(funcdef.name)
+	if fnptrname then
+		gen.output.append("(*")
+
+		gen.output.append(fnptrname)
+
+		gen.output.append(")")
+	else
+		gen.output.append(funcdef.name)
+	end
 
 	gen.output.append("(")
 
@@ -394,6 +390,14 @@ function gen.genFunctionSignatureCommon(funcdef)
 	gen.output.append(")")
 
 	return true
+end
+
+function gen.determineTypeArith(expr)
+	if expr.left.nodetype == "number" then
+		return gen.determineType(expr.right)
+	end
+
+	return gen.determineType(expr.left)
 end
 
 function gen.generateArith(expr)
@@ -434,6 +438,47 @@ function gen.generateAssign (expr)
 	return gen.generateExpression(expr.right)
 end
 
+function gen.genEnum(decl)
+	gen.output.append("enum _" .. decl.name .. " {\n")
+
+	for i = 1, #decl.values do
+		local val = decl.values[i]
+
+		gen.output.append(val.name)
+
+		if val.value then
+			gen.output.append("=")
+
+			if not gen.generateExpression(val.value) then
+				return false
+			end
+		end
+
+		gen.output.append(",\n")
+	end
+
+	gen.output.append("};\n")
+
+	gen.forwards.append("typedef enum _" ..decl.name .. " " .. decl.name .. ";\n")
+
+	return true
+end
+
+function gen.genFnPtr(decl)
+	gen.forwards.append("typedef ")
+
+	local oldout = gen.output
+	gen.output = gen.forwards
+
+	gen.genFunctionSignatureCommon(decl.value.funcdef, decl.name)
+
+	gen.output = oldout
+
+	gen.forwards.append(";\n")
+
+	return true
+end
+
 gen.genExprFunctions = {
 	["number"] = function (expr)
 		gen.output.append(tostring(expr.value))
@@ -441,26 +486,65 @@ gen.genExprFunctions = {
 		return true
 	end,
 	["id"] = function (expr)
-		gen.output.append(expr.names[1])
+		local sym = gen.getSymbol(gen.currentblock, expr.name, expr.errtoken, symboltypes.SYM_VAR)
 
-		for i = 2, #expr.names do
-			gen.output.append("." .. expr.names[i])
+		if not sym then
+			return false
 		end
+
+		gen.output.append(expr.name)
+
+		return true
+	end,
+	["."] = function (expr)
+		local type = gen.determineType(expr.left)
+
+		if not type then
+			return false
+		end
+
+		if type.pointer then
+			gen.err(expr.errtoken, "attempt to access a field in a pointer type, use ^.")
+			return false
+		end
+
+		if not type.compound then
+			gen.err(expr.errtoken, "attempt to access a field in a non compound type")
+			return false
+		end
+
+		if expr.right.nodetype ~= "id" then
+			gen.err(expr.errtoken, "non-id right side of . operator")
+			return false
+		end
+
+		if not gen.generateExpression(expr.left) then
+			return false
+		end
+
+		local field = type.elementsbyname[expr.right.name]
+
+		if not field then
+			gen.err(expr.errtoken, "attempt to access a non-existent field")
+			return false
+		end
+
+		gen.output.append("." .. expr.right.name)
 
 		return true
 	end,
 	["addrof"] = function (expr)
 		gen.output.append("&")
 
-		return gen.generateExpression(expr.expr)
+		return gen.generateExpression(expr.left)
 	end,
 	["label"] = function (expr)
 		gen.output.append(expr.def.name..":\n")
 
 		return true
 	end,
-	["call"] = function (expr)
-		if not gen.generateExpression(expr.funcname) then
+	["("] = function (expr)
+		if not gen.generateExpression(expr.left) then
 			return false
 		end
 
@@ -531,29 +615,36 @@ gen.genExprFunctions = {
 
 		return true
 	end,
-	["arrayref"] = function (expr)
-		if not gen.generateExpression(expr.base) then
+	["["] = function (expr)
+		if not gen.generateExpression(expr.left) then
 			return false
 		end
 
-		for i = 1, #expr.indices do
-			local index = expr.indices[1]
+		gen.output.append("[")
 
-			gen.output.append("[")
-
-			if not gen.generateExpression(index.expr) then
-				return false
-			end
-
-			gen.output.append("]")
+		if not gen.generateExpression(expr.expr) then
+			return false
 		end
+
+		gen.output.append("]")
 
 		return true
 	end,
-	["deref"] = function (expr)
-		gen.output.append("*")
+	["^"] = function (expr)
+		gen.output.append("(*")
 
-		return gen.generateExpression(expr.expr)
+		if not gen.generateExpression(expr.left) then
+			return false
+		end
+
+		gen.output.append(")")
+
+		return true
+	end,
+	["inverse"] = function (expr)
+		gen.output.append("-")
+
+		return gen.generateExpression(expr.left)
 	end,
 	["continue"] = function (expr)
 		gen.output.append("continue")
@@ -576,6 +667,69 @@ gen.genExprFunctions = {
 
 		return gen.genBlock(expr.block)
 	end,
+	["block"] = function (expr)
+		return gen.genBlock(expr)
+	end,
+	["goto"] = function (expr)
+		gen.output.append("goto " .. expr.name)
+
+		return true
+	end,
+	["cast"] = function (expr)
+		gen.output.append("(")
+
+		if not gen.genType(expr.type) then
+			return false
+		end
+
+		gen.output.append(")(")
+
+		if not gen.generateExpression(expr.left) then
+			return false
+		end
+
+		gen.output.append(")")
+
+		return true
+	end,
+	["sizeof"] = function (expr)
+		gen.output.append("sizeof(")
+
+		if not gen.generateExpression(expr.left) then
+			return false
+		end
+
+		gen.output.append(")")
+
+		return true
+	end,
+	["initializer"] = function (expr)
+		gen.output.append("{\n")
+
+		for i = 1, #expr.vals do
+			local val = expr.vals[i]
+
+			if val.index then
+				gen.output.append("[")
+
+				if not gen.generateExpression(val.index) then
+					return false
+				end
+
+				gen.output.append("] = ")
+			end
+
+			if not gen.generateExpression(val.value) then
+				return false
+			end
+
+			gen.output.append(",\n")
+		end
+
+		gen.output.append("}")
+
+		return true
+	end,
 
 	["="] = gen.generateAssign,
 	["+="] = gen.generateAssign,
@@ -584,7 +738,7 @@ gen.genExprFunctions = {
 	["%="] = gen.generateAssign,
 	["&="] = gen.generateAssign,
 	["|="] = gen.generateAssign,
-	[".="] = gen.generateAssign, -- xor equals
+	["$="] = gen.generateAssign, -- xor equals
 	[">>="] = gen.generateAssign,
 	["<<="] = gen.generateAssign,
 
@@ -602,7 +756,7 @@ gen.genExprFunctions = {
 	["=="] = gen.generateArith,
 	["!="] = gen.generateArith,
 	["&"] = gen.generateArith,
-	["^"] = gen.generateArith,
+	["$"] = gen.generateArith,
 	["|"] = gen.generateArith,
 	["AND"] = gen.generateArith,
 	["OR"] = gen.generateArith,
@@ -610,12 +764,8 @@ gen.genExprFunctions = {
 
 gen.genFunctions = {
 	["var"] = function (decl)
-		if decl.enumconst then
+		if decl.ignore then
 			return true
-		end
-
-		if decl.const then
-			gen.output.append("const ")
 		end
 
 		local type = decl.type
@@ -632,14 +782,22 @@ gen.genFunctions = {
 		decl.type = gen.evaluateType(type, decl.errtoken)
 		type = decl.type
 
+		if decl.const then
+			gen.output.append("const ")
+		elseif decl.extern then
+			gen.output.append("extern ")
+		end
+
 		if not gen.genType(type, decl.name) then
 			return false
 		end
 
-		if decl.value then
+		if decl.value and not decl.dontinitialize then
 			gen.output.append(" = ")
 
-			gen.generateExpression(decl.value)
+			if not gen.generateExpression(decl.value) then
+				return false
+			end
 		end
 
 		gen.output.append(";\n")
@@ -657,7 +815,7 @@ gen.genFunctions = {
 			return gen.genFnPtr(decl)
 		end
 
-		if type.values then
+		if decl.values then
 			return gen.genEnum(decl)
 		end
 
@@ -702,6 +860,150 @@ gen.genFunctions = {
 	["label"] = function (decl)
 		return true
 	end,
+}
+
+gen.determineTypeFunctions = {
+	["string"] = function (expr)
+		return stringtype
+	end,
+	["number"] = function (expr)
+		return defnumtype
+	end,
+	["cast"] = function (expr)
+		return gen.evaluateType(expr.type, expr.errtoken)
+	end,
+	["addrof"] = function (expr)
+		local type = {}
+		type.pointer = true
+		type.base = gen.determineType(expr.left)
+
+		if not type.base then
+			return false
+		end
+
+		return type
+	end,
+	["^"] = function (expr)
+		local type = gen.determineType(expr.left)
+
+		if not type then
+			return false
+		end
+
+		if not type.pointer then
+			gen.err(expr.errtoken, "attempt to deref a non-pointer type")
+			return false
+		end
+
+		return gen.evaluateType(type.base)
+	end,
+	["id"] = function (expr)
+		local varname = expr.name
+
+		local sym = gen.getSymbol(gen.currentblock, varname, expr.errtoken, symboltypes.SYM_VAR)
+
+		if not sym then
+			return false
+		end
+
+		local type
+
+		if sym.funcdef then
+			type = {}
+			type.funcdef = sym.funcdef
+		else
+			type = gen.evaluateType(sym.type, expr.errtoken)
+
+			if not type then
+				return false
+			end
+		end
+
+		return type
+	end,
+	["."] = function (expr)
+		local type = gen.determineType(expr.left)
+
+		if not type then
+			return false
+		end
+
+		if type.pointer then
+			gen.err(expr.errtoken, "attempt to access a field in a pointer type, use ^.")
+			return false
+		end
+
+		if not type.compound then
+			gen.err(expr.errtoken, "attempt to access a field in a non compound type")
+			return false
+		end
+
+		if expr.right.nodetype ~= "id" then
+			gen.err(expr.errtoken, "non-id right side of . operator")
+			return false
+		end
+
+		local field = type.elementsbyname[expr.right.name]
+
+		if not field then
+			gen.err(expr.errtoken, "attempt to access a non-existent field")
+			return false
+		end
+
+		return gen.evaluateType(field.type, expr.errtoken)
+	end,
+	["["] = function (expr)
+		local type = gen.determineType(expr.left)
+
+		if not type then
+			return false
+		end
+
+		if not type.array and not type.pointer then
+			gen.err(expr.errtoken, "attempt to index non-array, non-pointer type")
+			return false
+		end
+
+		return gen.evaluateType(type.base)
+	end,
+	["("] = function (expr)
+		local type = gen.determineType(expr.left)
+
+		if not type then
+			return false
+		end
+
+		if not type.funcdef then
+			gen.err(expr.errtoken, "attempt to call non-function type")
+			return false
+		end
+
+		if not type.funcdef.returntype then
+			gen.err(expr.errtoken, "attempt to take type of void function")
+			return false
+		end
+
+		return gen.evaluateType(type.funcdef.returntype)
+	end,
+
+	["*"] = gen.determineTypeArith,
+	["/"] = gen.determineTypeArith,
+	["%"] = gen.determineTypeArith,
+	["+"] = gen.determineTypeArith,
+	["-"] = gen.determineTypeArith,
+	["<<"] = gen.determineTypeArith,
+	[">>"] = gen.determineTypeArith,
+	["<"] = gen.determineTypeArith,
+	[">"] = gen.determineTypeArith,
+	["<="] = gen.determineTypeArith,
+	[">="] = gen.determineTypeArith,
+	["=="] = gen.determineTypeArith,
+	["!="] = gen.determineTypeArith,
+	["&"] = gen.determineTypeArith,
+	["$"] = gen.determineTypeArith,
+	["|"] = gen.determineTypeArith,
+	["AND"] = gen.determineTypeArith,
+	["OR"] = gen.determineTypeArith,
 }
 
 return gen

@@ -106,6 +106,9 @@ primitivetypes._int.max = 2147483647
 primitivetypes._int.bits = 32
 primitivetypes._int.ctype = "int"
 
+primitivetypes.VOID = {}
+primitivetypes.VOID.ctype = "void"
+
 primitivetypes.BYTE = {}
 primitivetypes.BYTE.min = -128
 primitivetypes.BYTE.max = 127

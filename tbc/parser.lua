@@ -122,6 +122,10 @@ function parser.parse(filename, file, incdir, libdir, symbols)
 
 	local lex = lexer.new(filename, file, incdir, libdir, symbols)
 
+	if not lex then
+		return false
+	end
+
 	parser.loopdepth = 0
 
 	return parser.parseBlock(lex)
@@ -895,7 +899,7 @@ function parser.parseFunctionSignature(lex)
 	return funcdef
 end
 
-function parser.parseFunction(lex)
+function parser.parseFunction(lex, extern)
 	local funcdef = parser.parseFunctionSignature(lex)
 
 	if not funcdef then
@@ -930,31 +934,29 @@ function parser.parseFunction(lex)
 	def.funcdef = funcdef
 	def.decltype = "fn"
 
-	if nocheck then
-		local sym = findSymbol(parser.currentblock, def.name)
+	local sym = findSymbol(parser.currentblock, def.name)
 
-		if sym then
-			if not sym.extern then
-				parser.err(tok, string.format("%s already defined", def.name))
-				return false
-			end
-
-			if not sym.funcdef then
-				parser.err(tok, string.format("%s already defined", def.name))
-				return false
-			end
-
-			if not parser.compareFunctionSignatures(funcdef, sym.funcdef, true) then
-				parser.err(tok, string.format("function signature mismatch with previously declared extern"))
-				return false
-			end
-
-			sym.ignore = true
+	if sym then
+		if not sym.extern then
+			parser.err(tok, string.format("%s already defined", def.name))
+			return false
 		end
+
+		if not sym.funcdef then
+			parser.err(tok, string.format("%s already defined", def.name))
+			return false
+		end
+
+		if not parser.compareFunctionSignatures(funcdef, sym.funcdef, true) then
+			parser.err(tok, string.format("function signature mismatch with previously declared extern"))
+			return false
+		end
+
+		sym.ignore = true
 	end
 
-	if not defineSymbol(parser.currentblock, def) then
-		parser.err(nametoken, string.format("%s already defined", def.name))
+	if not defineSymbol(parser.currentblock, def, true) then
+		parser.err(funcdef.errtoken, string.format("%s already defined", def.name))
 		return false
 	end
 end

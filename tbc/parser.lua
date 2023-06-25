@@ -408,8 +408,6 @@ function parser.parseAtom(lex, assign, minprec)
 		atom = astnode_t("string", token)
 
 		atom.value = token.str
-
-		return atom
 	elseif token.str == "{" then
 		-- initializer
 
@@ -420,9 +418,11 @@ function parser.parseAtom(lex, assign, minprec)
 
 		return parser.parseInitializer(lex, token)
 	elseif token.str == "TRUE" then
-		return numnode_t(1, token)
+		atom = numnode_t(1, token)
 	elseif token.str == "FALSE" then
-		return numnode_t(0, token)
+		atom = numnode_t(0, token)
+	elseif token.str == "NULL" then
+		atom = numnode_t(0, token)
 	elseif token.str == "(" then
 		-- parenthesized expression
 
@@ -450,8 +450,6 @@ function parser.parseAtom(lex, assign, minprec)
 		atom = astnode_t("number", token)
 
 		atom.value = token.value
-
-		return atom
 	else
 		-- identifier
 

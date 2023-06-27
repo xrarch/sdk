@@ -79,6 +79,7 @@ local function numnode_t(number, errtoken)
 end
 
 function parser.err(token, err)
+	--error("gunk")
 	print(string.format("tbc: %s:%d: %s", token.filename, token.linenumber, err))
 end
 
@@ -420,8 +421,6 @@ function parser.parseAtom(lex, assign, minprec)
 	elseif token.str == "TRUE" then
 		atom = numnode_t(1, token)
 	elseif token.str == "FALSE" then
-		atom = numnode_t(0, token)
-	elseif token.str == "NULL" then
 		atom = numnode_t(0, token)
 	elseif token.str == "(" then
 		-- parenthesized expression
@@ -1273,6 +1272,10 @@ parser.keywords = {
 		return node
 	end,
 
+	["LEAVE"] = function (lex)
+		return astnode_t("leave", parser.errtoken)
+	end,
+
 	["TYPE"] = function (lex)
 		local nametoken = lex.nextToken()
 
@@ -1371,7 +1374,7 @@ parser.keywords = {
 				return false
 			end
 
-			if def.value then
+			if def and def.value then
 				parser.err(nametoken, "initialization is not allowed in extern definitions")
 				return false
 			end
@@ -1734,6 +1737,7 @@ parser.decls = {
 parser.assigns = {
 	["="] = true,
 	["+="] = true,
+	["-="] = true,
 	["*="] = true,
 	["/="] = true,
 	["%="] = true,

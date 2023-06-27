@@ -562,6 +562,10 @@ gen.genExprFunctions = {
 
 			if c == "\n" then
 				gen.output.append("\\n")
+			elseif c == "\\" then
+				gen.output.append("\\")
+			elseif c == '"' then
+				gen.output.append("\\\"")
 			else
 				gen.output.append(c)
 			end
@@ -575,6 +579,11 @@ gen.genExprFunctions = {
 		gen.output.append("return ")
 
 		return gen.generateExpression(expr.expr)
+	end,
+	["leave"] = function (expr)
+		gen.output.append("return")
+
+		return true
 	end,
 	["if"] = function (expr)
 		gen.output.append("if ")
@@ -635,6 +644,17 @@ gen.genExprFunctions = {
 		gen.output.append("-")
 
 		return gen.generateExpression(expr.left)
+	end,
+	["not"] = function (expr)
+		gen.output.append("(!")
+
+		if not gen.generateExpression(expr.left) then
+			return false
+		end
+
+		gen.output.append(")")
+
+		return true
 	end,
 	["continue"] = function (expr)
 		gen.output.append("continue")
@@ -723,6 +743,7 @@ gen.genExprFunctions = {
 
 	["="] = gen.generateAssign,
 	["+="] = gen.generateAssign,
+	["-="] = gen.generateAssign,
 	["*="] = gen.generateAssign,
 	["/="] = gen.generateAssign,
 	["%="] = gen.generateAssign,
@@ -773,7 +794,7 @@ gen.genFunctions = {
 		type = decl.type
 
 		if decl.const then
-			gen.output.append("const ")
+			gen.output.append("static const ")
 		elseif decl.extern then
 			gen.output.append("extern ")
 		end

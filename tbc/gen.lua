@@ -401,6 +401,8 @@ function gen.generateArith(expr)
 		gen.output.append(" && ")
 	elseif expr.nodetype == "OR" then
 		gen.output.append(" || ")
+	elseif expr.nodetype == "$" then
+		gen.output.append(" ^ ")
 	else
 		gen.output.append(" " .. expr.nodetype .. " ")
 	end
@@ -419,7 +421,7 @@ function gen.generateAssign (expr)
 		return false
 	end
 
-	if expr.nodetype == ".=" then
+	if expr.nodetype == "$=" then
 		gen.output.append(" ^= ")
 	else
 		gen.output.append(" " .. expr.nodetype .. " ")

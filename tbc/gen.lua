@@ -702,10 +702,21 @@ gen.genExprFunctions = {
 
 		return true
 	end,
-	["sizeof"] = function (expr)
+	["sizeofvalue"] = function (expr)
 		gen.output.append("sizeof(")
 
 		if not gen.generateExpression(expr.left) then
+			return false
+		end
+
+		gen.output.append(")")
+
+		return true
+	end,
+	["sizeof"] = function (expr)
+		gen.output.append("sizeof(")
+
+		if not gen.genType(expr.value) then
 			return false
 		end
 

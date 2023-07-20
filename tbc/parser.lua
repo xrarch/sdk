@@ -422,6 +422,20 @@ function parser.parseAtom(lex, assign, minprec)
 		atom = numnode_t(1, token)
 	elseif token.str == "FALSE" then
 		atom = numnode_t(0, token)
+	elseif token.str == "SIZEOF" then
+		atom = astnode_t("sizeof", token)
+
+		atom.value = parser.parseType(lex)
+
+		if not atom.value then
+			return false
+		end
+	elseif token.value then
+		-- numerical value
+
+		atom = astnode_t("number", token)
+
+		atom.value = token.value
 	elseif token.str == "(" then
 		-- parenthesized expression
 
@@ -443,12 +457,6 @@ function parser.parseAtom(lex, assign, minprec)
 			parser.err(token, "unexpected token, expected )")
 			return false
 		end
-	elseif token.value then
-		-- numerical value
-
-		atom = astnode_t("number", token)
-
-		atom.value = token.value
 	else
 		-- identifier
 
@@ -1555,10 +1563,10 @@ parser.leftoperators = {
 			return true
 		end
 	},
-	["SIZEOF"] = {
+	["SIZEOFVALUE"] = {
 		precedence = 24,
 		parse = function (lex, minprec, node)
-			node.nodetype = "sizeof"
+			node.nodetype = "sizeofvalue"
 			return true
 		end,
 	}

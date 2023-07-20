@@ -382,6 +382,10 @@ function lexer.new(filename, file, incdir, libdir, symbols)
 			token.value = tonumber(token.str)
 		end
 
+		if token.value then
+			token.str = nil
+		end
+
 		return token
 	end
 

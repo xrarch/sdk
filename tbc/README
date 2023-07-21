@@ -1,4 +1,8 @@
 Tower Bootstrap Compiler
 
 Tower -> C compiler for use in writing the real self-hosted compiler.
-Won't be maintained after that compiler is complete.
+Won't be maintained after that compiler is complete, so this one is very
+rudimentary, does little error checking, will readily let bad stuff fall
+through to the C compiler, etc. Don't use this expecting a good time -- it's
+purely temporary for use in developing the real compiler and its entire purpose
+is to vanish as quickly as possible.

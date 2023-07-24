@@ -8,6 +8,40 @@ local function getdirectory(p)
 	return "./"
 end
 
+local gencount = 0
+
+function _G.tprint (tbl, indent)
+	if not indent then
+		gencount = gencount + 1
+		indent = 0
+	end
+
+	if tbl._tprint_gen_count == gencount then
+		local formatting = string.rep("  ", indent)
+
+		print(formatting .. "already printed!")
+
+		return
+	end
+
+	tbl._tprint_gen_count = gencount
+
+	for k, v in pairs(tbl) do
+		if k ~= "_tprint_gen_count" then
+			local formatting = string.rep("  ", indent) .. k .. ": "
+
+			if type(v) == "table" then
+				print(formatting)
+				tprint(v, indent+1)
+			elseif type(v) == 'boolean' then
+				print(formatting .. tostring(v))      
+			else
+				print(formatting .. tostring(v))
+			end
+		end
+	end
+end
+
 local asm = {}
 
 local function lerror(line, message)

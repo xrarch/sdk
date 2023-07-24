@@ -206,7 +206,7 @@ local function addFormat(operandinfo, encodingstring, formatstring, jmp)
 	format.bits = #encodingstring
 
 	if band(format.bits, 7) ~= 0 then
-		error("format bits isn't multiple of 8")
+		error("format bits isn't multiple of 8 " .. encodingstring)
 	end
 
 	format.bytes = format.bits/8
@@ -345,6 +345,8 @@ function numtobin(num, bits)
 end
 
 function repeatbit(b, n)
+	if n == 0 then return "" end
+
 	local bitstr = ""
 
 	for i = 1, n do
@@ -354,7 +356,7 @@ function repeatbit(b, n)
 	return bitstr
 end
 
-function makeFoxOpcode(opcode, size, condition, dest, src)
+function makeFoxOpcode(opcode, size, condition, dest, src, hasoff)
 	local bitstr = ""
 
 	-- generate opcode byte
@@ -364,7 +366,12 @@ function makeFoxOpcode(opcode, size, condition, dest, src)
 
 	-- generate condition byte
 
-	bitstr = bitstr .. "0"
+	if hasoff then
+		bitstr = bitstr .. "1"
+	else
+		bitstr = bitstr .. "0"
+	end
+
 	bitstr = bitstr .. "ccc"
 	bitstr = bitstr .. numtobin(dest, 2)
 	bitstr = bitstr .. numtobin(src, 2)
@@ -628,6 +635,16 @@ local instructions = {
 	},
 }
 
+local special8bitimm = {}
+
+special8bitimm.sla = true
+special8bitimm.srl = true
+special8bitimm.sra = true
+special8bitimm.rol = true
+special8bitimm.ror = true
+special8bitimm.bse = true
+special8bitimm.bcl = true
+
 -- type:
 -- 0: register
 -- 1: imm
@@ -638,6 +655,12 @@ local optypesd = {
 		"[^rd]",
 		1,
 		0
+	},
+	{
+		"[^rd + ^np]",
+		1,
+		0,
+		true
 	},
 	{
 		"[^nd]",
@@ -656,6 +679,12 @@ local optypess = {
 		"[^rs]",
 		1,
 		0
+	},
+	{
+		"[^rs + ^no]",
+		1,
+		0,
+		true
 	},
 	{
 		"[^ns]",
@@ -709,6 +738,12 @@ function addFoxFormats(instr)
 					local opid = v3[2]
 					local opreg = v3[3]
 
+					local srcoffset = ""
+
+					if hasoff then
+						srcoffset = repeatbit("o", 8)
+					end
+
 					local opinf
 
 					local fbittage
@@ -733,7 +768,7 @@ function addFoxFormats(instr)
 
 					addFormat(
 						opinfo,
-						repeatbit("s", fbittage)..makeFoxOpcode(opcode, v2, 0, 0, opid),
+						srcoffset..repeatbit("s", fbittage)..makeFoxOpcode(opcode, v2, 0, 0, opid, v3[4]),
 						f2.." "..opfmt,
 						instr[4]
 					)
@@ -749,7 +784,11 @@ function addFoxFormats(instr)
 					if sreg == 0 then
 						sbittage = 8
 					elseif sreg == 1 then
-						sbittage = bittage
+						if special8bitimm[name] then -- the shift instructions have special small imms
+							sbittage = 8
+						else
+							sbittage = bittage
+						end
 					elseif sreg == 2 then
 						sbittage = 32
 					end
@@ -758,6 +797,35 @@ function addFoxFormats(instr)
 						local dfmt = v4[1]
 						local did = v4[2]
 						local dreg = v4[3]
+
+						local destoffset = ""
+						local srcoffset = ""
+
+						if v4[4] then
+							if v3[3] == 0 then
+								-- src is a reg
+
+								if not v3[4] then
+									-- put a dummy offset on the source
+									srcoffset = "00000000"
+								else
+									srcoffset = repeatbit("o", 8)
+								end
+							end
+
+							destoffset = repeatbit("p", 8)
+						elseif v3[4] then
+							if v4[3] == 0 then
+								-- dest is a reg
+
+								-- put a dummy offset on the dest
+								destoffset = "00000000"
+							end
+
+							srcoffset = repeatbit("o", 8)
+						else
+							srcoffset = ""
+						end
 
 						local dbittage
 
@@ -783,7 +851,7 @@ function addFoxFormats(instr)
 
 						addFormat(
 							opinfo,
-							repeatbit("d", dbittage)..repeatbit("s", sbittage)..makeFoxOpcode(opcode, v2, 0, did, sid),
+							destoffset..repeatbit("d", dbittage)..srcoffset..repeatbit("s", sbittage)..makeFoxOpcode(opcode, v2, 0, did, sid, v3[4] or v4[4]),
 							f2.." "..dfmt.." "..sfmt,
 							instr[4]
 						)

@@ -802,7 +802,7 @@ function addFoxFormats(instr)
 						local srcoffset = ""
 
 						if v4[4] then
-							if v3[3] == 0 then
+							if v3[2] == 1 then
 								-- src is a reg
 
 								if not v3[4] then
@@ -815,7 +815,7 @@ function addFoxFormats(instr)
 
 							destoffset = repeatbit("p", 8)
 						elseif v3[4] then
-							if v4[3] == 0 then
+							if v4[2] == 1 then
 								-- dest is a reg
 
 								-- put a dummy offset on the dest

@@ -1674,39 +1674,39 @@ parser.operators = {
 		precedence = 18,
 		associativity = LEFT,
 	},
-	["<"] = {
-		precedence = 17,
-		associativity = LEFT,
-	},
-	[">"] = {
-		precedence = 17,
-		associativity = LEFT,
-	},
-	["<="] = {
-		precedence = 17,
-		associativity = LEFT,
-	},
-	[">="] = {
-		precedence = 17,
-		associativity = LEFT,
-	},
-	["=="] = {
-		precedence = 16,
-		associativity = LEFT,
-	},
-	["!="] = {
-		precedence = 16,
-		associativity = LEFT,
-	},
 	["&"] = {
-		precedence = 15,
+		precedence = 17,
 		associativity = LEFT,
 	},
 	["$"] = {
-		precedence = 14,
+		precedence = 16,
 		associativity = LEFT,
 	},
 	["|"] = {
+		precedence = 15,
+		associativity = LEFT,
+	},
+	["<"] = {
+		precedence = 14,
+		associativity = LEFT,
+	},
+	[">"] = {
+		precedence = 14,
+		associativity = LEFT,
+	},
+	["<="] = {
+		precedence = 14,
+		associativity = LEFT,
+	},
+	[">="] = {
+		precedence = 14,
+		associativity = LEFT,
+	},
+	["=="] = {
+		precedence = 13,
+		associativity = LEFT,
+	},
+	["!="] = {
 		precedence = 13,
 		associativity = LEFT,
 	},

@@ -558,10 +558,10 @@ local optable = {
 		end
 
 		text("\tiflt rjmp "..out)
-		text("\tmov "..rd.n..", 0")
+		text("\tmovz.8 "..rd.n..", 0")
 		text("\trjmp "..out2)
 		text(out..":")
-		text("\tmov "..rd.n..", 1")
+		text("\tmovz.8 "..rd.n..", 1")
 		text(out2..":")
 
 		freeofp(rd, reg1, reg2)
@@ -587,10 +587,10 @@ local optable = {
 		end
 
 		text("\tifgt rjmp "..out)
-		text("\tmov "..rd.n..", 0")
+		text("\tmovz.8 "..rd.n..", 0")
 		text("\trjmp "..out2)
 		text(out..":")
-		text("\tmov "..rd.n..", 1")
+		text("\tmovz.8 "..rd.n..", 1")
 		text(out2..":")
 
 		freeofp(rd, reg1, reg2)
@@ -641,10 +641,10 @@ local optable = {
 		text("\tifz  jmp "..badout)
 		text("\tand  "..rd.n..", 0x80000000")
 		text("\tifnz jmp "..badout)
-		text("\tmov  "..rd.n..", 1")
+		text("\tmovz.8  "..rd.n..", 1")
 		text("\tjmp  "..goodout)
 		text(badout..":")
-		text("\tmov  "..rd.n..", 0")
+		text("\tmovz.8  "..rd.n..", 0")
 		text(goodout..":")
 
 		freeofp(rd, rs)
@@ -680,10 +680,10 @@ local optable = {
 		end
 
 		text("\tiflteq rjmp "..out)
-		text("\tmov "..rd.n..", 0")
+		text("\tmovz.8 "..rd.n..", 0")
 		text("\trjmp "..out2)
 		text(out..":")
-		text("\tmov "..rd.n..", 1")
+		text("\tmovz.8 "..rd.n..", 1")
 		text(out2..":")
 
 		freeofp(rd, reg1, reg2)
@@ -709,10 +709,10 @@ local optable = {
 		end
 
 		text("\tifgteq rjmp "..out)
-		text("\tmov "..rd.n..", 0")
+		text("\tmovz.8 "..rd.n..", 0")
 		text("\trjmp "..out2)
 		text(out..":")
-		text("\tmov "..rd.n..", 1")
+		text("\tmovz.8 "..rd.n..", 1")
 		text(out2..":")
 
 		freeofp(rd, reg1, reg2)
@@ -930,10 +930,10 @@ function cg.expr(node, allowdirectauto, allowdirectptr, immtoreg, rootcanmut, al
 
 				text("\tcmp "..ro.n..", 0")
 				text("\tifz rjmp "..out)
-				text("\tmov "..rd.n..", 0")
+				text("\tmovz.8 "..rd.n..", 0")
 				text("\trjmp "..out2)
 				text(out..":")
-				text("\tmov "..rd.n..", 1")
+				text("\tmovz.8 "..rd.n..", 1")
 				text(out2..":")
 
 				freeofp(rd, ro)

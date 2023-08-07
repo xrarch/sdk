@@ -807,7 +807,15 @@ gen.genFunctions = {
 		type = decl.type
 
 		if decl.const then
-			gen.output.append("static const ")
+			gen.output.append("#define " .. decl.name .. " ")
+
+			if not gen.generateExpression(decl.value) then
+				return false
+			end
+
+			gen.output.append("\n")
+
+			return true
 		elseif decl.extern then
 			gen.output.append("extern ")
 		end

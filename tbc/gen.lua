@@ -557,7 +557,7 @@ gen.genExprFunctions = {
 		return true
 	end,
 	["string"] = function (expr)
-		gen.output.append('"')
+		gen.output.append('(uint8_t*)("')
 
 		for i = 1, #expr.value do
 			local c = expr.value:sub(i,i)
@@ -573,7 +573,7 @@ gen.genExprFunctions = {
 			end
 		end
 
-		gen.output.append('"')
+		gen.output.append('")')
 
 		return true
 	end,
@@ -601,7 +601,9 @@ gen.genExprFunctions = {
 
 			gen.output.append(")")
 
-			gen.genBlock(body)
+			if not gen.genBlock(body) then
+				return false
+			end
 
 			if i ~= #expr.bodies then
 				gen.output.append(" else if ")
@@ -611,7 +613,9 @@ gen.genExprFunctions = {
 		if expr.elseblock then
 			gen.output.append(" else ")
 
-			gen.genBlock(expr.elseblock)
+			if not gen.genBlock(expr.elseblock) then
+				return false
+			end
 		end
 
 		return true

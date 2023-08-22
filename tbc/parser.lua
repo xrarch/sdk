@@ -827,11 +827,8 @@ function parser.parseFunctionSignature(lex)
 				arg.inspec = true
 			elseif aheadtoken.str == "OUT" then
 				arg.outspec = true
-			elseif aheadtoken.str == "INOUT" then
-				arg.inspec = true
-				arg.outspec = true
 			else
-				parser.err(aheadtoken, "expected IN, OUT, or INOUT")
+				parser.err(aheadtoken, "expected IN or OUT")
 				return false
 			end
 

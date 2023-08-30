@@ -758,6 +758,12 @@ gen.genExprFunctions = {
 		return true
 	end,
 
+	["nullptr"] = function (decl)
+		gen.output.append("0")
+
+		return true
+	end,
+
 	["="] = gen.generateAssign,
 	["+="] = gen.generateAssign,
 	["-="] = gen.generateAssign,
@@ -918,6 +924,9 @@ gen.determineTypeFunctions = {
 		end
 
 		return type
+	end,
+	["nullptr"] = function (expr)
+		return nullptrtype
 	end,
 	["^"] = function (expr)
 		local type = gen.determineType(expr.left)

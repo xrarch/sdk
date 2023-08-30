@@ -101,7 +101,7 @@ end
 
 function parser.parse(filename, file, incdir, libdir, symbols)
 	local gtype = type_t()
-	gtype.base = "ubyte"
+	gtype.base = "UBYTE"
 	gtype.primitive = primitivetypes.UBYTE
 
 	local type = type_t()
@@ -116,10 +116,15 @@ function parser.parse(filename, file, incdir, libdir, symbols)
 
 	_G.defnumtype = type
 
+	gtype = type_t()
+	gtype.base = "VOID"
+	gtype.primitive = primitivetypes.VOID
+
 	type = type_t()
 	type.pointer = true
+	type.base = gtype
 
-	_G.defptrtype = type
+	_G.nullptrtype = type
 
 	local lex = lexer.new(filename, file, incdir, libdir, symbols)
 
@@ -422,6 +427,8 @@ function parser.parseAtom(lex, assign, minprec)
 		atom = numnode_t(1, token)
 	elseif token.str == "FALSE" then
 		atom = numnode_t(0, token)
+	elseif token.str == "NULLPTR" then
+		atom = astnode_t("nullptr", token)
 	elseif token.str == "SIZEOF" then
 		atom = astnode_t("sizeof", token)
 

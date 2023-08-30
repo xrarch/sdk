@@ -41,12 +41,12 @@ function preproc.pp(name, srcf, incdir, libdir, symbols, first)
 		for k,v in pairs(symbols) do
 			if v then
 				if tonumber(v) then
-					srctext.append("const "..k.." : int = "..v.."\n")
+					srctext.append("const "..k.." := "..v.."\n")
 				else
-					srctext.append("const "..k.." : int = 1\n")
+					srctext.append("const "..k.." := 1\n")
 				end
 			else
-				srctext.append("const "..k.." : int = 0\n")
+				srctext.append("const "..k.." := 0\n")
 			end
 		end
 	end

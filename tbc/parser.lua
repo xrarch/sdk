@@ -427,6 +427,8 @@ function parser.parseAtom(lex, assign, minprec)
 		atom = numnode_t(1, token)
 	elseif token.str == "FALSE" then
 		atom = numnode_t(0, token)
+	elseif token.str == "NULL" then
+		atom = numnode_t(0, token)
 	elseif token.str == "NULLPTR" then
 		atom = astnode_t("nullptr", token)
 	elseif token.str == "SIZEOF" then

@@ -393,9 +393,17 @@ function parser.parseAtom(lex, assign, minprec)
 		return false
 	end
 
+
+
 	local leftop = parser.leftoperators[token.str]
 
-	if leftop then
+	if token.literal then
+		-- string
+
+		atom = astnode_t("string", token)
+
+		atom.value = token.str
+	elseif leftop then
 		atom = astnode_t(token.str, token)
 		atom.left = parser.parseExpression(lex, leftop.precedence)
 
@@ -408,12 +416,6 @@ function parser.parseAtom(lex, assign, minprec)
 				return false
 			end
 		end
-	elseif token.literal then
-		-- string
-
-		atom = astnode_t("string", token)
-
-		atom.value = token.str
 	elseif token.str == "{" then
 		-- initializer
 

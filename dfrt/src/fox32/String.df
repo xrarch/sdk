@@ -13,7 +13,7 @@ memset:
 
 	mov  r31, a1
 	srl  r31, 2
-	ifz  jmp .skip
+	ifz  rjmp .skip
 
 .wordloop:
 	mov  [a2], a0
@@ -23,7 +23,7 @@ memset:
 .skip:
 	mov  r31, a1
 	and  r31, 3
-	ifz  jmp .skipbyte
+	ifz  rjmp .skipbyte
 
 .byteloop:
 	mov.8 [a2], a0
@@ -45,7 +45,7 @@ memcpy:
 
 	mov  r31, a0
 	srl  r31, 2
-	ifz  jmp .skip
+	ifz  rjmp .skip
 
 .wordloop:
 	mov  [a2], [a1]
@@ -56,52 +56,7 @@ memcpy:
 .skip:
 	mov  r31, a0
 	and  r31, 3
-	ifz  jmp .skipbyte
-
-.byteloop:
-	mov.8 [a2], [a1]
-	add  a2, 1
-	add  a1, 1
-	rloop .byteloop
-
-.skipbyte:
-	pop  fp
-	ret
-
-;a0 - size
-;a1 - src
-;a2 - dest
-memmove_fwd:
-	push fp
-	mov  fp, sp
-
-; if src - dest > 3, we can do our tricks.
-; otherwise, this will cause horrible things to happen.
-
-	mov  t0, a1
-	sub  t0, a2
-	cmp  t0, 3
-	ifgt jmp .go
-
-	mov  r31, a0
-
-	jmp  .byteloop
-
-.go:
-	mov  r31, a0
-	srl  r31, 2
-	ifz  jmp .skip
-
-.wordloop:
-	mov  [a2], [a1]
-	add  a2, 4
-	add  a1, 4
-	rloop .wordloop
-
-.skip:
-	mov  r31, a0
-	and  r31, 3
-	ifz  jmp .skipbyte
+	ifz  rjmp .skipbyte
 
 .byteloop:
 	mov.8 [a2], [a1]
@@ -117,8 +72,14 @@ memmove_fwd:
 ;a1 - src
 ;a2 - dest
 memmove_bck:
+.global memmove_bck
 	push fp
 	mov  fp, sp
+
+	mov  r31, a0
+
+	add  a1, a0
+	add  a2, a0
 
 ; if dest - src > 3, we can do our tricks.
 ; otherwise, this will cause horrible things to happen.
@@ -126,22 +87,10 @@ memmove_bck:
 	mov  t0, a2
 	sub  t0, a1
 	cmp  t0, 3
-	ifgt jmp .go
+	iflteq rjmp .byteloop
 
-	mov  r31, a0
-
-	add  a1, a0
-	add  a2, a0
-
-	jmp  .byteloop
-
-.go:
-	mov  r31, a0
 	srl  r31, 2
-	ifz  jmp .skip
-
-	add  a1, a0
-	add  a2, a0
+	ifz  rjmp .skip
 
 .wordloop:
 	sub  a2, 4
@@ -152,7 +101,7 @@ memmove_bck:
 .skip:
 	mov  r31, a0
 	and  r31, 3
-	ifz  jmp .skipbyte
+	ifz  rjmp .skipbyte
 
 .byteloop:
 	sub  a2, 1
@@ -170,11 +119,11 @@ memmove_bck:
 memmove:
 .global memmove
 	cmp  a0, 0
-	ifz  jmp .out
+	ifz  rjmp .out
 
 	cmp  a1, a2
-	iflt jmp .backwards
-	jmp  memmove_fwd
+	iflt rjmp .backwards
+	jmp  memcpy
 
 .backwards:
 	jmp  memmove_bck
@@ -192,14 +141,14 @@ strncpy:
 
 .loop:
 	cmp  a0, 0
-	ifz  jmp .done
+	ifz  rjmp .done
 	movz.8 t3, [a1]
 	mov.8 [a2], t3
 	add  a1, 1
 	add  a2, 1
 	sub  a0, 1
 	cmp  t3, 0
-	ifnz jmp .loop
+	ifnz rjmp .loop
 
 	pop  fp
 	ret

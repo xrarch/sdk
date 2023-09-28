@@ -1620,7 +1620,7 @@ parser.operators = {
 					return false
 				end
 
-				if aheadtoken.str == ")" then
+				if (not aheadtoken.literal) and aheadtoken.str == ")" then
 					break
 				end
 
@@ -1636,7 +1636,7 @@ parser.operators = {
 
 				aheadtoken = lex.nextToken()
 
-				if aheadtoken.str == ")" then
+				if (not aheadtoken.literal) and aheadtoken.str == ")" then
 					break
 				elseif aheadtoken.str ~= "," then
 					parser.err(aheadtoken, "unexpected token, expected ','")

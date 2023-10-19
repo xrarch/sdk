@@ -258,6 +258,10 @@ function gen.evaluateType(etype, errtoken)
 end
 
 function gen.determineType(expr)
+	if not gen.determineTypeFunctions[expr.nodetype] then
+		error("uh "..expr.nodetype)
+	end
+
 	return gen.determineTypeFunctions[expr.nodetype](expr)
 end
 
@@ -391,10 +395,40 @@ function gen.determineTypeArith(expr)
 end
 
 function gen.generateArith(expr)
+	local lefttype = gen.determineType(expr.left)
+
+	if not lefttype then
+		return false
+	end
+
+	local righttype = gen.determineType(expr.right)
+
+	if not righttype then
+		return false
+	end
+
+	-- In TOWER, pointer arithmetic is literal and loses the type, so we have
+	-- to cast here to uint8_t* if we see that happen and then the result
+	-- is casted to void*.
+
+	local ptrconvert = (expr.nodetype == "+") or (expr.nodetype == "-")
+
+	if ptrconvert and (lefttype.pointer or righttype.pointer) then
+		gen.output.append("(void*)")
+	end
+
 	gen.output.append("(")
+
+	if ptrconvert and lefttype.pointer then
+		gen.output.append("(uint8_t*)(")
+	end
 
 	if not gen.generateExpression(expr.left) then
 		return false
+	end
+
+	if ptrconvert and lefttype.pointer then
+		gen.output.append(")")
 	end
 
 	if expr.nodetype == "AND" then
@@ -407,8 +441,16 @@ function gen.generateArith(expr)
 		gen.output.append(" " .. expr.nodetype .. " ")
 	end
 
+	if ptrconvert and righttype.pointer then
+		gen.output.append("(uint8_t*)(")
+	end
+
 	if not gen.generateExpression(expr.right) then
 		return false
+	end
+
+	if ptrconvert and righttype.pointer then
+		gen.output.append(")")
 	end
 
 	gen.output.append(")")
@@ -416,7 +458,7 @@ function gen.generateArith(expr)
 	return true
 end
 
-function gen.generateAssign (expr)
+function gen.generateAssign(expr)
 	if not gen.generateExpression(expr.left) then
 		return false
 	end
@@ -924,6 +966,9 @@ gen.determineTypeFunctions = {
 		end
 
 		return type
+	end,
+	["sizeof"] = function (expr)
+		return defnumtype
 	end,
 	["nullptr"] = function (expr)
 		return nullptrtype

@@ -693,6 +693,17 @@ gen.genExprFunctions = {
 
 		return gen.generateExpression(expr.left)
 	end,
+	["~"] = function (expr)
+		gen.output.append("(~")
+
+		if not gen.generateExpression(expr.left) then
+			return false
+		end
+
+		gen.output.append(")")
+
+		return true
+	end,
 	["not"] = function (expr)
 		gen.output.append("(!")
 

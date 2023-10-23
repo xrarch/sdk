@@ -1639,7 +1639,7 @@ parser.operators = {
 				if (not aheadtoken.literal) and aheadtoken.str == ")" then
 					break
 				elseif aheadtoken.str ~= "," then
-					parser.err(aheadtoken, "unexpected token, expected ','")
+					parser.err(aheadtoken, "unexpected token, expected ',' "..aheadtoken.str)
 					return false
 				end
 			end

@@ -1074,6 +1074,10 @@ gen.determineTypeFunctions = {
 			return false
 		end
 
+		if type.fnptr then
+			type = type.base
+		end
+
 		if not type.funcdef then
 			gen.err(expr.errtoken, "attempt to call non-function type")
 			return false

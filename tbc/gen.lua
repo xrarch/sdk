@@ -981,6 +981,9 @@ gen.determineTypeFunctions = {
 	["sizeof"] = function (expr)
 		return defnumtype
 	end,
+	["not"] = function (expr)
+		return defnumtype
+	end,
 	["nullptr"] = function (expr)
 		return nullptrtype
 	end,

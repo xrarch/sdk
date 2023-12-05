@@ -57,7 +57,6 @@ isa.controlregisters = {
 	["tbindex"]  = 6,
 	["ebadaddr"] = 7,
 	["tbvec"]    = 8,
-	["fwvec"]    = 9,
 	["tbscratch"] = 10,
 	["tbhi"]     = 11,
 	["k0"]       = 12,
@@ -1157,14 +1156,14 @@ addFormat(
 
 addFormat(
 	{},
-	"0001iiiiiiiiiiiiiiiiiiiiii110001", -- brk i
-	"brk ^ni" 
+	"00010000000000000000000000110001", -- brk
+	"brk" 
 )
 
 addFormat(
 	{},
-	"0000iiiiiiiiiiiiiiiiiiiiii110001", -- sys i
-	"sys ^ni"
+	"00000000000000000000000000110001", -- sys
+	"sys"
 )
 
 addFormat(
@@ -1189,12 +1188,6 @@ addFormat(
 	{},
 	"10110000000000000000000000101001", -- rfe
 	"rfe"
-)
-
-addFormat(
-	{},
-	"1010iiiiiiiiiiiiiiiiiiiiii101001", -- fwc i
-	"fwc ^ni"
 )
 
 addFormat(

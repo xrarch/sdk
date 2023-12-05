@@ -240,7 +240,7 @@ if stubs then
 			end
 
 			stubs:write(string.format("\n\tli   t0, %d\n", sys.n))
-			stubs:write("\tsys  0\n\n")
+			stubs:write("\tsys\n\n")
 
 			regnum = FIRSTREG + #sys.rets - 1
 

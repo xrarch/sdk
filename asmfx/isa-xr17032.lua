@@ -50,19 +50,20 @@ isa.registers = {
 
 isa.controlregisters = {
 	["rs"]       = 0,
-	["tblo"]     = 2,
-	["epc"]      = 3,
-	["evec"]     = 4,
-	["pgtb"]     = 5,
-	["tbindex"]  = 6,
+	["tblo"]     = 1,
+	["tbhi"]     = 2,
+	["tbindex"]  = 3,
+	["tbpde"]    = 4,
+	["evec"]     = 5,
+	["epc"]      = 6,
 	["ebadaddr"] = 7,
 	["tbvec"]    = 8,
-	["tbscratch"] = 10,
-	["tbhi"]     = 11,
-	["k0"]       = 12,
-	["k1"]       = 13,
-	["k2"]       = 14,
-	["k3"]       = 15,
+
+	["scratch0"] = 11,
+	["scratch1"] = 12,
+	["scratch2"] = 13,
+	["scratch3"] = 14,
+	["scratch4"] = 15,
 }
 
 function isa.relocate(sections)

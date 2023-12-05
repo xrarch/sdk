@@ -54,10 +54,9 @@ isa.controlregisters = {
 	["tbhi"]     = 2,
 	["tbindex"]  = 3,
 	["tbpde"]    = 4,
-	["evec"]     = 5,
+	["eb"]       = 5,
 	["epc"]      = 6,
 	["ebadaddr"] = 7,
-	["tbvec"]    = 8,
 
 	["scratch0"] = 11,
 	["scratch1"] = 12,

@@ -49,20 +49,32 @@ isa.registers = {
 }
 
 isa.controlregisters = {
-	["rs"]       = 0,
-	["tblo"]     = 1,
-	["tbhi"]     = 2,
-	["tbindex"]  = 3,
-	["tbpde"]    = 4,
-	["eb"]       = 5,
-	["epc"]      = 6,
-	["ebadaddr"] = 7,
+	["rs"]         = 0,
+	["eb"]         = 5,
+	["epc"]        = 6,
+	["ebadaddr"]   = 7,
+	["tbmissaddr"] = 9,
+	["tbpc"]       = 10,
 
-	["scratch0"] = 11,
-	["scratch1"] = 12,
-	["scratch2"] = 13,
-	["scratch3"] = 14,
-	["scratch4"] = 15,
+	["scratch0"]   = 11,
+	["scratch1"]   = 12,
+	["scratch2"]   = 13,
+	["scratch3"]   = 14,
+	["scratch4"]   = 15,
+
+	["itbpte"]     = 16,
+	["itbtag"]     = 17,
+	["itbindex"]   = 18,
+	["itbctrl"]    = 19,
+	["icachectrl"] = 20,
+	["itbaddr"]    = 21,
+
+	["dtbpte"]     = 24,
+	["dtbtag"]     = 25,
+	["dtbindex"]   = 26,
+	["dtbctrl"]    = 27,
+	["dcachectrl"] = 28,
+	["dtbaddr"]    = 29,
 }
 
 function isa.relocate(sections)
@@ -1156,6 +1168,18 @@ addFormat(
 
 addFormat(
 	{},
+	"00110000000000000000000000110001", -- mb
+	"mb"
+)
+
+addFormat(
+	{},
+	"00100000000000000000000000110001", -- wmb
+	"wmb"
+)
+
+addFormat(
+	{},
 	"00010000000000000000000000110001", -- brk
 	"brk" 
 )
@@ -1168,13 +1192,13 @@ addFormat(
 
 addFormat(
 	{},
-	"111100000000ssss00000ddddd101001", -- mfcr rd, cs
+	"11110000000sssss00000ddddd101001", -- mfcr rd, cs
 	"mfcr ^rd ^cs"
 )
 
 addFormat(
 	{},
-	"111000000000ssssaaaaa00000101001", -- mtcr cs, ra
+	"11100000000sssssaaaaa00000101001", -- mtcr cs, ra
 	"mtcr ^cs ^ra"
 )
 
@@ -1188,36 +1212,6 @@ addFormat(
 	{},
 	"10110000000000000000000000101001", -- rfe
 	"rfe"
-)
-
-addFormat(
-	{},
-	"1000iiiiiiiiiiiiiiiiiiiiii101001", -- cachei i
-	"cachei ^ni"
-)
-
-addFormat(
-	{},
-	"0011000000000000aaaaaddddd101001", -- tbld
-	"tbld ^rd ^ra"
-)
-
-addFormat(
-	{},
-	"00100000000000000000000000101001", -- tbrd
-	"tbrd"
-)
-
-addFormat(
-	{},
-	"00010000000000000000000000101001", -- tbfn
-	"tbfn"
-)
-
-addFormat(
-	{},
-	"00000000000000000000000000101001", -- tbwr
-	"tbwr"
 )
 
 -- more pseudoinstructions

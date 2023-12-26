@@ -521,8 +521,8 @@ addFormat(
 			relative=true
 		}
 	},
-	"jjjjjjjjjjjjjjjjjjjjjaaaaa011101", -- bge ra, j
-	"bge ^ra ^nj"
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa011101", -- ble ra, j
+	"ble ^ra ^nj"
 )
 addFormat(
 	{
@@ -532,8 +532,8 @@ addFormat(
 			relative=true
 		}
 	},
-	"jjjjjjjjjjjjjjjjjjjjjaaaaa010101", -- ble ra, j
-	"ble ^ra ^nj"
+	"jjjjjjjjjjjjjjjjjjjjjaaaaa010101", -- bge ra, j
+	"bge ^ra ^nj"
 )
 addFormat(
 	{

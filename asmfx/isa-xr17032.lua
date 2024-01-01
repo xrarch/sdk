@@ -50,6 +50,7 @@ isa.registers = {
 
 isa.controlregisters = {
 	["rs"]         = 0,
+	["whami"]      = 1,
 	["eb"]         = 5,
 	["epc"]        = 6,
 	["ebadaddr"]   = 7,

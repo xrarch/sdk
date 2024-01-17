@@ -1093,6 +1093,9 @@ gen.determineTypeFunctions = {
 
 		return gen.evaluateType(type.funcdef.returntype)
 	end,
+	["inverse"] = function (expr)
+		return defnumtype
+	end,
 
 	["*"] = gen.determineTypeArith,
 	["/"] = gen.determineTypeArith,

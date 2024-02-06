@@ -1096,6 +1096,9 @@ gen.determineTypeFunctions = {
 	["inverse"] = function (expr)
 		return defnumtype
 	end,
+	["~"] = function (expr)
+		return defnumtype
+	end,
 
 	["*"] = gen.determineTypeArith,
 	["/"] = gen.determineTypeArith,

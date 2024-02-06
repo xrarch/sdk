@@ -841,7 +841,7 @@ function asm.labels(isa, sections, lines, sectionsbyid)
 				if not l then
 					labels[label] = label_t(label, 0, "extern", nil)
 				end
-			elseif t1 == ".dl" then
+			elseif (t1 == ".dl") or (t1 == ".dp") then
 				-- put a long
 
 				if not currentsection then
@@ -1092,7 +1092,7 @@ function asm.instr(isa, sections, lines, sectionsbyid)
 				end
 			elseif t1 == ".struct" then
 				instruct = true
-			elseif t1 == ".dl" then
+			elseif (t1 == ".dl") or (t1 == ".dp") then
 				-- put a long
 
 				local whatlong = line.tokens[2]

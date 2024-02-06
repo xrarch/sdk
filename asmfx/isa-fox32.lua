@@ -740,7 +740,7 @@ function addFoxFormats(instr)
 
 					local srcoffset = ""
 
-					if hasoff then
+					if v3[4] then
 						srcoffset = repeatbit("o", 8)
 					end
 

@@ -849,6 +849,10 @@ function addFoxFormats(instr)
 
 						opinfo.TT = sbittage
 
+						if v3[4] then
+							opinfo.TT = opinfo.TT + 8
+						end
+
 						addFormat(
 							opinfo,
 							destoffset..repeatbit("d", dbittage)..srcoffset..repeatbit("s", sbittage)..makeFoxOpcode(opcode, v2, 0, did, sid, v3[4] or v4[4]),

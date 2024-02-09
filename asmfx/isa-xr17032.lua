@@ -1068,12 +1068,20 @@ addFormat(
 )
 
 addFormat(
-	{},
+	{
+		["o"] = {
+			signmask=0xFFFFFFF0,
+		},
+	},
 	"iiiiiiiiiiiiiiiioooooaaaaa011010", -- mov byte [ra + i], o
 	"mov byte [^ra + ^ni] ^no"
 )
 addFormat(
-	{},
+	{
+		["o"] = {
+			signmask=0xFFFFFFF0,
+		},
+	},
 	"0000000000000000oooooaaaaa011010", -- mov byte [ra + 0], o
 	"mov byte [^ra] ^no"
 )
@@ -1083,13 +1091,20 @@ addFormat(
 		["i"] = {
 			mask=0x1,
 			shift=1
-		}
+		},
+		["o"] = {
+			signmask=0xFFFFFFF0,
+		},
 	},
 	"iiiiiiiiiiiiiiiioooooaaaaa010010", -- mov int [ra + i], o
 	"mov int [^ra + ^ni] ^no"
 )
 addFormat(
-	{},
+	{
+		["o"] = {
+			signmask=0xFFFFFFF0,
+		},
+	},
 	"0000000000000000oooooaaaaa010010", -- mov int [ra + 0], o
 	"mov int [^ra] ^no"
 )
@@ -1099,13 +1114,20 @@ addFormat(
 		["i"] = {
 			mask=0x3,
 			shift=2
-		}
+		},
+		["o"] = {
+			signmask=0xFFFFFFF0,
+		},
 	},
 	"iiiiiiiiiiiiiiiioooooaaaaa001010", -- mov long [ra + i], o
 	"mov long [^ra + ^ni] ^no"
 )
 addFormat(
-	{},
+	{
+		["o"] = {
+			signmask=0xFFFFFFF0,
+		},
+	},
 	"0000000000000000oooooaaaaa001010", -- mov long [ra + 0], o
 	"mov long [^ra] ^no"
 )
@@ -1315,7 +1337,10 @@ addFormat(
 		["b"] = {
 			repeatbits=1,
 			repeatbitsby=5,
-		}
+		},
+		["s"] = {
+			signmask=0xFFFFFFF0,
+		},
 	},
 	"iiiiiiiiiiiiiiiisssssbbbbb011010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov byte [rb + i], ns
 	"mov byte [^ni] ^ns tmp=^rb"
@@ -1330,7 +1355,10 @@ addFormat(
 		["b"] = {
 			repeatbits=1,
 			repeatbitsby=5,
-		}
+		},
+		["s"] = {
+			signmask=0xFFFFFFF0,
+		},
 	},
 	"0iiiiiiiiiiiiiiisssssbbbbb010010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov int [rb + i], ns
 	"mov int [^ni] ^ns tmp=^rb"
@@ -1345,7 +1373,10 @@ addFormat(
 		["b"] = {
 			repeatbits=1,
 			repeatbitsby=5,
-		}
+		},
+		["s"] = {
+			signmask=0xFFFFFFF0,
+		},
 	},
 	"00iiiiiiiiiiiiiisssssbbbbb001010iiiiiiiiiiiiiiii00000bbbbb000100", -- lui rb, zero, i; mov int [rb + i], ns
 	"mov long [^ni] ^ns tmp=^rb"

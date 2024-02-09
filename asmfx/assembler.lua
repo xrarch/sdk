@@ -281,11 +281,26 @@ local function match(isa, format, formattok, linetok)
 						return false
 					end
 
-					local max = operandinfo.max or math.huge
+					local signmask = operandinfo.signmask or 0
 
-					if operandvalue > max then
-						print(operandinfo.bits)
+					local signmasked = band(operandvalue, signmask)
+
+					if signmasked < 0 then
+						signmasked = signmasked + 0xFFFFFFFF + 1
+					end
+
+					if signmasked ~= signmask and
+						signmasked ~= 0 then
+
 						return false
+					end
+
+					if not operandinfo.signmask then
+						local max = operandinfo.max or math.huge
+
+						if operandvalue > max then
+							return false
+						end
 					end
 				end
 			end

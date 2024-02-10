@@ -69,6 +69,7 @@ local XLOFFSYMTYPE_GLOBAL  = 1
 local XLOFFSYMTYPE_LOCAL   = 2
 local XLOFFSYMTYPE_EXTERN  = 3
 local XLOFFSYMTYPE_SPECIAL = 4
+local XLOFFSYMTYPE_EXPORT  = 6
 
 local XLOFFSECTIONFLAG_BSS   = 1
 local XLOFFSECTIONFLAG_DEBUG = 2
@@ -82,6 +83,7 @@ local symbolnames = {
 	["local"]   = XLOFFSYMTYPE_LOCAL,
 	["extern"]  = XLOFFSYMTYPE_EXTERN,
 	["special"] = XLOFFSYMTYPE_SPECIAL,
+	["export"]  = XLOFFSYMTYPE_EXPORT,
 }
 
 function format.encode(sections, symbols, isa, sectionsbyid)

@@ -188,7 +188,7 @@ end
 local XLOFFFLAG_ALIGN4K  = 1
 local XLOFFFLAG_FRAGMENT = 2
 local XLOFFFLAG_ISTRIP   = 4  -- can't be internally relocated
-local XLOFFFLAG_GSTRIP   = 8  -- can't be dynamically linked against
+local XLOFFFLAG_GSTRIP   = 8  -- can't be statically linked against
 local XLOFFFLAG_FSTRIP   = 16 -- can't be fixed up
 
 local XLOFFSYMTYPE_GLOBAL  = 1
@@ -196,6 +196,7 @@ local XLOFFSYMTYPE_LOCAL   = 2
 local XLOFFSYMTYPE_EXTERN  = 3
 local XLOFFSYMTYPE_SPECIAL = 4
 local XLOFFSYMTYPE_DEXTERN = 5
+local XLOFFSYMTYPE_EXPORT  = 6
 
 local XLOFFSECTIONFLAG_BSS   = 1
 local XLOFFSECTIONFLAG_DEBUG = 2
@@ -210,6 +211,7 @@ local symbolnames = {
 	["extern"]  = XLOFFSYMTYPE_EXTERN,
 	["special"] = XLOFFSYMTYPE_SPECIAL,
 	["dextern"] = XLOFFSYMTYPE_DEXTERN,
+	["export"]  = XLOFFSYMTYPE_EXPORT,
 }
 
 xloff.symtypenames = {}
@@ -217,7 +219,8 @@ xloff.symtypenames[XLOFFSYMTYPE_GLOBAL]  = "global"
 xloff.symtypenames[XLOFFSYMTYPE_LOCAL]   = "local"
 xloff.symtypenames[XLOFFSYMTYPE_EXTERN]  = "extern"
 xloff.symtypenames[XLOFFSYMTYPE_SPECIAL] = "special"
-xloff.symtypenames[XLOFFSYMTYPE_DEXTERN]  = "dextern"
+xloff.symtypenames[XLOFFSYMTYPE_DEXTERN] = "dextern"
+xloff.symtypenames[XLOFFSYMTYPE_EXPORT]  = "export"
 
 xloff.sectionflagnames = {}
 
@@ -230,12 +233,6 @@ xloff.sectionflagnames[4] = "READONLY"
 local XLOFFSPECIALVALUE_START = 1
 local XLOFFSPECIALVALUE_SIZE  = 2
 local XLOFFSPECIALVALUE_END   = 3
-
-local XLOFFFLAG_ALIGN4K  = 1
-local XLOFFFLAG_FRAGMENT = 2
-local XLOFFFLAG_ISTRIP   = 4  -- can't be internally relocated
-local XLOFFFLAG_GSTRIP   = 8  -- can't be dynamically linked against
-local XLOFFFLAG_FSTRIP   = 16 -- can't be fixed up
 
 xloff.flagnames = {}
 
@@ -735,7 +732,7 @@ function xloff.new(filename)
 			local sym = img.symbolsbyid[i]
 
 			if (sym.type ~= XLOFFSYMTYPE_LOCAL) or (not self.lstrip) then
-				if (sym.type ~= XLOFFSYMTYPE_GLOBAL) or (not self.gstrip) or (sym == self.entrysymbol) then
+				if (sym.type ~= XLOFFSYMTYPE_GLOBAL) or (sym.type == XLOFFSYMTYPE_EXPORT) or (not self.gstrip) or (sym == self.entrysymbol) then
 					if ((sym.type ~= XLOFFSYMTYPE_EXTERN) and (sym.type ~= XLOFFSYMTYPE_DEXTERN)) or (not self.fstrip) then
 						if not addSymbol(img.symbolsbyid[i]) then return false end
 					end
@@ -1173,7 +1170,7 @@ function xloff.new(filename)
 			if sym.type == XLOFFSYMTYPE_EXTERN then
 				local lookup = withimg.symbolsbyname[sym.name]
 
-				if lookup and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
+				if lookup and ((lookup.type == XLOFFSYMTYPE_GLOBAL) or (lookup.type == XLOFFSYMTYPE_EXPORT)) then
 					sym.type = XLOFFSYMTYPE_DEXTERN
 					sym.import = import
 					sym.value = lookup.value + lookup.section.vaddr
@@ -1253,21 +1250,22 @@ function xloff.new(filename)
 				end
 
 				if lookup then
-					if (sym.type == XLOFFSYMTYPE_GLOBAL) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
+					if ((sym.type == XLOFFSYMTYPE_GLOBAL) or (sym.type == XLOFFSYMTYPE_EXPORT)) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
 						-- overwrite our extern symbol with their global symbol
 
 						lookup.file = sym.file
 
-						lookup.type = XLOFFSYMTYPE_GLOBAL
+						lookup.type = sym.type
 						lookup.section = sym.section.forward
 						lookup.value = sym.value + sym.section.offsetinfile
 						lookup.flags = sym.flags
 						lookup.name = sym.name
-					elseif (sym.type == XLOFFSYMTYPE_GLOBAL) and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
+					elseif (sym.type == XLOFFSYMTYPE_GLOBAL or sym.type == XLOFFSYMTYPE_EXPORT) and
+						(lookup.type == XLOFFSYMTYPE_GLOBAL or lookup.type == XLOFFSYMTYPE_EXPORT) then
 						-- collision! error
 						print(string.format("xoftool: symbol conflict: '%s' is defined in both:\n %s\n %s", sym.name, sym.file, lookup.file))
 						return false
-					elseif (sym.type == XLOFFSYMTYPE_EXTERN) and (lookup.type == XLOFFSYMTYPE_GLOBAL) then
+					elseif (sym.type == XLOFFSYMTYPE_EXTERN) and (lookup.type == XLOFFSYMTYPE_GLOBAL or lookup.type == XLOFFSYMTYPE_EXPORT) then
 						-- resolved, forward theirs to ours
 					elseif (sym.type == XLOFFSYMTYPE_EXTERN) and (lookup.type == XLOFFSYMTYPE_EXTERN) then
 						-- resolved, forward theirs to ours

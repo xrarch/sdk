@@ -827,7 +827,7 @@ function asm.labels(isa, sections, lines, sectionsbyid)
 				end
 
 				l.type = "global"
-			elseif t1 == ".weak" then
+			elseif t1 == ".export" then
 				local label = line.tokens[2]
 
 				if not label then
@@ -842,7 +842,7 @@ function asm.labels(isa, sections, lines, sectionsbyid)
 					return false
 				end
 
-				l.type = "weak"
+				l.type = "export"
 			elseif t1 == ".extern" then
 				local label = line.tokens[2]
 

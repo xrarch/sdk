@@ -62,7 +62,7 @@ for i = 1, #narg/2 do
 end
 
 local lua = sd.."lua.sh "
-local jackalc = sd.."../newsdk/build/jkl "..target.." "..incdir.." "..libdir.." "..preprocargs
+local jackalc = sd.."../newsdk/bin/jkl.exe "..target.." "..incdir.." "..libdir.." "..preprocargs
 local asm = sd.."asmfx/asmfx.lua "..format.." "..target.." "
 
 if flat then
